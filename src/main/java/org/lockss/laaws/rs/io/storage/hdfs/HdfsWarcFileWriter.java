@@ -54,25 +54,6 @@ import java.nio.charset.Charset;
 public class HdfsWarcFileWriter extends AbstractDataStreamWriter implements DataStoreWriter<WARCRecordInfo>, WARCConstants {
     private final static Log log = LogFactory.getLog(HdfsWarcFileWriter.class);
 
-    // These constants should be moved elsewhere
-    private static final String SCHEME = "urn:uuid";
-    private static final String SCHEME_COLON = SCHEME + ":";
-    private static final byte CR = 13;
-    private static final byte LF = 10;
-    private static final byte COLON = 58;
-    private static final byte SP = 32;
-    private static final Charset UTF8 = Charset.forName("UTF-8");
-
-    private static final String CRLF = "\r\n";
-    private static byte[] CRLF_BYTES;
-    static {
-        try {
-            CRLF_BYTES = CRLF.getBytes(DEFAULT_ENCODING);
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-    }
-
     private StreamsHolder<OutputStream> streamsHolder;
 
     public HdfsWarcFileWriter(Configuration configuration, Path basePath, CodecInfo codec) {
