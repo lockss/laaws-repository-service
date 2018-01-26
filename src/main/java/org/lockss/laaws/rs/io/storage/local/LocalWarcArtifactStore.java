@@ -28,14 +28,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.io.storage;
+package org.lockss.laaws.rs.io.storage.local;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpException;
 import org.archive.format.warc.WARCConstants;
 import org.archive.io.ArchiveRecord;
 import org.archive.io.ArchiveRecordHeader;
 import org.archive.io.warc.WARCReaderFactory;
+import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
 import org.lockss.laaws.rs.util.ArtifactFactory;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.model.ArtifactIndexData;
@@ -48,20 +50,20 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 
-public class LocalWARCArtifactStore extends WARCArtifactStore {
-    private static final Log log = LogFactory.getLog(LocalWARCArtifactStore.class);
+public class LocalWarcArtifactStore extends WarcArtifactStore {
+    private static final Log log = LogFactory.getLog(LocalWarcArtifactStore.class);
     private static final String WARC_FILE_SUFFIX = ".warc";
 
-    //@Autowired
     private ArtifactIndex index;
+    private File baseDir;
 
-    public LocalWARCArtifactStore(ArtifactIndex index, File baseDir) {
+    public LocalWarcArtifactStore(ArtifactIndex index, File baseDir) {
         log.info(String.format("Loading all WARCs under %s", baseDir.getAbsolutePath()));
 
-        // Set the index to the one provided via the constructor args rather than via an @Autowired
         this.index = index;
+        this.baseDir = baseDir;
 
-        // Get a list of WARCs and rebuild the index
+        // Rebuild the index
         if (baseDir.exists() && baseDir.isDirectory()) {
             Collection<File> warcs = scanDirectories(baseDir);
             warcs.stream().forEach(this::addWARC);
@@ -111,22 +113,8 @@ public class LocalWARCArtifactStore extends WARCArtifactStore {
                             headers.getVersion()
                     ));
 
-                    // Add the Artifact to the index
-                    if (index == null) {
-                        throw new RuntimeException("No artifact index");
-                    } else {
-                        ArtifactIdentifier id = artifact.getIdentifier();
-                        log.info(String.format(
-                                "Indexing artifact (%s, %s, %s, %s)",
-                                id.getCollection(),
-                                id.getAuid(),
-                                id.getUri(),
-                                id.getVersion()
-                        ));
-
-                        ArtifactIndexData data = index.indexArtifact(artifact);
-                        index.commitArtifact(data.getId());
-                    }
+                    // Add the artifact
+                    addArtifact(artifact);
                 }
             }
         } catch (IOException e) {
@@ -136,12 +124,47 @@ public class LocalWARCArtifactStore extends WARCArtifactStore {
 
     @Override
     public ArtifactIdentifier addArtifact(Artifact artifact) throws IOException {
-        // Create a directory for this collection if one doesn't exist
-        // Open the WARC file for this AU
-        // Write artifact to WARC
-        // Index artifact
+        if (index == null) {
+            // YES: Cannot proceed without an artifact index - throw RuntimeException
+            throw new RuntimeException("No artifact index");
+        } else {
+            // NO: Add the Artifact to the index
+            ArtifactIdentifier id = artifact.getIdentifier();
+            log.info(String.format(
+                    "Indexing artifact (%s, %s, %s, %s)",
+                    id.getCollection(),
+                    id.getAuid(),
+                    id.getUri(),
+                    id.getVersion()
+            ));
+
+            //// Add the artifact to the storage
+
+            // Create a directory for this collection if one doesn't exist
+            if (baseDir.exists()) {
+                if (!baseDir.isDirectory()) {
+                    throw new RuntimeException("Base directory path must point to a directory");
+                }
+
+                baseDir.mkdir();
+            }
+
+            // Open the WARC file for this AU
+
+            // Write artifact to WARC
+            try {
+                this.writeArtifact(artifact, null);
+            } catch (HttpException e) {
+
+            }
+
+            // Add the artifact to the index
+            ArtifactIndexData data = index.indexArtifact(artifact);
+            index.commitArtifact(data.getId());
+        }
+
         // Return a pointer to the artifact
-        return null;
+        return artifact.getIdentifier();
     }
 
     @Override
