@@ -28,13 +28,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.io.storage.hdfs;
+package org.lockss.laaws.rs.io.index.solr;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.junit4.SpringRunner;
 
-public class WARCHDFSRepositoryTest {
+/**
+ * Test of the ArtifactoryRepository Spring Data for Solr repository interface
+ *
+ * TODO: Need to figure out how to mock Spring Data repositories
+ */
+@RunWith(SpringRunner.class)
+public class TestSolrArtifactIndexDataRepository {
+    /*
+    @MockBean
+    private WARCArtifactIndexRepository repository;
+    */
+
     @Before
     public void setUp() throws Exception {
     }
@@ -44,15 +58,15 @@ public class WARCHDFSRepositoryTest {
     }
 
     @Test
-    public void closeWriters() throws Exception {
+    public void findById() throws Exception {
     }
 
     @Test
-    public void writeWARCRecord() throws Exception {
+    public void findByAuid() throws Exception {
     }
 
     @Test
-    public void writeUncommittedWARCRecord() throws Exception {
+    public void findAllByAspectEqualsAndAspectAndAuidAndCommitted() throws Exception {
     }
 
 }

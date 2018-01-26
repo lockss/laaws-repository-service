@@ -32,33 +32,34 @@ package org.lockss.laaws.rs.io.storage.hdfs;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.archive.io.ArchiveRecord;
-import org.archive.io.warc.WARCRecord;
+import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
+import org.lockss.laaws.rs.model.Artifact;
+import org.lockss.laaws.rs.model.ArtifactIdentifier;
+import org.lockss.laaws.rs.model.ArtifactIndexData;
 
-import java.io.IOException;
+import java.io.*;
 
-public class WARCFileReader {
-    private final static Log log = LogFactory.getLog(WARCFileReader.class);
+public class HdfsWarcArtifactStore extends WarcArtifactStore {
+    private final static Log log = LogFactory.getLog(HdfsWarcArtifactStore.class);
 
-    private FSDataInputStream is;
-
-    public WARCFileReader(final Path path) throws IOException {
-        // TODO: Get HDFS configuration using Spring infrastructure
-        FileSystem fs = FileSystem.get(new Configuration());
-
-        // Get InputStream from HDFS
-        this.is = fs.open(path);
+    @Override
+    public ArtifactIdentifier addArtifact(Artifact artifact) throws IOException {
+        return null;
     }
 
-    public ArchiveRecord getArchiveRecord(long offset) throws IOException {
-        // Seek to beginning of record
-        is.seek(offset);
+    @Override
+    public Artifact getArtifact(ArtifactIndexData indexData) throws IOException {
+        return null;
+    }
 
-        // Return WARC record as an ArchiveRecord
-        return new WARCRecord(is, "WARCFileReader", 0);
+    @Override
+    public void updateArtifact(ArtifactIndexData indexData, Artifact artifact) {
+
+    }
+
+    @Override
+    public void deleteArtifact(ArtifactIndexData indexData) {
+
     }
 }
+

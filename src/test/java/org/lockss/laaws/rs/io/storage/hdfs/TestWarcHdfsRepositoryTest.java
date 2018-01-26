@@ -30,16 +30,29 @@
 
 package org.lockss.laaws.rs.io.storage.hdfs;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
-/**
- * Test for WARCFileReader
- *
- * TODO: Placeholder. Need to figure out how to mock HDFS.
- */
-public class WARCFileReaderTest {
+public class TestWarcHdfsRepositoryTest {
+    @Before
+    public void setUp() throws Exception {
+    }
+
+    @After
+    public void tearDown() throws Exception {
+    }
+
     @Test
-    public void getArchiveRecord() throws Exception {
+    public void closeWriters() throws Exception {
+    }
+
+    @Test
+    public void writeWARCRecord() throws Exception {
+    }
+
+    @Test
+    public void writeUncommittedWARCRecord() throws Exception {
     }
 
 }

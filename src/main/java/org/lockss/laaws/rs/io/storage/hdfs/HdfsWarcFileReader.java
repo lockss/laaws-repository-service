@@ -30,41 +30,35 @@
 
 package org.lockss.laaws.rs.io.storage.hdfs;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.junit.Test;
-import org.springframework.data.hadoop.store.strategy.naming.FileNamingStrategy;
-import org.springframework.data.hadoop.store.strategy.naming.UuidFileNamingStrategy;
+import org.archive.io.ArchiveRecord;
+import org.archive.io.warc.WARCRecord;
 
-import static org.junit.Assert.*;
+import java.io.IOException;
 
-/**
- * Test for RollingUuidFileNamingStrategy
- */
-public class RollingUuidFileNamingStrategyTest {
-    private FileNamingStrategy namingStrategy = new RollingUuidFileNamingStrategy();
+public class HdfsWarcFileReader {
+    private final static Log log = LogFactory.getLog(HdfsWarcFileReader.class);
 
-    @Test
-    public void nextResolvePath() throws Exception {
-        // Resolve a path
-        Path path = namingStrategy.resolve(null);
+    private FSDataInputStream is;
 
-        // Iterate to the next name in the strategy
-        namingStrategy.next();
+    public HdfsWarcFileReader(final Path path) throws IOException {
+        // TODO: Get HDFS configuration using Spring infrastructure
+        FileSystem fs = FileSystem.get(new Configuration());
 
-        // Check that the naming strategy resolves to something different
-        assertNotEquals(path, namingStrategy.resolve(null));
+        // Get InputStream from HDFS
+        this.is = fs.open(path);
     }
 
-    @Test
-    public void nextUuid() throws Exception {
-        // Get the current UUID
-        String uuid = ((UuidFileNamingStrategy)namingStrategy).getUuid();
+    public ArchiveRecord getArchiveRecord(long offset) throws IOException {
+        // Seek to beginning of record
+        is.seek(offset);
 
-        // Set strategy to the next UUID
-        namingStrategy.next();
-
-        // Assert the UUIDs are not equal
-        assertNotEquals(uuid, ((UuidFileNamingStrategy)namingStrategy).getUuid());
+        // Return WARC record as an ArchiveRecord
+        return new WARCRecord(is, "HdfsWarcFileReader", 0);
     }
-
 }

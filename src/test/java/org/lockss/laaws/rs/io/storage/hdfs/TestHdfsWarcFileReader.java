@@ -28,45 +28,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.io.index.solr;
+package org.lockss.laaws.rs.io.storage.hdfs;
 
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.junit4.SpringRunner;
 
 /**
- * Test of the ArtifactoryRepository Spring Data for Solr repository interface
+ * Test for HdfsWarcFileReader
  *
- * TODO: Need to figure out how to mock Spring Data repositories
+ * TODO: Placeholder. Need to figure out how to mock HDFS.
  */
-@RunWith(SpringRunner.class)
-public class SolrArtifactIndexDataRepositoryTest {
-    /*
-    @MockBean
-    private WARCArtifactIndexRepository repository;
-    */
-
-    @Before
-    public void setUp() throws Exception {
-    }
-
-    @After
-    public void tearDown() throws Exception {
-    }
-
+public class TestHdfsWarcFileReader {
     @Test
-    public void findById() throws Exception {
-    }
-
-    @Test
-    public void findByAuid() throws Exception {
-    }
-
-    @Test
-    public void findAllByAspectEqualsAndAspectAndAuidAndCommitted() throws Exception {
+    public void getArchiveRecord() throws Exception {
     }
 
 }

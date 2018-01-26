@@ -32,13 +32,11 @@ package org.lockss.laaws.rs.configuration;
 
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactStore;
-import org.lockss.laaws.rs.io.storage.LocalWARCArtifactStore;
-import org.lockss.laaws.rs.io.storage.mock.VolatileWARCArtifactStore;
+import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactStore;
+import org.lockss.laaws.rs.io.storage.mock.VolatileWarcArtifactStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.io.File;
 
 @Configuration
 public class ArtifactStoreConfig {
@@ -48,9 +46,9 @@ public class ArtifactStoreConfig {
     @Bean
     public ArtifactStore setArtifactStore() {
         // Default volatile (memory-only) artifact store
-        return new VolatileWARCArtifactStore();
+        return new VolatileWarcArtifactStore();
 
         // WIP: Local filesystem-based artifact store
-        //return new LocalWARCArtifactStore(index, new File("."));
+        //return new LocalWarcArtifactStore(index, new File("."));
     }
 }

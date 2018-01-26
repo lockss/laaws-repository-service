@@ -31,18 +31,15 @@
 package org.lockss.laaws.rs.io.storage.hdfs;
 
 // Dependencies on webarchive-commons
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
 import org.archive.format.warc.WARCConstants;
 import org.archive.io.warc.WARCRecordInfo;
-import org.archive.util.ArchiveUtils;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Syncable;
-import org.archive.util.anvl.Element;
+import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
 import org.springframework.data.hadoop.store.DataStoreWriter;
 import org.springframework.data.hadoop.store.codec.CodecInfo;
 import org.springframework.data.hadoop.store.event.FileWrittenEvent;
@@ -52,14 +49,10 @@ import org.springframework.data.hadoop.store.support.OutputContext;
 import org.springframework.data.hadoop.store.support.StreamsHolder;
 
 import java.io.*;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.Iterator;
-import java.util.UUID;
 
-public class WARCFileWriter extends AbstractDataStreamWriter implements DataStoreWriter<WARCRecordInfo>, WARCConstants {
-    private final static Log log = LogFactory.getLog(WARCFileWriter.class);
+public class HdfsWarcFileWriter extends AbstractDataStreamWriter implements DataStoreWriter<WARCRecordInfo>, WARCConstants {
+    private final static Log log = LogFactory.getLog(HdfsWarcFileWriter.class);
 
     // These constants should be moved elsewhere
     private static final String SCHEME = "urn:uuid";
@@ -82,7 +75,7 @@ public class WARCFileWriter extends AbstractDataStreamWriter implements DataStor
 
     private StreamsHolder<OutputStream> streamsHolder;
 
-    public WARCFileWriter(Configuration configuration, Path basePath, CodecInfo codec) {
+    public HdfsWarcFileWriter(Configuration configuration, Path basePath, CodecInfo codec) {
         super(configuration, basePath, codec);
     }
 
@@ -171,61 +164,19 @@ public class WARCFileWriter extends AbstractDataStreamWriter implements DataStor
                 HttpHeaders headers = createWARCInfoRecord();
                 writeRecord(streamsHolder.getStream(), headers, "PLACEHOLDER".getBytes());
                 */
-                write(createWARCInfoRecord(), streamsHolder.getStream());
+                WarcArtifactStore.writeWarcRecord(
+                        WarcArtifactStore.createWARCInfoRecord(null),
+                        streamsHolder.getStream()
+                );
             }
         }
 
         return streamsHolder;
     }
 
-    // From webarchive-commons
-    public WARCRecordInfo createWARCInfoRecord() throws IOException {
-        WARCRecordInfo record = new WARCRecordInfo();
-        record.setType(WARCRecordType.warcinfo);
-        record.setCreate14DigitDate(ArchiveUtils.get14DigitDate());
-        record.setMimetype("application/warc-fields");
-        record.addExtraHeader(HEADER_KEY_FILENAME, streamsHolder.getPath().getName());
-        record.setRecordId(generateRecordId());
-
-        byte[] contents = null;
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        baos.write("Not implemented".getBytes(UTF8));
-        contents = baos.toByteArray();
-        record.setContentStream(new ByteArrayInputStream(contents));
-        record.setContentLength((long)contents.length);
-
-        /*
-        HttpHeaders headers = new HttpHeaders();
-        headers.add(HEADER_KEY_TYPE, WARCRecordType.warcinfo.name());
-        headers.add(HEADER_KEY_DATE, DateUtils.getLog14Date());
-        headers.add(HEADER_KEY_ID, makeRecordId());
-        headers.add(HEADER_KEY_FILENAME, streamsHolder.getPath().getName());
-        headers.add(CONTENT_TYPE, WARC_FIELDS_TYPE);
-        */
-
-        return record;
-    }
-
-    private static URI generateRecordId() {
-        URI uri;
-
-        try {
-            uri = new URI(SCHEME_COLON + UUID.randomUUID().toString());
-        } catch (URISyntaxException e) {
-            // This should never happen
-            throw new RuntimeException(e);
-        }
-
-        return uri;
-    }
-
-    // From webarchive-commons
-    private static String makeRecordId() {
-        StringBuilder id = new StringBuilder();
-        id.append("<").append(SCHEME_COLON);
-        id.append(UUID.randomUUID().toString());
-        id.append(">");
-        return id.toString();
+    // Experimental: Exposed for use in calculating
+    public long getPosition() throws IOException {
+        return getPosition(getOutput());
     }
 
     @Override
@@ -240,7 +191,7 @@ public class WARCFileWriter extends AbstractDataStreamWriter implements DataStor
         OutputStream out = streamsHolder.getStream();
 
         // Write the WARC record
-        write(record, out);
+        WarcArtifactStore.writeWarcRecord(record, out);
 
         // Update the writer's position with the position of the output stream
         setWritePosition(getPosition(streamsHolder));
@@ -258,127 +209,62 @@ public class WARCFileWriter extends AbstractDataStreamWriter implements DataStor
     }
 
 
-    /*
-    // From webarchive-commons with some modifications
-    private void writeRecord(OutputStream out, HttpHeaders headers, byte[] contents) throws IOException {
-        // Add Content-Length header
-        if (contents == null) {
-            headers.add(CONTENT_LENGTH, "0");
-        } else {
-            headers.add(CONTENT_LENGTH, String.valueOf(contents.length));
-        }
-
-        out.write(WARC_ID.getBytes(DEFAULT_ENCODING));
-
-        out.write(CRLF_BYTES);
-
-        // Write headers bytes
-        writeRecordHeaders(out, headers);
-
-        out.write(CRLF_BYTES);
-
-        if (contents != null) {
-            out.write(contents);
-        }
-
-        // Emit the 2 trailing CRLF sequences.
-        out.write(CRLF_BYTES);
-        out.write(CRLF_BYTES);
-    }
-
-    private void writeRecordHeaders(OutputStream out, HttpHeaders headers) throws IOException {
-        Iterator i = headers.entrySet().iterator();
-
-        while (i.hasNext()) {
-           Map.Entry<String, List<String>> entry = (Map.Entry)i.next();
-           for (String v: entry.getValue()) {
-               out.write(entry.getKey().getBytes(UTF8));
-               out.write(COLON);
-               out.write(SP);
-               out.write(v.getBytes(UTF8));
-               out.write(CRLF_BYTES);
-           }
-        }
-    }
-
-
-
-    private HttpHeaders createWARCRecordHeaders(WARCRecordInfo record) {
-        // Construct WARC record headers
-        HttpHeaders headers = new HttpHeaders();
-
-        // Mandatory WARC record headers
-        headers.add(HEADER_KEY_ID, record.getRecordId().toString());
-        headers.add(HEADER_KEY_TYPE, record.getType().toString());
-        headers.add(HEADER_KEY_DATE, record.getCreate14DigitDate());
-
-        // Optional fields
-        headers.add("Content-Length", String.valueOf(record.getContentLength()));
-        headers.add(HEADER_KEY_BLOCK_DIGEST, "");
-        headers.add(HEADER_KEY_PAYLOAD_DIGEST, "");
-
-        return headers;
-    }
-    */
-
-    // Experimental: Exposed for use in calculating
-    public long getPosition() throws IOException {
-        return getPosition(getOutput());
-    }
-
-    public static void write(WARCRecordInfo record, OutputStream out) throws IOException {
-        if (record.getContentLength() == 0 &&
-                (record.getExtraHeaders() == null || record.getExtraHeaders().size() <= 0)) {
-            throw new IllegalArgumentException("Cannot write record of content-length zero and base headers only");
-        }
-
-        // Write out the header
-        out.write(createRecordHeader(record).getBytes(WARC_HEADER_ENCODING));
-
-        // Write out the header/body separator
-        out.write(CRLF_BYTES);
-
-        if (record.getContentStream() != null && record.getContentLength() > 0) {
-            //contentBytes += copyFrom(recordInfo.getContentStream(), recordInfo.getContentLength(), recordInfo.getEnforceLength());
-            IOUtils.copy(record.getContentStream(), out);
-        }
-
-        // Write out the two blank lines at end of all records.
-        out.write(CRLF_BYTES);
-        out.write(CRLF_BYTES);
-    }
-
-    protected static String createRecordHeader(WARCRecordInfo record) {
-        final StringBuilder sb = new StringBuilder(2048/*A SWAG: TODO: Do analysis.*/);
-
-        sb.append(WARC_ID).append(CRLF);
-        sb.append(HEADER_KEY_TYPE).append(COLON_SPACE).append(record.getType()).append(CRLF);
-
-        // Do not write a subject-uri if not one present.
-        if (!StringUtils.isEmpty(record.getUrl())) {
-            sb.append(HEADER_KEY_URI).append(COLON_SPACE).
-                    //append(checkHeaderValue(metaRecord.getUrl())).append(CRLF);
-            append(record.getUrl()).append(CRLF);
-        }
-
-        sb.append(HEADER_KEY_DATE).append(COLON_SPACE).append(record.getCreate14DigitDate()).append(CRLF);
-
-        if (record.getExtraHeaders() != null) {
-            for (final Iterator<Element> i = record.getExtraHeaders().iterator(); i.hasNext();) {
-                sb.append(i.next()).append(CRLF);
-            }
-        }
-
-        sb.append(HEADER_KEY_ID).append(COLON_SPACE).append('<').append(record.getRecordId().toString()).append('>').append(CRLF);
-
-        if (record.getContentLength() > 0) {
-            sb.append(CONTENT_TYPE).append(COLON_SPACE).append(
-                    //checkHeaderLineMimetypeParameter(metaRecord.getMimetype())).append(CRLF);
-                    record.getMimetype()).append(CRLF);
-        }
-
-        sb.append(CONTENT_LENGTH).append(COLON_SPACE).append(Long.toString(record.getContentLength())).append(CRLF);
-
-        return sb.toString();
-    }
+//    // From webarchive-commons with some modifications
+//    private void writeRecord(OutputStream out, HttpHeaders headers, byte[] contents) throws IOException {
+//        // Add Content-Length header
+//        if (contents == null) {
+//            headers.add(CONTENT_LENGTH, "0");
+//        } else {
+//            headers.add(CONTENT_LENGTH, String.valueOf(contents.length));
+//        }
+//
+//        out.write(WARC_ID.getBytes(DEFAULT_ENCODING));
+//
+//        out.write(CRLF_BYTES);
+//
+//        // Write headers bytes
+//        writeRecordHeaders(out, headers);
+//
+//        out.write(CRLF_BYTES);
+//
+//        if (contents != null) {
+//            out.write(contents);
+//        }
+//
+//        // Emit the 2 trailing CRLF sequences.
+//        out.write(CRLF_BYTES);
+//        out.write(CRLF_BYTES);
+//    }
+//
+//    private void writeRecordHeaders(OutputStream out, HttpHeaders headers) throws IOException {
+//        Iterator i = headers.entrySet().iterator();
+//
+//        while (i.hasNext()) {
+//           Map.Entry<String, List<String>> entry = (Map.Entry)i.next();
+//           for (String v: entry.getValue()) {
+//               out.write(entry.getKey().getBytes(UTF8));
+//               out.write(COLON);
+//               out.write(SP);
+//               out.write(v.getBytes(UTF8));
+//               out.write(CRLF_BYTES);
+//           }
+//        }
+//    }
+//
+//    private HttpHeaders createWARCRecordHeaders(WARCRecordInfo record) {
+//        // Construct WARC record headers
+//        HttpHeaders headers = new HttpHeaders();
+//
+//        // Mandatory WARC record headers
+//        headers.add(HEADER_KEY_ID, record.getRecordId().toString());
+//        headers.add(HEADER_KEY_TYPE, record.getType().toString());
+//        headers.add(HEADER_KEY_DATE, record.getCreate14DigitDate());
+//
+//        // Optional fields
+//        headers.add("Content-Length", String.valueOf(record.getContentLength()));
+//        headers.add(HEADER_KEY_BLOCK_DIGEST, "");
+//        headers.add(HEADER_KEY_PAYLOAD_DIGEST, "");
+//
+//        return headers;
+//    }
 }

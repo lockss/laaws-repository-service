@@ -35,11 +35,11 @@ import org.junit.Before;
 import org.junit.Test;
 
 /**
- * Test for WARCFileWriter
+ * Test for HdfsWarcFileWriter
  *
  * TODO: Placeholder. Need to figure out how to mock HDFS.
  */
-public class WARCFileWriterTest {
+public class TestHdfsAbstractWarcFileWriter {
     @Before
     public void setUp() throws Exception {
     }

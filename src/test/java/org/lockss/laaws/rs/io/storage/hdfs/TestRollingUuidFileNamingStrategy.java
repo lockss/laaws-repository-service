@@ -30,39 +30,41 @@
 
 package org.lockss.laaws.rs.io.storage.hdfs;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.lockss.laaws.rs.io.storage.WARCArtifactStore;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.ArtifactIndexData;
+import org.apache.hadoop.fs.Path;
+import org.junit.Test;
+import org.springframework.data.hadoop.store.strategy.naming.FileNamingStrategy;
+import org.springframework.data.hadoop.store.strategy.naming.UuidFileNamingStrategy;
 
-import java.io.*;
+import static org.junit.Assert.*;
 
 /**
- * SolrArtifactIndexData storage that saves artifacts as WARC records
+ * Test for RollingUuidFileNamingStrategy
  */
-public class HDFSWARCArtifactStore extends WARCArtifactStore {
-    private final static Log log = LogFactory.getLog(HDFSWARCArtifactStore.class);
+public class TestRollingUuidFileNamingStrategy {
+    private FileNamingStrategy namingStrategy = new RollingUuidFileNamingStrategy();
 
-    @Override
-    public ArtifactIdentifier addArtifact(Artifact artifact) throws IOException {
-        return null;
+    @Test
+    public void nextResolvePath() throws Exception {
+        // Resolve a path
+        Path path = namingStrategy.resolve(null);
+
+        // Iterate to the next name in the strategy
+        namingStrategy.next();
+
+        // Check that the naming strategy resolves to something different
+        assertNotEquals(path, namingStrategy.resolve(null));
     }
 
-    @Override
-    public Artifact getArtifact(ArtifactIndexData indexData) throws IOException {
-        return null;
+    @Test
+    public void nextUuid() throws Exception {
+        // Get the current UUID
+        String uuid = ((UuidFileNamingStrategy)namingStrategy).getUuid();
+
+        // Set strategy to the next UUID
+        namingStrategy.next();
+
+        // Assert the UUIDs are not equal
+        assertNotEquals(uuid, ((UuidFileNamingStrategy)namingStrategy).getUuid());
     }
 
-    @Override
-    public void updateArtifact(ArtifactIndexData indexData, Artifact artifact) {
-
-    }
-
-    @Override
-    public void deleteArtifact(ArtifactIndexData indexData) {
-
-    }
 }
-

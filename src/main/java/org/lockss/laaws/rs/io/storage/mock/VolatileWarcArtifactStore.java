@@ -35,12 +35,10 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpException;
 import org.archive.io.warc.WARCRecord;
 import org.lockss.laaws.rs.util.ArtifactFactory;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.model.ArtifactIndexData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.io.storage.WARCArtifactStore;
+import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
 import org.lockss.laaws.rs.model.Artifact;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -48,11 +46,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
-public class VolatileWARCArtifactStore extends WARCArtifactStore {
-    private final static Log log = LogFactory.getLog(VolatileWARCArtifactStore.class);
+public class VolatileWarcArtifactStore extends WarcArtifactStore {
+    private final static Log log = LogFactory.getLog(VolatileWarcArtifactStore.class);
     private Map<String, Map<String, Map<String, byte[]>>> repository;
 
-    public VolatileWARCArtifactStore() {
+    public VolatileWarcArtifactStore() {
         this.repository = new HashMap<>();
     }
 
