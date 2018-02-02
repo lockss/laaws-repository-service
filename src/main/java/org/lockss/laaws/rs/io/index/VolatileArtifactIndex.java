@@ -32,6 +32,7 @@ package org.lockss.laaws.rs.io.index;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.lockss.laaws.rs.io.storage.local.WarcRepositoryArtifactMetadata;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactIndexData;
@@ -48,21 +49,22 @@ public class VolatileArtifactIndex implements ArtifactIndex {
 
     @Override
     public ArtifactIndexData indexArtifact(Artifact artifact) {
-        // New UUID for the object representing this artifact in the index (TODO: Resolve collisions)
-        UUID indexDataId = UUID.randomUUID();
-
-        ArtifactIdentifier artifactIdentifier = artifact.getIdentifier();
+        ArtifactIdentifier artifactId = artifact.getIdentifier();
+        WarcRepositoryArtifactMetadata repoMetadata = (WarcRepositoryArtifactMetadata)artifact.getRepositoryMetadata();
 
         ArtifactIndexData indexData = new ArtifactIndexData(
-                indexDataId.toString(),
-                artifactIdentifier.getCollection(),
-                artifactIdentifier.getAuid(),
-                artifactIdentifier.getUri(),
-                artifactIdentifier.getVersion(),
-                false
+                artifactId.getId(),
+                artifactId.getCollection(),
+                artifactId.getAuid(),
+                artifactId.getUri(),
+                artifactId.getVersion(),
+                false,
+                artifactId.getId(),
+                repoMetadata.getWarcFilePath().toString(),
+                repoMetadata.getWarcRecordOffset()
         );
 
-        index.put(indexDataId.toString(), indexData);
+        index.put(artifactId.getId(), indexData);
 
         return indexData;
     }

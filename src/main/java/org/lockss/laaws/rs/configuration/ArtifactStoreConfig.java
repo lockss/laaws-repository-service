@@ -38,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.File;
+
 @Configuration
 public class ArtifactStoreConfig {
     @Autowired
@@ -49,6 +51,6 @@ public class ArtifactStoreConfig {
         return new VolatileWarcArtifactStore();
 
         // WIP: Local filesystem-based artifact store
-        //return new LocalWarcArtifactStore(index, new File("."));
+//        return new LocalWarcArtifactStore(index, new File("./repo/"));
     }
 }

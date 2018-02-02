@@ -28,47 +28,50 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.io.storage.hdfs;
+package org.lockss.laaws.rs.io.storage.local;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
-import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.ArtifactMetadata;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
 
-import java.io.*;
+import java.io.File;
 
-public class HdfsWarcArtifactStore extends WarcArtifactStore {
-    private final static Log log = LogFactory.getLog(HdfsWarcArtifactStore.class);
+/**
+ * Extends the RepositoryArtifactMetadata class to additionally track an artifact's WARC record location (i.e., the pair
+ * of "WARC file path" and "offset to beginning of WARC record").
+ *
+ */
+public class WarcRepositoryArtifactMetadata extends RepositoryArtifactMetadata {
+    public static String WARCFILE_PATH_KEY = "warcFile";
+    public static String WARCFILE_OFFSET_KEY = "warcRecordOffset";
 
-    @Override
-    public Artifact addArtifact(Artifact artifact) throws IOException {
-        return null;
+//    public static String LOCKSS_METADATA_ID = "lockss-repo";
+
+//    @Override
+//    public String getMetadataId() {
+//        return this.LOCKSS_METADATA_ID;
+//    }
+
+    public WarcRepositoryArtifactMetadata(ArtifactIdentifier identifier, String warcFilePath, long offset, boolean committed, boolean deleted) {
+        super(identifier);
+        this.setWarcFilePath(warcFilePath);
+        this.setWarcRecordOffset(offset);
+        this.setCommitted(committed);
+        this.setDeleted(deleted);
     }
 
-    @Override
-    public Artifact getArtifact(ArtifactIdentifier artifactId) throws IOException {
-        return null;
+    public String getWarcFilePath() {
+        return this.getString(WARCFILE_PATH_KEY);
     }
 
-    @Override
-    public ArtifactMetadata updateArtifactMetadata(ArtifactIdentifier artifactId, ArtifactMetadata metadata) throws IOException {
-
-        return metadata;
+    public long getWarcRecordOffset() {
+        return this.getLong(WARCFILE_OFFSET_KEY);
     }
 
-    @Override
-    public RepositoryArtifactMetadata commitArtifact(ArtifactIdentifier artifactId) throws IOException {
-
-        return null;
+    public void setWarcFilePath(String warcFilePath) {
+        this.put(WARCFILE_PATH_KEY, warcFilePath);
     }
 
-    @Override
-    public RepositoryArtifactMetadata deleteArtifact(ArtifactIdentifier artifactId) throws IOException {
-
-        return null;
+    public void setWarcRecordOffset(long warcRecordOffset) {
+        this.put(WARCFILE_OFFSET_KEY, warcRecordOffset);
     }
 }
-

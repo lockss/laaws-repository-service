@@ -94,9 +94,18 @@ public class ReposApiController implements ReposApi {
         if (!artifactIndex.artifactExists(artifactid))
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
-        // Remove the artifact from the artifact store and index
-        artifactStore.deleteArtifact(artifactIndex.getArtifactIndexData(artifactid));
-        artifactIndex.deleteArtifact(artifactid);
+        try {
+            // Remove the artifact from the artifact store and index
+            artifactStore.deleteArtifact(artifactIndex.getArtifactIndexData(artifactid).getIdentifier());
+            artifactIndex.deleteArtifact(artifactid);
+        } catch (IOException e) {
+            log.error(String.format(
+                    "IOException occurred while attempting to delete artifact from repository (artifactId: %s)",
+                    artifactid
+            ));
+
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
         return new ResponseEntity<>(HttpStatus.OK);
     }
@@ -112,75 +121,97 @@ public class ReposApiController implements ReposApi {
     public ResponseEntity<StreamingResponseBody> reposArtifactsArtifactidGet(
             @ApiParam(value = "Repository to add artifact into", required = true) @PathVariable("repository") String repository,
             @ApiParam(value = "Artifact ID", required = true) @PathVariable("artifactid") String artifactId
-    ) throws IOException {
+    ) {
+        log.info(String.format("Retrieving artifact: %s from collection %s", artifactId, repository));
 
         // Make sure the artifact exists
         if (!artifactIndex.artifactExists(artifactId))
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
-        // Retrieve the Artifact from the artifact store
-        Artifact artifact = artifactStore.getArtifact(artifactIndex.getArtifactIndexData(artifactId));
+        try {
+            // Retrieve the Artifact from the artifact store
+            Artifact artifact = artifactStore.getArtifact(artifactIndex.getArtifactIndexData(artifactId).getIdentifier());
 
-        log.info(String.format("Retrieving artifact: %s from collection %s", artifactId, repository));
+            // Setup HTTP response headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
+            // TODO: headers.setContentLength();
 
-        // Setup HTTP response headers
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
-        // TODO: headers.setContentLength();
+                return new ResponseEntity<>(
+                        outputStream -> {
+                            try {
+                                ArtifactUtil.writeHttpResponse(
+                                        ArtifactUtil.getHttpResponseFromArtifact(artifact),
+                                        outputStream
+                                );
+                            } catch (HttpException e) {
+                                e.printStackTrace();
+                            }
+                        },
+                        headers,
+                        HttpStatus.OK
+                );
+        } catch (IOException e) {
+            log.error(String.format(
+                    "IOException occurred while attempting to retrieve artifact from repository (artifactId: %s): %s",
+                    artifactId,
+                    e
+            ));
 
-        return new ResponseEntity<>(
-                outputStream -> {
-                    try {
-                        ArtifactUtil.writeHttpResponse(
-                                ArtifactUtil.getHttpResponseFromArtifact(artifact),
-                                outputStream
-                        );
-                    } catch (HttpException e) {
-                        e.printStackTrace();
-                    }
-                },
-                headers,
-                HttpStatus.OK
-        );
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
-     * Implementation of PUT on /repos/{repository}/artifacts/{artifactid}: Updates an artifact's properties
+     * Implementation of PUT on /repos/{repository}/artifacts/{artifactId}: Updates an artifact's properties
      *
      * Currently limited to updating an artifact's committed status.
      *
      * @param repository
-     * @param artifactid
+     * @param artifactId
      * @param committed
      * @return
      */
     public ResponseEntity<String> reposArtifactsArtifactidPut(
             @ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository,
-            @ApiParam(value = "Artifact ID",required=true ) @PathVariable("artifactid") String artifactid,
-            @ApiParam(value = "New commit status of artifact") @RequestPart(value="committed", required=false) Boolean committed) {
+            @ApiParam(value = "Artifact ID",required=true ) @PathVariable("artifactid") String artifactId,
+            @ApiParam(value = "New commit status of artifact") @RequestPart(value="committed", required=false) Boolean committed
+    ) {
 
         // Make sure that the artifact exists
-        if (!artifactIndex.artifactExists(artifactid))
+        if (!artifactIndex.artifactExists(artifactId))
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
         // Return bad request if new commit status has not been passed
         if (committed == null)
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 
-        ArtifactIndexData indexData = artifactIndex.getArtifactIndexData(artifactid);
+        ArtifactIndexData indexData = artifactIndex.getArtifactIndexData(artifactId);
 
         log.info(String.format(
                 "Updating commit status for %s (%s -> %s)",
-                artifactid,
+                artifactId,
                 indexData.getCommitted(),
                 committed
         ));
 
-        // Record the commit status in storage
-        //artifactStore.updateArtifact(indexData, null);
+        try {
+            // Record the commit status in storage
+            artifactStore.commitArtifact(indexData.getIdentifier());
+        } catch (IOException e) {
+            log.error(String.format(
+                    "IOException occurred while attempting to update artifact metadata (artifactId: %s): %s",
+                    artifactId,
+                    e
+            ));
+
+            e.printStackTrace();
+
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
         // Change the commit status in the index
-        artifactIndex.commitArtifact(artifactid);
+        artifactIndex.commitArtifact(artifactId);
 
         return new ResponseEntity<>(HttpStatus.OK);
     }

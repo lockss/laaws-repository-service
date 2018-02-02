@@ -36,31 +36,44 @@ import org.apache.commons.io.output.DeferredFileOutputStream;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.yarn.webapp.MimeType;
 import org.apache.http.HttpException;
 import org.archive.format.warc.WARCConstants;
+import org.archive.io.ArchiveRecordHeader;
+import org.archive.io.warc.WARCRecord;
 import org.archive.io.warc.WARCRecordInfo;
 import org.archive.util.ArchiveUtils;
 import org.archive.util.anvl.Element;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
+import org.json.JSONObject;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.ArtifactUtil;
-import org.lockss.laaws.rs.model.Artifact;
 import org.springframework.util.MultiValueMap;
 
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.Charset;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.UUID;
 
 public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants {
     private final static Log log = LogFactory.getLog(WarcArtifactStore.class);
 
+    public static final String AU_DIR_PREFIX = "au-";
     private static final String SCHEME = "urn:uuid";
     private static final String SCHEME_COLON = SCHEME + ":";
     private static final Charset UTF8 = Charset.forName("UTF-8");
     public static final String CRLF = "\r\n";
     public static byte[] CRLF_BYTES;
+    public static String SEPARATOR = "/";
+
+    protected ArtifactIndex index;
+    public File repositoryBasePath;
 
     static {
         try {
@@ -70,27 +83,96 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
         }
     }
 
+    /**
+     * Returns the WARC-Record-Id of the WARC record backing a given Artifact.
+     *
+     * @param file URL to a WARC file.
+     * @param offset Absolute byte offset of WARC record in WARC file.
+     * @return The value of the mandatory WARC-Record-Id header.
+     * @throws IOException
+     */
+    public static String getWarcRecordId(URL file, long offset) throws IOException {
+        WARCRecord record = getWarcRecord(file, offset);
+        ArchiveRecordHeader recordHeader = record.getHeader();
+        return (String) recordHeader.getHeaderValue(WARCConstants.HEADER_KEY_ID);
+    }
+
+    /**
+     * Returns a WARCRecord object representing the WARC record at a given URL and offset.
+     *
+     * Support for different protocols is handled by implementing URLConnection, URLStreamHandler, and
+     * URLStreamHandlerFactory, then registering the custom URLStreamHandlerFactory with URL#setURLStreamHandlerFactory.
+     *
+     * @param file URL to a WARC file.
+     * @param offset Absolute byte offset of WARC record in WARC file.
+     * @return A WARCRecord object representing the WARC record in the WARC file, at the given offset.
+     * @throws IOException
+     */
+    public static WARCRecord getWarcRecord(URL file, long offset) throws IOException {
+        InputStream warcStream = file.openStream();
+        warcStream.skip(offset);
+        return new WARCRecord(file.openStream(), "WarcArtifactStore", 0);
+    }
+
+    /**
+     * Creates a WARCRecordInfo object representing a WARC metadata record with a JSON object as its payload.
+     *
+     * @param refersTo The WARC-Record-Id of the WARC record this metadata is attached to (i.e., for WARC-Refers-To).
+     * @param metadata Artifact metadata implemented as a JSONObject.
+     * @return A WARCRecordInfo representing the given artifact metadata.
+     */
+    public static WARCRecordInfo createWarcMetadataRecord(String refersTo, JSONObject metadata) {
+        // Create a WARC record object
+        WARCRecordInfo record = new WARCRecordInfo();
+
+        // Set record content stream
+        byte[] metadataBytes = metadata.toString().getBytes();
+        record.setContentStream(new ByteArrayInputStream(metadataBytes));
+
+        // Mandatory WARC record headers
+        record.setRecordId(URI.create(UUID.randomUUID().toString()));
+        record.setCreate14DigitDate(DateTimeFormatter.ISO_INSTANT.format(Instant.now().atZone(ZoneOffset.UTC)));
+        record.setType(WARCRecordType.metadata);
+        record.setContentLength(metadataBytes.length);
+        record.setMimetype(MimeType.JSON);
+
+        // Set the WARC-Refers-To field to the WARC-Record-ID of the artifact
+        record.addExtraHeader(WARCConstants.HEADER_KEY_REFERS_TO, refersTo);
+
+        return record;
+    }
+
+    /**
+     * Writes an artifact as a WARC record to a given OutputStream.
+     *
+     * @param artifact Artifact to add to the repository.
+     * @param outputStream OutputStream to write the WARC record representing this artifact.
+     * @return The number of bytes written to the WARC file for this record.
+     * @throws IOException
+     * @throws HttpException
+     */
     public static long writeArtifact(Artifact artifact, OutputStream outputStream) throws IOException, HttpException {
         // Get artifact identifier
-        ArtifactIdentifier identifier = artifact.getIdentifier();
+        ArtifactIdentifier artifactId = artifact.getIdentifier();
 
         // Create a WARC record object
         WARCRecordInfo record = new WARCRecordInfo();
 
         // Mandatory WARC record headers
-        record.setRecordId(URI.create(UUID.randomUUID().toString()));
-        record.setCreate14DigitDate(identifier.getVersion());
-        record.setType(WARCConstants.WARCRecordType.response);
+//        record.setRecordId(URI.create(UUID.randomUUID().toString()));
+        record.setRecordId(URI.create(artifactId.getId()));
+        record.setCreate14DigitDate(artifactId.getVersion());
+        record.setType(WARCRecordType.response);
 
         // Optional WARC record headers
-        record.setUrl(identifier.getUri());
+        record.setUrl(artifactId.getUri());
         record.setMimetype("application/http; msgtype=response"); // Content-Type of WARC payload
 
         // Add LOCKSS-specific WARC headers to record
-        record.addExtraHeader("X-Lockss-Collection", identifier.getCollection());
-        record.addExtraHeader("X-Lockss-AuId", identifier.getAuid());
-        record.addExtraHeader("X-Lockss-Uri", identifier.getUri());
-        record.addExtraHeader("X-Lockss-Version", identifier.getVersion());
+        record.addExtraHeader("X-Lockss-Collection", artifactId.getCollection());
+        record.addExtraHeader("X-Lockss-AuId", artifactId.getAuid());
+        record.addExtraHeader("X-Lockss-Uri", artifactId.getUri());
+        record.addExtraHeader("X-Lockss-Version", artifactId.getVersion());
 
         // We must determine the size of the WARC payload (which is an artifact encoded as an HTTP response stream)
         // but it is not possible to determine the final size without reading the InputStream entirely, so we use a
@@ -109,6 +191,13 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
         return cout.getCount();
     }
 
+    /**
+     * Writes a WARC record to a given OutputStream.
+     *
+     * @param record An instance of WARCRecordInfo to write to the OutputStream.
+     * @param out An OutputStream.
+     * @throws IOException
+     */
     public static void writeWarcRecord(WARCRecordInfo record, OutputStream out) throws IOException {
         // Write the header
         out.write(createRecordHeader(record).getBytes(WARC_HEADER_ENCODING));
@@ -129,6 +218,12 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
         out.write(CRLF_BYTES);
     }
 
+    /**
+     * Composes a String object containing WARC record header of a given WARCRecordInfo.
+     *
+     * @param record A WARCRecordInfo representing a WARC record.
+     * @return The header for this WARCRecordInfo.
+     */
     public static String createRecordHeader(WARCRecordInfo record) {
         final StringBuilder sb = new StringBuilder();
 
@@ -151,6 +246,8 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
 
         // Extra WARC record headers
         if (record.getExtraHeaders() != null) {
+//            record.getExtraHeaders().stream().map(x -> sb.append(x).append(CRLF));
+
             for (final Iterator<Element> i = record.getExtraHeaders().iterator(); i.hasNext();) {
                 sb.append(i.next()).append(CRLF);
             }
@@ -159,24 +256,38 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
         return sb.toString();
     }
 
-    // Adapted from webarchive-commons
-    public static WARCRecordInfo createWARCInfoRecord(MultiValueMap<String, String> extraHeaders) throws IOException {
+    /**
+     * Creates a warcinfo type WARC record with metadata common to all following WARC records.
+     *
+     * Adapted from iipc/webarchive-commons.
+     *
+     * @param extraHeaders
+     * @return
+     * @throws IOException
+     */
+    public static WARCRecordInfo createWARCInfoRecord(MultiValueMap<String, String> extraHeaders) {
         WARCRecordInfo record = new WARCRecordInfo();
+        record.setRecordId(generateRecordId());
         record.setType(WARCRecordType.warcinfo);
         record.setCreate14DigitDate(ArchiveUtils.get14DigitDate());
-        record.setMimetype("application/warc-fields");
-        record.setRecordId(generateRecordId());
 
         // Set extra headers
         extraHeaders.forEach((k, vs) -> vs.forEach(v -> record.addExtraHeader(k, v)));
 
-        byte[] contents = "Not implemented".getBytes(UTF8);
-        record.setContentStream(new ByteArrayInputStream(contents));
-        record.setContentLength((long)contents.length);
+//        record.setMimetype("application/warc-fields");
+//        byte[] contents = "Not implemented".getBytes(UTF8);
+//        record.setContentStream(new ByteArrayInputStream(contents));
+//        record.setContentLength((long)contents.length);
+        record.setContentLength(0);
 
         return record;
     }
 
+    /**
+     * Generates a new UUID for use as the WARC-Record-Id for a WARC record.
+     *
+     * @return A new UUID.
+     */
     private static URI generateRecordId() {
         try {
             return new URI(SCHEME_COLON + UUID.randomUUID().toString());

@@ -30,16 +30,15 @@
 
 package org.lockss.laaws.rs.io.storage;
 
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.ArtifactIndexData;
+import org.lockss.laaws.rs.model.*;
 
 import java.io.IOException;
 
-public interface ArtifactStore<ID extends ArtifactIdentifier, A extends Artifact> {
-    ID addArtifact(Artifact artifact) throws IOException;
-    A getArtifact(ArtifactIndexData indexData) throws IOException;
-    void updateArtifact(ArtifactIndexData indexData, Artifact artifact);
-    void deleteArtifact(ArtifactIndexData indexData);
+public interface ArtifactStore<ID extends ArtifactIdentifier, A extends Artifact, MD extends ArtifactMetadata> {
+    A addArtifact(Artifact artifact) throws IOException;
+    A getArtifact(ID artifactId) throws IOException;
+    MD updateArtifactMetadata(ID artifactId, MD metadata) throws IOException;
+    RepositoryArtifactMetadata commitArtifact(ID artifactId) throws IOException;
+    RepositoryArtifactMetadata deleteArtifact(ID artifactId) throws IOException;
 }
 
