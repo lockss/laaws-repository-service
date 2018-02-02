@@ -50,6 +50,9 @@ public class VolatileArtifactIndex implements ArtifactIndex {
     @Override
     public ArtifactIndexData indexArtifact(Artifact artifact) {
         ArtifactIdentifier artifactId = artifact.getIdentifier();
+
+        // TODO: Remove dependency of on WARC
+        // RepositoryArtifactMetadata repoMetadata = artifact.getRepositoryMetadata();
         WarcRepositoryArtifactMetadata repoMetadata = (WarcRepositoryArtifactMetadata)artifact.getRepositoryMetadata();
 
         ArtifactIndexData indexData = new ArtifactIndexData(

@@ -34,6 +34,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpException;
 import org.archive.io.warc.WARCRecord;
+import org.lockss.laaws.rs.io.storage.local.WarcRepositoryArtifactMetadata;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.ArtifactFactory;
 import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
@@ -66,8 +67,22 @@ public class VolatileWarcArtifactStore extends WarcArtifactStore {
         try {
             // Convert artifact to WARC record stream
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+            // Set unique artifactId
+            artifact.getIdentifier().setId(UUID.randomUUID().toString());
+
+            // Create and set the artifact's repository metadata
+            WarcRepositoryArtifactMetadata repoMetadata = new WarcRepositoryArtifactMetadata(
+                    artifactId, "volatile", 0, false, false
+            );
+
+            artifact.setRepositoryMetadata(repoMetadata);
+
+            // Write artifact as a WARC record stream to the OutputStream
             writeArtifact(artifact, baos);
-            au.put(artifactId.getUri() + String.valueOf(artifactId.getVersion()), baos.toByteArray());
+
+            //au.put(artifactId.getUri() + String.valueOf(artifactId.getVersion()), baos.toByteArray());
+            au.put(artifactId.getId(), baos.toByteArray());
         } catch (HttpException e) {
             throw new IOException(e);
         }
