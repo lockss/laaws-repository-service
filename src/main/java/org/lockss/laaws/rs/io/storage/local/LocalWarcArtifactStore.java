@@ -112,7 +112,7 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
                             artifact.setRepositoryMetadata(new WarcRepositoryArtifactMetadata(
                                     artifact.getIdentifier(),
                                     warcFile.getAbsolutePath(),
-                                    record.getPosition(),
+                                    record.getHeader().getOffset(),
                                     false,
                                     false
                             ));
