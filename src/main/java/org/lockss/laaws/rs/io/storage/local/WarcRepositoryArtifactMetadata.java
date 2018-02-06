@@ -53,10 +53,24 @@ public class WarcRepositoryArtifactMetadata extends RepositoryArtifactMetadata {
 
     public WarcRepositoryArtifactMetadata(ArtifactIdentifier identifier, String warcFilePath, long offset, boolean committed, boolean deleted) {
         super(identifier);
+
+        // Set defaults
         this.setWarcFilePath(warcFilePath);
         this.setWarcRecordOffset(offset);
         this.setCommitted(committed);
         this.setDeleted(deleted);
+    }
+
+    public WarcRepositoryArtifactMetadata(String s) {
+        super(s);
+
+//         Set defaults
+//        if (!this.has(WARCFILE_PATH_KEY) || !this.has(WARCFILE_OFFSET_KEY))
+//            throw new RuntimeException(String.format("JSON is missing a mandatory field for %s", this.getClass()));
+
+        // These are set by the parent class
+//        this.setCommitted(committed);
+//        this.setDeleted(deleted);
     }
 
     public String getWarcFilePath() {
