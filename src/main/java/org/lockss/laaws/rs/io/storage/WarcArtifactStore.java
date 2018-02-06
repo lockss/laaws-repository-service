@@ -47,6 +47,7 @@ import org.archive.util.anvl.Element;
 import org.json.JSONObject;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactUtil;
 import org.springframework.util.MultiValueMap;
 
@@ -168,11 +169,13 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
         record.setUrl(artifactId.getUri());
         record.setMimetype("application/http; msgtype=response"); // Content-Type of WARC payload
 
-        // Add LOCKSS-specific WARC headers to record
-        record.addExtraHeader("X-Lockss-Collection", artifactId.getCollection());
-        record.addExtraHeader("X-Lockss-AuId", artifactId.getAuid());
-        record.addExtraHeader("X-Lockss-Uri", artifactId.getUri());
-        record.addExtraHeader("X-Lockss-Version", artifactId.getVersion());
+        // Add LOCKSS-specific WARC headers to record (Note: X-Lockss-ArtifactId and X-Lockss-Uri are redundant because
+        // the same information is recorded as WARC-Record-ID and WARC-Target-URI, respectively).
+        record.addExtraHeader(ArtifactConstants.ARTIFACTID_ID_KEY, artifactId.getId());
+        record.addExtraHeader(ArtifactConstants.ARTIFACTID_COLLECTION_KEY, artifactId.getCollection());
+        record.addExtraHeader(ArtifactConstants.ARTIFACTID_AUID_KEY, artifactId.getAuid());
+        record.addExtraHeader(ArtifactConstants.ARTIFACTID_URI_KEY, artifactId.getUri());
+        record.addExtraHeader(ArtifactConstants.ARTIFACTID_VERSION_KEY, artifactId.getVersion());
 
         // We must determine the size of the WARC payload (which is an artifact encoded as an HTTP response stream)
         // but it is not possible to determine the final size without reading the InputStream entirely, so we use a
@@ -231,7 +234,8 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
         sb.append(WARC_ID).append(CRLF);
 
         // WARC record mandatory headers
-        sb.append(HEADER_KEY_ID).append(COLON_SPACE).append('<').append(record.getRecordId().toString()).append('>').append(CRLF);
+        sb.append(HEADER_KEY_ID).append(COLON_SPACE).append('<').append(SCHEME_COLON).append(record.getRecordId().toString()).append('>').append(CRLF);
+//        sb.append(HEADER_KEY_ID).append(COLON_SPACE).append(record.getRecordId().toString()).append(CRLF);
         sb.append(CONTENT_LENGTH).append(COLON_SPACE).append(Long.toString(record.getContentLength())).append(CRLF);
         sb.append(HEADER_KEY_DATE).append(COLON_SPACE).append(record.getCreate14DigitDate()).append(CRLF);
         sb.append(HEADER_KEY_TYPE).append(COLON_SPACE).append(record.getType()).append(CRLF);
