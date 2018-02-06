@@ -30,6 +30,7 @@
 
 package org.lockss.laaws.rs.io.storage.local;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpException;
@@ -39,6 +40,7 @@ import org.archive.io.ArchiveRecordHeader;
 import org.archive.io.warc.WARCReaderFactory;
 import org.archive.io.warc.WARCRecord;
 import org.archive.io.warc.WARCRecordInfo;
+import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.ArtifactFactory;
@@ -50,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class LocalWarcArtifactStore extends WarcArtifactStore {
     private static final Log log = LogFactory.getLog(LocalWarcArtifactStore.class);
@@ -58,10 +61,10 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
     public static final String AU_ARTIFACTS_WARC = "artifacts" + WARC_FILE_SUFFIX;
 
     /**
-     * Constructor. Rebuilds the index on start-up from a given repository base path.
+     * Constructor. Rebuilds the index on start-up from a given repository base path, if using a volatile index.
      *
      * @param index              An instance of ArtifactIndex to use for indexing artifacts.
-     * @param repositoryBasePath The base path of the repository's WARC file directory structure.
+     * @param repositoryBasePath The base path of the local repository.
      */
     public LocalWarcArtifactStore(ArtifactIndex index, File repositoryBasePath) {
         log.info(String.format("Loading all WARCs under %s", repositoryBasePath.getAbsolutePath()));
@@ -69,15 +72,118 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
         this.index = index;
         this.repositoryBasePath = repositoryBasePath;
 
-        // Rebuild the index
-//        if (repositoryBasePath.exists() && repositoryBasePath.isDirectory()) {
-//            Collection<File> warcs = scanDirectories(repositoryBasePath);
-//            warcs.stream().forEach(this::addWARC);
-//        }
+        // Make sure the base path exists
+        mkdirIfNotExist(repositoryBasePath);
+
+        // Rebuild the index if using volatile index
+        if (index.getClass() == VolatileArtifactIndex.class)
+            rebuildIndex(repositoryBasePath);
     }
 
     /**
-     * Recursively finds all WARC files under a given base path.
+     * Rebuilds the index by traversing a repository base path for artifacts and metadata WARC files.
+     *
+     * @param basePath The base path of the local repository.
+     */
+    public void rebuildIndex(File basePath) {
+        Collection<File> warcs = scanDirectories(basePath);
+
+        Collection<File> artifactWarcFiles = warcs
+                .stream()
+                .filter(file -> file.getName().endsWith("artifacts" + WARC_FILE_SUFFIX))
+                .collect(Collectors.toList());
+
+        // Re-index artifacts first
+        for (File warcFile : artifactWarcFiles) {
+            try {
+                for (ArchiveRecord record : WARCReaderFactory.get(warcFile)) {
+                    log.info(String.format(
+                            "Re-indexing artifact from WARC %s record %s from %s",
+                            record.getHeader().getHeaderValue(WARCConstants.HEADER_KEY_TYPE),
+                            record.getHeader().getHeaderValue(WARCConstants.HEADER_KEY_ID),
+                            warcFile
+                    ));
+
+                    try {
+                        Artifact artifact = ArtifactFactory.fromArchiveRecord(record);
+
+                        if (artifact != null) {
+                            // Attach repository metadata to artifact
+                            artifact.setRepositoryMetadata(new WarcRepositoryArtifactMetadata(
+                                    artifact.getIdentifier(),
+                                    warcFile.getAbsolutePath(),
+                                    record.getPosition(),
+                                    false,
+                                    false
+                            ));
+
+                            // Add artifact to the index
+                            index.indexArtifact(artifact);
+                        }
+                    } catch (IOException e) {
+                        log.error(String.format(
+                                "IOException caught while attempting to re-index WARC record %s from %s",
+                                record.getHeader().getHeaderValue(WARCConstants.HEADER_KEY_ID),
+                                warcFile
+                        ));
+                    }
+
+                }
+            } catch (IOException e) {
+                log.error(String.format("IOException caught while attempt to re-index WARC file %s", warcFile));
+            }
+        }
+
+        // TODO: What follows is loading of artifact repository-specific metadata. It should be generalized to others.
+
+        // Get a collection of repository metadata files
+        Collection<File> repoMetadataWarcFiles = warcs
+                .stream()
+                .filter(file -> file.getName().endsWith("lockss-repo" + WARC_FILE_SUFFIX))
+                .collect(Collectors.toList());
+
+        // Load repository artifact metadata by "replaying" them
+        for (File metadataFile : repoMetadataWarcFiles) {
+            try {
+                for (ArchiveRecord record : WARCReaderFactory.get(metadataFile)) {
+                    log.info(String.format(
+                            "Re-indexing artifact metadata from WARC %s record %s from %s",
+                            record.getHeader().getHeaderValue(WARCConstants.HEADER_KEY_TYPE),
+                            record.getHeader().getHeaderValue(WARCConstants.HEADER_KEY_ID),
+                            metadataFile
+                    ));
+
+                    // Parse the JSON as a WarcRepositoryArtifactMetadata object
+                    WarcRepositoryArtifactMetadata repoStatus = new WarcRepositoryArtifactMetadata(
+                            IOUtils.toString(record)
+                    );
+
+                    if (index.artifactExists(repoStatus.getArtifactId())) {
+                        if (repoStatus.isDeleted()) {
+                            log.info(String.format("Removing artifact %s from index", repoStatus.getArtifactId()));
+                            index.deleteArtifact(repoStatus.getArtifactId());
+                            continue;
+                        }
+
+                        if (repoStatus.isCommitted()) {
+                            log.info(String.format("Marking aritfact %s as committed in index", repoStatus.getArtifactId()));
+                            index.commitArtifact(repoStatus.getArtifactId());
+                        }
+                    } else {
+                        log.warn(String.format("Artifact %s not found in index", repoStatus.getArtifactId()));
+                    }
+                }
+            } catch (IOException e) {
+                log.error(String.format(
+                        "IOException caught while attempt to re-index metadata WARC file %s",
+                        metadataFile
+                ));
+            }
+        }
+    }
+
+    /**
+     * Recursively finds artifact WARC files under a given base path.
      *
      * @param basePath The base path to scan recursively for WARC files.
      * @return A collection of paths to WARC files under the given base path.
@@ -97,58 +203,6 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
 
         // Return WARC files at this level
         return warcFiles;
-    }
-
-    /**
-     * Adds the WARC records in WARC file from given path, to the repository.
-     *
-     * @param warcFile Path to a WARC file to process.
-     */
-    public void addWARC(File warcFile) {
-        try {
-            for (ArchiveRecord record : WARCReaderFactory.get(warcFile)) {
-                // Get WARC record headers
-                ArchiveRecordHeader headers = record.getHeader();
-                String recordId = (String) headers.getHeaderValue(WARCConstants.HEADER_KEY_ID);
-                String recordType = (String) headers.getHeaderValue(WARCConstants.HEADER_KEY_TYPE);
-
-                log.info(String.format(
-                        "Importing WARC record (ID: %s, type: %s), headers: %s",
-                        record.getHeader().getHeaderValue("WARC-Record-ID"),
-                        recordType,
-                        record.getHeader()
-                ));
-
-                try {
-                    // Convert ArchiveRecord to Artifact
-                    Artifact artifact = ArtifactFactory.fromArchiveRecord(record);
-
-                    // If we got an Artifact object without errors, add it to the repository
-                    if (artifact != null) {
-                        // TODO: Assign the artifact an identity - this must come from WARC record
-                        artifact.setIdentifier(new ArtifactIdentifier(
-                                "collection1",
-                                "auid",
-                                headers.getUrl(),
-                                headers.getVersion(),
-                                recordId
-                        ));
-
-                        // Add artifact to repository
-                        addArtifact(artifact);
-                    }
-                } catch (IOException e) {
-                    log.error(String.format(
-                            "An IO exception occurred while attempting to add WARC record id %s from %s: %s",
-                            recordId,
-                            warcFile,
-                            e)
-                    );
-                }
-            }
-        } catch (IOException e) {
-            log.error(String.format("An IO exception occurred while iterating over records from %s: %s", warcFile, e));
-        }
     }
 
     /**
