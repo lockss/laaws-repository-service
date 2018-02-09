@@ -175,4 +175,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     
   </dependencies>
 
+  <profiles>
+  
+    <!-- 
+    Enable this profile if using Eclipse to do development on this project
+    (right-click project -> Properties -> Maven -> add lockss-eclipse ton list)
+    -->
+    <profile>
+      <id>lockss-eclipse</id>
+      <dependencies>
+        <dependency>
+          <groupId>org.skyscreamer</groupId>
+          <artifactId>jsonassert</artifactId>
+          <version>1.4.0</version>
+          <scope>test</scope>
+          <exclusions>
+            <exclusion>
+              <groupId>com.vaadin.external.google</groupId>
+              <artifactId>android-json</artifactId>
+            </exclusion>
+          </exclusions> 
+        </dependency>
+      </dependencies>
+    </profile>
+  
+  </profiles>
+
 </project>
