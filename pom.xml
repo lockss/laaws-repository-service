@@ -179,7 +179,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   
     <!-- 
     Enable this profile if using Eclipse to do development on this project
-    (right-click project -> Properties -> Maven -> add lockss-eclipse ton list)
+    (right-click project -> Properties -> Maven -> add lockss-eclipse to list)
     -->
     <profile>
       <id>lockss-eclipse</id>
