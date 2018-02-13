@@ -113,8 +113,8 @@ public interface ArtifactIndex {
      * Provides an indication of whether an artifact with a given text index
      * identifier exists in the index.
      * 
-     * @param indexDataId
-     *          A String with the artifact index identifier.
+     * @param artifactId
+     *          A String with the artifact identifier.
      * @return <code>true</code> if the artifact exists in the index,
      * <code>false</code> otherwise.
      */

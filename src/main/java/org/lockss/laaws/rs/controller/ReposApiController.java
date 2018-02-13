@@ -116,7 +116,6 @@ public class ReposApiController implements ReposApi {
      * @param repository
      * @param artifactId
      * @return
-     * @throws IOException
      */
     public ResponseEntity<StreamingResponseBody> reposArtifactsArtifactidGet(
             @ApiParam(value = "Repository to add artifact into", required = true) @PathVariable("repository") String repository,
