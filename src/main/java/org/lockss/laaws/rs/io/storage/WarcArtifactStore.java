@@ -267,7 +267,6 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
      *
      * @param extraHeaders
      * @return
-     * @throws IOException
      */
     public static WARCRecordInfo createWARCInfoRecord(MultiValueMap<String, String> extraHeaders) {
         WARCRecordInfo record = new WARCRecordInfo();
