@@ -32,7 +32,6 @@ package org.lockss.laaws.rs.io.index;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.lockss.laaws.rs.io.storage.local.WarcRepositoryArtifactMetadata;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactIndexData;
@@ -77,15 +76,6 @@ public class VolatileArtifactIndex implements ArtifactIndex {
               "ArtifactIdentifier has null or empty id");
         }
 
-        // TODO: Remove dependency of on WARC
-        // RepositoryArtifactMetadata repoMetadata = artifact.getRepositoryMetadata();
-        WarcRepositoryArtifactMetadata repoMetadata = (WarcRepositoryArtifactMetadata)artifact.getRepositoryMetadata();
-
-        if (repoMetadata == null) {
-          throw new IllegalArgumentException(
-              "Artifact has null repository metadata");
-        }
-
         ArtifactIndexData indexData = new ArtifactIndexData(
                 id,
                 artifactId.getCollection(),
@@ -93,9 +83,7 @@ public class VolatileArtifactIndex implements ArtifactIndex {
                 artifactId.getUri(),
                 artifactId.getVersion(),
                 false,
-                artifactId.getId(),
-                repoMetadata.getWarcFilePath().toString(),
-                repoMetadata.getWarcRecordOffset()
+                artifact.getStorageUrl()
         );
 
         index.put(id, indexData);

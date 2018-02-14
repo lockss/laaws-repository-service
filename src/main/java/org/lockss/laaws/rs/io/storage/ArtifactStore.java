@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -33,12 +33,13 @@ package org.lockss.laaws.rs.io.storage;
 import org.lockss.laaws.rs.model.*;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 
-public interface ArtifactStore<ID extends ArtifactIdentifier, A extends Artifact, MD extends ArtifactMetadata> {
+public interface ArtifactStore<ID extends ArtifactIdentifier, A extends Artifact, MD extends RepositoryArtifactMetadata> {
     A addArtifact(Artifact artifact) throws IOException;
-    A getArtifact(ID artifactId) throws IOException;
+    A getArtifact(ID artifactId) throws IOException, URISyntaxException;
     MD updateArtifactMetadata(ID artifactId, MD metadata) throws IOException;
-    RepositoryArtifactMetadata commitArtifact(ID artifactId) throws IOException;
-    RepositoryArtifactMetadata deleteArtifact(ID artifactId) throws IOException;
+    RepositoryArtifactMetadata commitArtifact(ID artifactId) throws IOException, URISyntaxException;
+    RepositoryArtifactMetadata deleteArtifact(ID artifactId) throws IOException, URISyntaxException;
 }
 
