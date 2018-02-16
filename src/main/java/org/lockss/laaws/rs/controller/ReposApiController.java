@@ -35,6 +35,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.*;
 import org.lockss.laaws.rs.api.ReposApi;
+import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactFactory;
 import org.lockss.laaws.rs.util.ArtifactUtil;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
@@ -407,7 +408,7 @@ public class ReposApiController implements ReposApi {
         artifactMetadata.setCommitted(false);
         */
 
-        log.info(String.format("%s, %s, %s", repository, auid, uri));
+        log.info(String.format("Adding artifact %s, %s, %s, %d", repository, auid, uri, version));
 
         String artifactId = null;
 
@@ -424,8 +425,14 @@ public class ReposApiController implements ReposApi {
                 return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
             }
 
-            Artifact artifact = ArtifactFactory.fromHttpResponseStream(artifactPart.getInputStream());
+            // Inject version header
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
+
+            Artifact artifact = ArtifactFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
             artifactStore.addArtifact(artifact);
+
+            log.info(String.format("Wrote artifact to %s", artifact.getStorageUrl()));
 
             // Index artifact into Solr
             ArtifactIndexData id = artifactIndex.indexArtifact(artifact);
