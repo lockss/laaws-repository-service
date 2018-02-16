@@ -30,18 +30,12 @@
 
 package org.lockss.laaws.rs.configuration;
 
-import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.fs.Path;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactStore;
-import org.lockss.laaws.rs.io.storage.hdfs.HdfsWarcArtifactStore;
-import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactStore;
-import org.lockss.laaws.rs.io.storage.mock.VolatileWarcArtifactStore;
+import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.io.File;
 
 @Configuration
 public class ArtifactStoreConfig {
