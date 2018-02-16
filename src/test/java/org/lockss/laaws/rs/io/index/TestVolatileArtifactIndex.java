@@ -38,10 +38,10 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.Before;
 import org.junit.Test;
-import org.lockss.laaws.rs.io.storage.local.WarcRepositoryArtifactMetadata;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.ArtifactIndexData;
+import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
 import org.lockss.test.LockssTestCase4;
 
 /**
@@ -52,8 +52,8 @@ public class TestVolatileArtifactIndex extends LockssTestCase4 {
   private ArtifactIdentifier aid1;
   private UUID uuid;
   private ArtifactIdentifier aid2;
-  private WarcRepositoryArtifactMetadata md1;
-  private WarcRepositoryArtifactMetadata md2;
+  private RepositoryArtifactMetadata md1;
+  private RepositoryArtifactMetadata md2;
   private Artifact artifact1;
   private Artifact artifact2;
   private VolatileArtifactIndex index;
@@ -66,11 +66,11 @@ public class TestVolatileArtifactIndex extends LockssTestCase4 {
     aid2 =
 	new ArtifactIdentifier(uuid.toString(), "coll2", "auid2", "uri2", "v2");
 
-    md1 = new WarcRepositoryArtifactMetadata(aid1, "wfp1", 1, false, false);
-    md2 = new WarcRepositoryArtifactMetadata(aid2, "wfp2", 2, true, false);
+    md1 = new RepositoryArtifactMetadata(aid1, false, false);
+    md2 = new RepositoryArtifactMetadata(aid2, true, false);
 
-    artifact1 = new Artifact(aid1, null, null, null, md1);
-    artifact2 = new Artifact(aid2, null, null, null, md2);
+    artifact1 = new Artifact(aid1, null, null, null, "surl1", md1);
+    artifact2 = new Artifact(aid2, null, null, null, "surl2", md2);
 
     index = new VolatileArtifactIndex();
   }
@@ -93,17 +93,7 @@ public class TestVolatileArtifactIndex extends LockssTestCase4 {
     expectedMessage = "Artifact has null identifier";
 
     try {
-      index.indexArtifact(new Artifact(null, null, null, null, null));
-      fail("Should have thrown IllegalArgumentException(" + expectedMessage
-	  + ")");
-    } catch (IllegalArgumentException iae) {
-      assertEquals(expectedMessage, iae.getMessage());
-    }
-
-    expectedMessage = "Artifact has null repository metadata";
-
-    try {
-      index.indexArtifact(new Artifact(aid1, null, null, null, null));
+      index.indexArtifact(new Artifact(null, null, null, null, null, null));
       fail("Should have thrown IllegalArgumentException(" + expectedMessage
 	  + ")");
     } catch (IllegalArgumentException iae) {
@@ -117,9 +107,7 @@ public class TestVolatileArtifactIndex extends LockssTestCase4 {
     assertEquals("auid1", aidata.getAuid());
     assertEquals("uri1", aidata.getUri());
     assertEquals("v1", aidata.getVersion());
-    assertEquals("id1", aidata.getWarcRecordId());
-    assertEquals("wfp1", aidata.getWarcFilePath());
-    assertEquals(1, aidata.getWarcRecordOffset());
+    assertEquals("surl1", aidata.getStorageUrl());
     assertEquals(false, aidata.getCommitted());
     assertEquals(aidata, index.getArtifactIndexData("id1"));
 
@@ -130,9 +118,7 @@ public class TestVolatileArtifactIndex extends LockssTestCase4 {
     assertEquals("auid2", aidata.getAuid());
     assertEquals("uri2", aidata.getUri());
     assertEquals("v2", aidata.getVersion());
-    assertEquals(uuid.toString(), aidata.getWarcRecordId());
-    assertEquals("wfp2", aidata.getWarcFilePath());
-    assertEquals(2, aidata.getWarcRecordOffset());
+    assertEquals("surl2", aidata.getStorageUrl());
     assertEquals(false, aidata.getCommitted());
     assertEquals(aidata, index.getArtifactIndexData(uuid.toString()));
 
@@ -143,9 +129,7 @@ public class TestVolatileArtifactIndex extends LockssTestCase4 {
     assertEquals("auid2", aidata.getAuid());
     assertEquals("uri2", aidata.getUri());
     assertEquals("v2", aidata.getVersion());
-    assertEquals(uuid.toString(), aidata.getWarcRecordId());
-    assertEquals("wfp2", aidata.getWarcFilePath());
-    assertEquals(2, aidata.getWarcRecordOffset());
+    assertEquals("surl2", aidata.getStorageUrl());
     assertEquals(false, aidata.getCommitted());
     assertEquals(aidata, index.getArtifactIndexData(uuid.toString()));
   }

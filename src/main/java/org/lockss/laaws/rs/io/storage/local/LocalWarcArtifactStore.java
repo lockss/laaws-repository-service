@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -36,7 +36,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpException;
 import org.archive.format.warc.WARCConstants;
 import org.archive.io.ArchiveRecord;
-import org.archive.io.ArchiveRecordHeader;
 import org.archive.io.warc.WARCReaderFactory;
 import org.archive.io.warc.WARCRecord;
 import org.archive.io.warc.WARCRecordInfo;
@@ -46,11 +45,15 @@ import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.ArtifactFactory;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.springframework.util.DigestUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -109,10 +112,8 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
 
                         if (artifact != null) {
                             // Attach repository metadata to artifact
-                            artifact.setRepositoryMetadata(new WarcRepositoryArtifactMetadata(
+                            artifact.setRepositoryMetadata(new RepositoryArtifactMetadata(
                                     artifact.getIdentifier(),
-                                    warcFile.getAbsolutePath(),
-                                    record.getHeader().getOffset(),
                                     false,
                                     false
                             ));
@@ -153,8 +154,8 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
                             metadataFile
                     ));
 
-                    // Parse the JSON as a WarcRepositoryArtifactMetadata object
-                    WarcRepositoryArtifactMetadata repoStatus = new WarcRepositoryArtifactMetadata(
+                    // Parse the JSON as a RepositoryArtifactMetadata object
+                    RepositoryArtifactMetadata repoStatus = new RepositoryArtifactMetadata(
                             IOUtils.toString(record)
                     );
 
@@ -305,10 +306,8 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
             fos.close();
 
             // Attach the artifact's repository metadata
-            artifact.setRepositoryMetadata(new WarcRepositoryArtifactMetadata(
+            artifact.setRepositoryMetadata(new RepositoryArtifactMetadata(
                     artifactId,
-                    auArtifactsWarcPath.toString(),
-                    offset,
                     false,
                     false
             ));
@@ -330,9 +329,11 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
      * @param artifactId The artifact identifier of artifact to retrieve.
      * @return An artifact.
      * @throws IOException
+     * @throws URISyntaxException 
      */
     @Override
-    public Artifact getArtifact(ArtifactIdentifier artifactId) throws IOException {
+    public Artifact getArtifact(ArtifactIdentifier artifactId)
+	throws IOException, URISyntaxException {
         log.info(String.format("Retrieving artifact from store (artifactId: %s)", artifactId.toString()));
 
         // Get details from the artifact index service
@@ -341,11 +342,20 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
         // TODO: Remove - only for debugging
         log.info(indexedData.toString());
 
+        URI uri = new URI(indexedData.getStorageUrl());
+
         // Get InputStream to WARC file
-        InputStream warcStream = new FileInputStream(indexedData.getWarcFilePath());
+        String warcFilePath =
+            uri.getScheme() + uri.getAuthority() + uri.getPath();
+        InputStream warcStream = new FileInputStream(warcFilePath);
 
         // Seek to the WARC record
-        warcStream.skip(indexedData.getWarcRecordOffset());
+        List<String> offsetQueryArgs = UriComponentsBuilder
+            .fromUri(uri).build().getQueryParams().get("offset");
+
+        if (offsetQueryArgs != null && !offsetQueryArgs.isEmpty()) {
+          warcStream.skip(Long.parseLong(offsetQueryArgs.get(0)));
+        }
 
         // Get a WARCRecord object
         WARCRecord record = new WARCRecord(warcStream, "LocalWarcArtifactStore#getArtifact", 0);
@@ -354,10 +364,8 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
         Artifact artifact = ArtifactFactory.fromArchiveRecord(record);
 
         // Set artifact's repository metadata
-        WarcRepositoryArtifactMetadata repoMetadata = new WarcRepositoryArtifactMetadata(
+        RepositoryArtifactMetadata repoMetadata = new RepositoryArtifactMetadata(
                 artifactId,
-                indexedData.getWarcFilePath(),
-                indexedData.getWarcRecordOffset(),
                 indexedData.getCommitted(),
                 false
         );
@@ -376,7 +384,7 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
      * @throws IOException
      */
     @Override
-    public ArtifactMetadata updateArtifactMetadata(ArtifactIdentifier artifactId, ArtifactMetadata metadata) throws IOException {
+    public RepositoryArtifactMetadata updateArtifactMetadata(ArtifactIdentifier artifactId, RepositoryArtifactMetadata metadata) throws IOException {
 
 //        if (!isDeleted(artifactId)) {
             // Convert ArtifactMetadata object into a WARC metadata record
@@ -404,9 +412,12 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
      * committed status in the artifact index.
      *
      * @param artifactId The artifact identifier of the artifact to commit.
+     * @throws IOException
+     * @throws URISyntaxException 
      */
     @Override
-    public RepositoryArtifactMetadata commitArtifact(ArtifactIdentifier artifactId) throws IOException {
+    public RepositoryArtifactMetadata commitArtifact(ArtifactIdentifier artifactId)
+	throws IOException, URISyntaxException {
         Artifact artifact = getArtifact(artifactId);
         RepositoryArtifactMetadata repoMetadata = artifact.getRepositoryMetadata();
 
@@ -428,8 +439,10 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
      * @param artifactId The artifact identifier of the aritfact to check.
      * @return A boolean indicating whether the artifact is marked as deleted.
      * @throws IOException
+     * @throws URISyntaxException 
      */
-    public boolean isDeleted(ArtifactIdentifier artifactId) throws IOException {
+    public boolean isDeleted(ArtifactIdentifier artifactId)
+	throws IOException, URISyntaxException {
         Artifact artifact = getArtifact(artifactId);
         RepositoryArtifactMetadata metadata = artifact.getRepositoryMetadata();
         return metadata.isDeleted();
@@ -438,9 +451,13 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
     /**
      * Returns a boolean indicating whether an artifact is marked as committed in the repository storage.
      *
+     * @param artifactId The artifact identifier of the artifact to check.
      * @return A boolean indicating whether the artifact is marked as committed.
+     * @throws IOException
+     * @throws URISyntaxException 
      */
-    public boolean isCommitted(ArtifactIdentifier artifactId) throws IOException {
+    public boolean isCommitted(ArtifactIdentifier artifactId)
+	throws IOException, URISyntaxException {
         Artifact artifact = getArtifact(artifactId);
         RepositoryArtifactMetadata metadata = artifact.getRepositoryMetadata();
         return metadata.isCommitted();
@@ -450,9 +467,12 @@ public class LocalWarcArtifactStore extends WarcArtifactStore {
      * Marks the artifact as deleted in the repository by updating the repository metadata for this artifact.
      *
      * @param artifactId The artifact identifier of the artifact to mark as deleted.
+     * @throws IOException
+     * @throws URISyntaxException 
      */
     @Override
-    public RepositoryArtifactMetadata deleteArtifact(ArtifactIdentifier artifactId) throws IOException {
+    public RepositoryArtifactMetadata deleteArtifact(ArtifactIdentifier artifactId)
+	throws IOException, URISyntaxException {
         Artifact artifact = getArtifact(artifactId);
         RepositoryArtifactMetadata repoMetadata = artifact.getRepositoryMetadata();
 

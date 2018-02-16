@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -44,7 +44,6 @@ import org.archive.io.warc.WARCRecord;
 import org.archive.io.warc.WARCRecordInfo;
 import org.archive.util.ArchiveUtils;
 import org.archive.util.anvl.Element;
-import org.json.JSONObject;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.ArtifactConstants;
@@ -55,7 +54,6 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -68,7 +66,6 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
     public static final String AU_DIR_PREFIX = "au-";
     private static final String SCHEME = "urn:uuid";
     private static final String SCHEME_COLON = SCHEME + ":";
-    private static final Charset UTF8 = Charset.forName("UTF-8");
     public static final String CRLF = "\r\n";
     public static byte[] CRLF_BYTES;
     public static String SEPARATOR = "/";
@@ -119,15 +116,15 @@ public abstract class WarcArtifactStore implements ArtifactStore, WARCConstants 
      * Creates a WARCRecordInfo object representing a WARC metadata record with a JSON object as its payload.
      *
      * @param refersTo The WARC-Record-Id of the WARC record this metadata is attached to (i.e., for WARC-Refers-To).
-     * @param metadata Artifact metadata implemented as a JSONObject.
+     * @param metadata A RepositoryArtifactMetadata with the artifact metadata.
      * @return A WARCRecordInfo representing the given artifact metadata.
      */
-    public static WARCRecordInfo createWarcMetadataRecord(String refersTo, JSONObject metadata) {
+    public static WARCRecordInfo createWarcMetadataRecord(String refersTo, RepositoryArtifactMetadata metadata) {
         // Create a WARC record object
         WARCRecordInfo record = new WARCRecordInfo();
 
         // Set record content stream
-        byte[] metadataBytes = metadata.toString().getBytes();
+        byte[] metadataBytes = metadata.toJson().toString().getBytes();
         record.setContentStream(new ByteArrayInputStream(metadataBytes));
 
         // Mandatory WARC record headers

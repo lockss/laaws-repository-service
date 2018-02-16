@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -34,7 +34,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpException;
 import org.archive.io.warc.WARCRecord;
-import org.lockss.laaws.rs.io.storage.local.WarcRepositoryArtifactMetadata;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.ArtifactFactory;
 import org.lockss.laaws.rs.io.storage.WarcArtifactStore;
@@ -72,8 +71,8 @@ public class VolatileWarcArtifactStore extends WarcArtifactStore {
             artifact.getIdentifier().setId(UUID.randomUUID().toString());
 
             // Create and set the artifact's repository metadata
-            WarcRepositoryArtifactMetadata repoMetadata = new WarcRepositoryArtifactMetadata(
-                    artifactId, "volatile", 0, false, false
+            RepositoryArtifactMetadata repoMetadata =
+        	new RepositoryArtifactMetadata(artifactId, false, false
             );
 
             artifact.setRepositoryMetadata(repoMetadata);
@@ -129,8 +128,7 @@ public class VolatileWarcArtifactStore extends WarcArtifactStore {
         return artifact;
     }
 
-    @Override
-    public ArtifactMetadata updateArtifactMetadata(ArtifactIdentifier artifactId, ArtifactMetadata artifact) {
+    public RepositoryArtifactMetadata updateArtifactMetadata(ArtifactIdentifier artifactId, RepositoryArtifactMetadata artifact) {
         // TODO
         return null;
     }
