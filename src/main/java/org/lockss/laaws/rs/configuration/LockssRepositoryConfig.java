@@ -30,15 +30,25 @@
 
 package org.lockss.laaws.rs.configuration;
 
-import org.lockss.laaws.rs.core.LocalLockssRepository;
+import org.lockss.laaws.rs.core.BaseLockssRepository;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
+import org.lockss.laaws.rs.io.storage.ArtifactStore;
+import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactStore;
+import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.io.File;
 
 @Configuration
 public class LockssRepositoryConfig {
     @Bean
     public LockssRepository createRepository() {
-        return new LocalLockssRepository();
+        ArtifactIndex index = new VolatileArtifactIndex();
+        ArtifactStore store = new VolatileWarcArtifactStore();
+//        ArtifactStore store = new LocalWarcArtifactStore(new File("repo"));
+        return new BaseLockssRepository(index, store);
     }
 }
