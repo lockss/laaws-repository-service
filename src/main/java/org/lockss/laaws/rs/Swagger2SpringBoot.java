@@ -34,11 +34,13 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.SecurityAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
-@SpringBootApplication
+// TODO: This disables Spring authentication
+@SpringBootApplication(exclude = {SecurityAutoConfiguration.class })
 @EnableSwagger2
 @ComponentScan(basePackages = "org.lockss.laaws.rs")
 public class Swagger2SpringBoot implements CommandLineRunner {

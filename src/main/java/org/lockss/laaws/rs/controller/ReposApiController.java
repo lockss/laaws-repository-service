@@ -35,6 +35,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.*;
 import org.lockss.laaws.rs.api.ReposApi;
+import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactFactory;
 import org.lockss.laaws.rs.util.ArtifactUtil;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
@@ -60,58 +62,30 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- *
+ * Spring controller for the REST presentation of the LOCKSS Repository service.
  */
 @Controller
 public class ReposApiController implements ReposApi {
     private final static Log log = LogFactory.getLog(ReposApiController.class);
-
-    @Autowired
-    ArtifactStore artifactStore;
-
-    @Autowired
-    ArtifactIndex artifactIndex;
-
-    // TODO: Figure out a better place to put this?
     public static final String APPLICATION_HTTP_RESPONSE_VALUE = "application/http;msgtype=response";
     public static final MediaType APPLICATION_HTTP_RESPONSE = MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
 
+    @Autowired
+    LockssRepository repo;
+
     /**
-     * Implementation of GET on /repos: Returns a list of repository names
+     * GET /repos: Returns a list of collection names managed by this repository.
      *
-     * This works by creating a Solr "facet" query, which generates a response which includes the counts for each value
-     * for each field over the documents in the query result. The query is set to match all documents ('q=*:*'). We get
-     * the facet result page for the "repository" field (using FacetPage#getFacetResultPage), then iterate through the
-     * facet field's entries for value and value count, storing the former into an ArrayList to return.
-     *
-     * It is not clear how this scales to large Solr collections.
+     * @return List of collection names.
      */
     public ResponseEntity<List<String>> reposGet() {
-        /*
-        FacetQuery query = new SimpleFacetQuery(new Criteria(Criteria.WILDCARD).expression(Criteria.WILDCARD));
-        query.setFacetOptions(new FacetOptions().addFacetOnField("repository"));
-
-        // Not interested in the actual results
-        query.setRows(0);
-
-        // Submit and receive facet query results from Solr
-        FacetPage<SolrArtifactIndexData> page = solrTemplate.queryForFacetPage(query, SolrArtifactIndexData.class);
-
-        // Build a list of repository names
-        List<String> repos = new ArrayList<String>();
-        for (FacetFieldEntry ffe: page.getFacetResultPage("repository")) {
-            //log.info(ffe.getValue() + ": " + ffe.getValueCount());
-            repos.add(ffe.getValue());
-        }
-        */
-
         List<String> collectionIds = new ArrayList<>();
-        artifactIndex.getCollectionIds().forEachRemaining(x -> collectionIds.add(x));
+        repo.getCollectionIds().forEachRemaining(x -> collectionIds.add(x));
         return new ResponseEntity<>(collectionIds, HttpStatus.OK);
     }
 
     /**
-     * Implementation of DELETE on /repos/{repository}/artifacts/{artifactid}: Deletes an artifact from the repository
+     * DELETE /repos/{collection}/artifacts/{artifactId}: Deletes an artifact from a collection managed by this repository.
      *
      * @param repository
      * @param artifactid
@@ -119,16 +93,17 @@ public class ReposApiController implements ReposApi {
      */
     public ResponseEntity<Void> reposArtifactsArtifactidDelete(
             @ApiParam(value = "Repository to add artifact into", required=true) @PathVariable("repository") String repository,
-            @ApiParam(value = "Artifact ID", required=true) @PathVariable("artifactid") String artifactid) {
-
+            @ApiParam(value = "Artifact ID", required=true) @PathVariable("artifactid") String artifactid
+    ) {
         // Check that the artifact exists
-        if (!artifactIndex.artifactExists(artifactid))
+        if (!repo.artifactExists(artifactid))
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
         try {
             // Remove the artifact from the artifact store and index
-            artifactStore.deleteArtifact(artifactIndex.getArtifactIndexData(artifactid).getIdentifier());
-            artifactIndex.deleteArtifact(artifactid);
+            repo.deleteArtifact(repository, artifactid);
+            return new ResponseEntity<>(HttpStatus.OK);
+
         } catch (IOException e) {
             log.error(String.format(
                     "IOException occurred while attempting to delete artifact from repository (artifactId: %s)",
@@ -136,20 +111,12 @@ public class ReposApiController implements ReposApi {
             ));
 
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        } catch (URISyntaxException e) {
-            log.error(String.format(
-                    "URISyntaxException occurred while attempting to delete artifact from repository (artifactId: %s)",
-                    artifactid
-            ));
-
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
-        return new ResponseEntity<>(HttpStatus.OK);
     }
 
+
     /**
-     * Implementation of GET on /repos/{repository}/artifacts/{artifactid}: Returns an artifact from the repository
+     * GET /repos/{collection}/artifacts/{artifactId}: Retrieves an artifact from the repository.
      *
      * @param repository
      * @param artifactId
@@ -162,43 +129,35 @@ public class ReposApiController implements ReposApi {
         log.info(String.format("Retrieving artifact: %s from collection %s", artifactId, repository));
 
         // Make sure the artifact exists
-        if (!artifactIndex.artifactExists(artifactId))
+        if (!repo.artifactExists(artifactId))
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
         try {
             // Retrieve the Artifact from the artifact store
-            Artifact artifact = artifactStore.getArtifact(artifactIndex.getArtifactIndexData(artifactId).getIdentifier());
+            Artifact artifact = repo.getArtifact(repository, artifactId);
 
             // Setup HTTP response headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
             // TODO: headers.setContentLength();
 
-                return new ResponseEntity<>(
-                        outputStream -> {
-                            try {
-                                ArtifactUtil.writeHttpResponse(
-                                        ArtifactUtil.getHttpResponseFromArtifact(artifact),
-                                        outputStream
-                                );
-                            } catch (HttpException e) {
-                                e.printStackTrace();
-                            }
-                        },
-                        headers,
-                        HttpStatus.OK
-                );
+            return new ResponseEntity<>(
+                    outputStream -> {
+                        try {
+                            ArtifactUtil.writeHttpResponse(
+                                    ArtifactUtil.getHttpResponseFromArtifact(artifact),
+                                    outputStream
+                            );
+                        } catch (HttpException e) {
+                            e.printStackTrace();
+                        }
+                    },
+                    headers,
+                    HttpStatus.OK
+            );
         } catch (IOException e) {
             log.error(String.format(
                     "IOException occurred while attempting to retrieve artifact from repository (artifactId: %s): %s",
-                    artifactId,
-                    e
-            ));
-
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        } catch (URISyntaxException e) {
-            log.error(String.format(
-                    "URISyntaxException occurred while attempting to retrieve artifact from repository (artifactId: %s): %s",
                     artifactId,
                     e
             ));
@@ -224,25 +183,23 @@ public class ReposApiController implements ReposApi {
     ) {
 
         // Make sure that the artifact exists
-        if (!artifactIndex.artifactExists(artifactId))
+        if (!repo.artifactExists(artifactId))
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
         // Return bad request if new commit status has not been passed
         if (committed == null)
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 
-        ArtifactIndexData indexData = artifactIndex.getArtifactIndexData(artifactId);
-
         log.info(String.format(
                 "Updating commit status for %s (%s -> %s)",
                 artifactId,
-                indexData.getCommitted(),
+                repo.isArtifactCommitted(artifactId),
                 committed
         ));
 
         try {
             // Record the commit status in storage
-            artifactStore.commitArtifact(indexData.getIdentifier());
+            repo.commitArtifact(repository, artifactId);
         } catch (IOException e) {
             log.error(String.format(
                     "IOException occurred while attempting to update artifact metadata (artifactId: %s): %s",
@@ -250,23 +207,8 @@ public class ReposApiController implements ReposApi {
                     e
             ));
 
-            e.printStackTrace();
-
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        } catch (URISyntaxException e) {
-            log.error(String.format(
-                    "IOException occurred while attempting to update artifact metadata (artifactId: %s): %s",
-                    artifactId,
-                    e
-            ));
-
-            e.printStackTrace();
-
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
-        // Change the commit status in the index
-        artifactIndex.commitArtifact(artifactId);
 
         return new ResponseEntity<>(HttpStatus.OK);
     }
@@ -305,17 +247,21 @@ public class ReposApiController implements ReposApi {
             @ApiParam(value = "Begin listing with given artifact (used for pagination)") @RequestParam(value = "next_artifact", required = false) String nextArtifact
     ) {
 
-        ArtifactPredicateBuilder query = new ArtifactPredicateBuilder()
-                .filterByCommitStatus(committed)
-                .filterByCollection(repository)
-                .filterByAuid(auid)
-                .filterByURIPrefix(uri);
+//        ArtifactPredicateBuilder query = new ArtifactPredicateBuilder()
+//                .filterByCommitStatus(committed)
+//                .filterByCollection(repository)
+//                .filterByAuid(auid)
+//                .filterByURIPrefix(uri);
 
 
-        Iterator<ArtifactIndexData> result = artifactIndex.query(query);
+//        Iterator<ArtifactIndexData> result = repo.queryArtifacts(query);
 
-        List<String> artifacts = new ArrayList<>();
-        result.forEachRemaining(x -> artifacts.add(x.getId()));
+//        List<String> artifacts = new ArrayList<>();
+//        result.forEachRemaining(x -> artifacts.add(x.getId()));
+//        return new ResponseEntity<>(artifacts, HttpStatus.OK);
+
+        List<String> artifacts = new ArrayList<String>();
+        artifacts.add("ok");
         return new ResponseEntity<>(artifacts, HttpStatus.OK);
 
         /*
@@ -407,7 +353,7 @@ public class ReposApiController implements ReposApi {
         artifactMetadata.setCommitted(false);
         */
 
-        log.info(String.format("%s, %s, %s", repository, auid, uri));
+        log.info(String.format("Adding artifact %s, %s, %s, %d", repository, auid, uri, version));
 
         String artifactId = null;
 
@@ -424,12 +370,18 @@ public class ReposApiController implements ReposApi {
                 return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
             }
 
-            Artifact artifact = ArtifactFactory.fromHttpResponseStream(artifactPart.getInputStream());
-            artifactStore.addArtifact(artifact);
+            // Inject version header
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
+
+            Artifact artifact = ArtifactFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
+            artifactId = repo.addArtifact(artifact);
+
+            log.info(String.format("Wrote artifact to %s", artifact.getStorageUrl()));
 
             // Index artifact into Solr
-            ArtifactIndexData id = artifactIndex.indexArtifact(artifact);
-            artifactId = id.getId();
+//            ArtifactIndexData id = repo.indexArtifact(artifact);
+//            artifactId = id.getId();
 
             // TODO: Process artifact's aspects
             for (MultipartFile aspectPart : aspectParts) {

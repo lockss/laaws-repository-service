@@ -28,16 +28,27 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.io.index.solr;
+package org.lockss.laaws.rs.configuration;
 
-import org.springframework.data.repository.NoRepositoryBean;
-import org.springframework.data.solr.repository.SolrCrudRepository;
+import org.lockss.laaws.rs.core.BaseLockssRepository;
+import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
+import org.lockss.laaws.rs.io.storage.ArtifactStore;
+import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactStore;
+import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactStore;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-import java.util.List;
+import java.io.File;
 
-@NoRepositoryBean
-public interface SolrArtifactIndexRepository<A extends SolrArtifactIndexData> extends SolrCrudRepository<SolrArtifactIndexData, String> {
-    public A findById(String id);
-    public List<A> findByAuid(String auid);
-    public void deleteById(String id);
+@Configuration
+public class LockssRepositoryConfig {
+    @Bean
+    public LockssRepository createRepository() {
+        ArtifactIndex index = new VolatileArtifactIndex();
+        ArtifactStore store = new VolatileWarcArtifactStore();
+//        ArtifactStore store = new LocalWarcArtifactStore(new File("repo"));
+        return new BaseLockssRepository(index, store);
+    }
 }
