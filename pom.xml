@@ -97,16 +97,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <scope>provided</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-data-solr</artifactId>
-    </dependency>
+    <!--<dependency>-->
+      <!--<groupId>org.springframework.boot</groupId>-->
+      <!--<artifactId>spring-boot-starter-data-solr</artifactId>-->
+    <!--</dependency>-->
 
-    <dependency>
-      <groupId>org.springframework.data</groupId>
-      <artifactId>spring-data-solr</artifactId>
-      <version>${spring-data-solr.version}</version>
-    </dependency>
+    <!--<dependency>-->
+      <!--<groupId>org.springframework.data</groupId>-->
+      <!--<artifactId>spring-data-solr</artifactId>-->
+      <!--<version>${spring-data-solr.version}</version>-->
+    <!--</dependency>-->
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -169,10 +169,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     <dependency>
       <groupId>org.lockss.laaws</groupId>
-      <artifactId>laaws-repository-common</artifactId>
-      <version>1.2.0-SNAPSHOT</version>
+      <artifactId>laaws-repository-core</artifactId>
+      <version>1.3.0-SNAPSHOT</version>
     </dependency>
-    
+
+    <dependency>
+      <groupId>org.apache.solr</groupId>
+      <artifactId>solr-solrj</artifactId>
+      <version>6.6.0</version>
+    </dependency>
+
   </dependencies>
 
   <profiles>
