@@ -80,7 +80,13 @@ public class ReposApiController implements ReposApi {
      */
     public ResponseEntity<List<String>> reposGet() {
         List<String> collectionIds = new ArrayList<>();
-        repo.getCollectionIds().forEachRemaining(x -> collectionIds.add(x));
+        try {
+            repo.getCollectionIds().forEachRemaining(x -> collectionIds.add(x));
+        } catch (IOException e) {
+            log.error("IOException was caught trying to enumerate collection IDs");
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
         return new ResponseEntity<>(collectionIds, HttpStatus.OK);
     }
 
@@ -95,11 +101,11 @@ public class ReposApiController implements ReposApi {
             @ApiParam(value = "Repository to add artifact into", required=true) @PathVariable("repository") String repository,
             @ApiParam(value = "Artifact ID", required=true) @PathVariable("artifactid") String artifactid
     ) {
-        // Check that the artifact exists
-        if (!repo.artifactExists(artifactid))
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-
         try {
+            // Check that the artifact exists
+            if (!repo.artifactExists(artifactid))
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+
             // Remove the artifact from the artifact store and index
             repo.deleteArtifact(repository, artifactid);
             return new ResponseEntity<>(HttpStatus.OK);
@@ -128,11 +134,11 @@ public class ReposApiController implements ReposApi {
     ) {
         log.info(String.format("Retrieving artifact: %s from collection %s", artifactId, repository));
 
-        // Make sure the artifact exists
-        if (!repo.artifactExists(artifactId))
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-
         try {
+            // Make sure the artifact exists
+            if (!repo.artifactExists(artifactId))
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+
             // Retrieve the Artifact from the artifact store
             Artifact artifact = repo.getArtifact(repository, artifactId);
 
@@ -181,23 +187,22 @@ public class ReposApiController implements ReposApi {
             @ApiParam(value = "Artifact ID",required=true ) @PathVariable("artifactid") String artifactId,
             @ApiParam(value = "New commit status of artifact") @RequestPart(value="committed", required=false) Boolean committed
     ) {
-
-        // Make sure that the artifact exists
-        if (!repo.artifactExists(artifactId))
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-
         // Return bad request if new commit status has not been passed
         if (committed == null)
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 
-        log.info(String.format(
-                "Updating commit status for %s (%s -> %s)",
-                artifactId,
-                repo.isArtifactCommitted(artifactId),
-                committed
-        ));
-
         try {
+            // Make sure that the artifact exists
+            if (!repo.artifactExists(artifactId))
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+
+            log.info(String.format(
+                    "Updating commit status for %s (%s -> %s)",
+                    artifactId,
+                    repo.isArtifactCommitted(artifactId),
+                    committed
+            ));
+
             // Record the commit status in storage
             repo.commitArtifact(repository, artifactId);
         } catch (IOException e) {

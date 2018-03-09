@@ -31,7 +31,7 @@
 package org.lockss.laaws.rs.api;
 
 import io.swagger.annotations.*;
-import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndexData;
+import org.lockss.laaws.rs.model.ArtifactIndexData;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -90,9 +90,9 @@ public interface ReposApi {
     ResponseEntity<StreamingResponseBody> reposArtifactsArtifactidGet(@ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository,@ApiParam(value = "ArtifactInfo ID",required=true ) @PathVariable("artifactid") String artifactid) throws IOException;
 
 
-    @ApiOperation(value = "Update artifact metadata", notes = "", response = SolrArtifactIndexData.class, tags={  })
+    @ApiOperation(value = "Update artifact metadata", notes = "", response = ArtifactIndexData.class, tags={  })
     @ApiResponses(value = {
-        @ApiResponse(code = 200, message = "Artifact updated", response = SolrArtifactIndexData.class),
+        @ApiResponse(code = 200, message = "Artifact updated", response = ArtifactIndexData.class),
         @ApiResponse(code = 400, message = "Invalid input", response = Void.class),
         @ApiResponse(code = 401, message = "Unauthorized client", response = Void.class),
         @ApiResponse(code = 403, message = "Client not authorized to update artifact", response = Void.class),
@@ -137,9 +137,9 @@ public interface ReposApi {
     );
 
 
-    @ApiOperation(value = "Create an artifact", notes = "", response = SolrArtifactIndexData.class, tags={  })
+    @ApiOperation(value = "Create an artifact", notes = "", response = ArtifactIndexData.class, tags={  })
     @ApiResponses(value = {
-        @ApiResponse(code = 201, message = "Artifact created", response = SolrArtifactIndexData.class),
+        @ApiResponse(code = 201, message = "Artifact created", response = ArtifactIndexData.class),
         @ApiResponse(code = 302, message = "Duplicate content; artifact not created", response = Void.class),
         @ApiResponse(code = 400, message = "Invalid input", response = Void.class),
         @ApiResponse(code = 401, message = "Unauthorized client", response = Void.class),
