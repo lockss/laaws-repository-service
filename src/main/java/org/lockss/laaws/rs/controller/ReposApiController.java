@@ -36,7 +36,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.*;
 import org.lockss.laaws.rs.api.ReposApi;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.util.ArtifactDataConstants;
+import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
@@ -377,7 +377,7 @@ public class ReposApiController implements ReposApi {
 
             // Inject version header
             HttpHeaders headers = new HttpHeaders();
-            headers.set(ArtifactDataConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
+            headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
 
             ArtifactData artifact = ArtifactDataFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
             artifactId = repo.addArtifact(artifact);
