@@ -36,11 +36,11 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.*;
 import org.lockss.laaws.rs.api.ReposApi;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.util.ArtifactConstants;
-import org.lockss.laaws.rs.util.ArtifactFactory;
-import org.lockss.laaws.rs.util.ArtifactUtil;
+import org.lockss.laaws.rs.util.ArtifactDataConstants;
+import org.lockss.laaws.rs.util.ArtifactDataFactory;
+import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.model.ArtifactIndexData;
+import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.io.index.ArtifactPredicateBuilder;
 import org.lockss.laaws.rs.io.storage.ArtifactStore;
 import org.lockss.laaws.rs.model.*;
@@ -99,7 +99,7 @@ public class ReposApiController implements ReposApi {
      */
     public ResponseEntity<Void> reposArtifactsArtifactidDelete(
             @ApiParam(value = "Repository to add artifact into", required=true) @PathVariable("repository") String repository,
-            @ApiParam(value = "Artifact ID", required=true) @PathVariable("artifactid") String artifactid
+            @ApiParam(value = "ArtifactData ID", required=true) @PathVariable("artifactid") String artifactid
     ) {
         try {
             // Check that the artifact exists
@@ -130,7 +130,7 @@ public class ReposApiController implements ReposApi {
      */
     public ResponseEntity<StreamingResponseBody> reposArtifactsArtifactidGet(
             @ApiParam(value = "Repository to add artifact into", required = true) @PathVariable("repository") String repository,
-            @ApiParam(value = "Artifact ID", required = true) @PathVariable("artifactid") String artifactId
+            @ApiParam(value = "ArtifactData ID", required = true) @PathVariable("artifactid") String artifactId
     ) {
         log.info(String.format("Retrieving artifact: %s from collection %s", artifactId, repository));
 
@@ -139,8 +139,8 @@ public class ReposApiController implements ReposApi {
             if (!repo.artifactExists(artifactId))
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
-            // Retrieve the Artifact from the artifact store
-            Artifact artifact = repo.getArtifact(repository, artifactId);
+            // Retrieve the ArtifactData from the artifact store
+            ArtifactData artifact = repo.getArtifact(repository, artifactId);
 
             // Setup HTTP response headers
             HttpHeaders headers = new HttpHeaders();
@@ -150,8 +150,8 @@ public class ReposApiController implements ReposApi {
             return new ResponseEntity<>(
                     outputStream -> {
                         try {
-                            ArtifactUtil.writeHttpResponse(
-                                    ArtifactUtil.getHttpResponseFromArtifact(artifact),
+                            ArtifactDataUtil.writeHttpResponse(
+                                    ArtifactDataUtil.getHttpResponseFromArtifact(artifact),
                                     outputStream
                             );
                         } catch (HttpException e) {
@@ -184,7 +184,7 @@ public class ReposApiController implements ReposApi {
      */
     public ResponseEntity<String> reposArtifactsArtifactidPut(
             @ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository,
-            @ApiParam(value = "Artifact ID",required=true ) @PathVariable("artifactid") String artifactId,
+            @ApiParam(value = "ArtifactData ID",required=true ) @PathVariable("artifactid") String artifactId,
             @ApiParam(value = "New commit status of artifact") @RequestPart(value="committed", required=false) Boolean committed
     ) {
         // Return bad request if new commit status has not been passed
@@ -238,14 +238,14 @@ public class ReposApiController implements ReposApi {
      */
     public ResponseEntity<List<String>> reposArtifactsGet(
             @ApiParam(value = "Collection ID",required=true ) @PathVariable("repository") String repository,
-            @ApiParam(value = "Artifact ID") @RequestParam(value = "artifact", required = false) String artifact,
-            @ApiParam(value = "Artifact AUID") @RequestParam(value = "auid", required = false) String auid,
-            @ApiParam(value = "Artifact URI") @RequestParam(value = "uri", required = false) String uri,
-            @ApiParam(value = "Artifact aspect") @RequestParam(value = "aspect", required = false) String aspect,
+            @ApiParam(value = "ArtifactData ID") @RequestParam(value = "artifact", required = false) String artifact,
+            @ApiParam(value = "ArtifactData AUID") @RequestParam(value = "auid", required = false) String auid,
+            @ApiParam(value = "ArtifactData URI") @RequestParam(value = "uri", required = false) String uri,
+            @ApiParam(value = "ArtifactData aspect") @RequestParam(value = "aspect", required = false) String aspect,
             @ApiParam(value = "Date and time associated with artifact's content") @RequestParam(value = "timestamp", required = false) Integer timestamp,
             @ApiParam(value = "Date and time of artifact acquisition into repository") @RequestParam(value = "acquired", required = false) Integer acquired,
-            @ApiParam(value = "Artifact content digest") @RequestParam(value = "hash", required = false) String hash,
-            @ApiParam(value = "Artifact committed status", defaultValue = "true") @RequestParam(value = "committed", required = false, defaultValue="true") Boolean committed,
+            @ApiParam(value = "ArtifactData content digest") @RequestParam(value = "hash", required = false) String hash,
+            @ApiParam(value = "ArtifactData committed status", defaultValue = "true") @RequestParam(value = "committed", required = false, defaultValue="true") Boolean committed,
             @ApiParam(value = "Include artifact aspects in results (default: false)", defaultValue = "false") @RequestParam(value = "includeAllAspects", required = false, defaultValue="false") Boolean includeAllAspects,
             @ApiParam(value = "Includes all versions if set (default: false)", defaultValue = "false") @RequestParam(value = "includeAllVersions", required = false, defaultValue="false") Boolean includeAllVersions,
             @ApiParam(value = "Maximum number of results to return (used for pagination)", defaultValue = "1000") @RequestParam(value = "limit", required = false, defaultValue="1000") Integer limit,
@@ -259,7 +259,7 @@ public class ReposApiController implements ReposApi {
 //                .filterByURIPrefix(uri);
 
 
-//        Iterator<ArtifactIndexData> result = repo.queryArtifacts(query);
+//        Iterator<Artifact> result = repo.queryArtifacts(query);
 
 //        List<String> artifacts = new ArrayList<>();
 //        result.forEachRemaining(x -> artifacts.add(x.getId()));
@@ -343,8 +343,8 @@ public class ReposApiController implements ReposApi {
             @ApiParam(value = "",required=true ) @PathVariable("repository") String repository,
             @ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestPart(value="auid", required=true) String auid,
             @ApiParam(value = "URI represented by this artifact", required=true) @RequestPart(value="uri", required=true) String uri,
-            @ApiParam(value = "Artifact version", required=true) @RequestPart(value="version", required=true) Integer version,
-            @ApiParam(value = "Artifact") @RequestPart(value = "artifact", required=true) MultipartFile artifactPart,
+            @ApiParam(value = "ArtifactData version", required=true) @RequestPart(value="version", required=true) Integer version,
+            @ApiParam(value = "ArtifactData") @RequestPart(value = "artifact", required=true) MultipartFile artifactPart,
             @ApiParam(value = "Aspects") @RequestPart("aspects") MultipartFile... aspectParts
      ) {
 
@@ -363,7 +363,7 @@ public class ReposApiController implements ReposApi {
         String artifactId = null;
 
         try {
-            log.info(String.format("MultipartFile: Type: Artifact, Content-type: %s", artifactPart.getContentType()));
+            log.info(String.format("MultipartFile: Type: ArtifactData, Content-type: %s", artifactPart.getContentType()));
 
             // Only accept artifact encoded within an HTTP response
             if (!isHttpResponseType(MediaType.parseMediaType(artifactPart.getContentType()))) {
@@ -377,15 +377,15 @@ public class ReposApiController implements ReposApi {
 
             // Inject version header
             HttpHeaders headers = new HttpHeaders();
-            headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
+            headers.set(ArtifactDataConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
 
-            Artifact artifact = ArtifactFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
+            ArtifactData artifact = ArtifactDataFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
             artifactId = repo.addArtifact(artifact);
 
             log.info(String.format("Wrote artifact to %s", artifact.getStorageUrl()));
 
             // Index artifact into Solr
-//            ArtifactIndexData id = repo.indexArtifact(artifact);
+//            Artifact id = repo.indexArtifact(artifact);
 //            artifactId = id.getId();
 
             // TODO: Process artifact's aspects

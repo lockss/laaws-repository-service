@@ -31,7 +31,7 @@
 package org.lockss.laaws.rs.api;
 
 import io.swagger.annotations.*;
-import org.lockss.laaws.rs.model.ArtifactIndexData;
+import org.lockss.laaws.rs.model.Artifact;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -65,14 +65,14 @@ public interface ReposApi {
         @ApiResponse(code = 200, message = "Successfully removed artifact", response = Void.class),
         @ApiResponse(code = 401, message = "Unauthorized client", response = Void.class),
         @ApiResponse(code = 403, message = "Client not authorized to delete artifact", response = Void.class),
-        @ApiResponse(code = 404, message = "Artifact not found", response = Void.class),
+        @ApiResponse(code = 404, message = "ArtifactData not found", response = Void.class),
         @ApiResponse(code = 409, message = "Cannot delete committed artifact", response = Void.class) })
 
     @RequestMapping(value = "/repos/{repository}/artifacts/{artifactid}",
         produces = { "application/json" },
         //consumes = { "application/json" },
         method = RequestMethod.DELETE)
-    ResponseEntity<Void> reposArtifactsArtifactidDelete(@ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository,@ApiParam(value = "Artifact ID",required=true ) @PathVariable("artifactid") String artifactid);
+    ResponseEntity<Void> reposArtifactsArtifactidDelete(@ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository,@ApiParam(value = "ArtifactData ID",required=true ) @PathVariable("artifactid") String artifactid);
 
 
     @ApiOperation(value = "Get artifact content and metadata", notes = "", response = Void.class, tags={  })
@@ -80,7 +80,7 @@ public interface ReposApi {
         @ApiResponse(code = 200, message = "OK", response = Void.class),
         @ApiResponse(code = 401, message = "Unauthorized client", response = Void.class),
         @ApiResponse(code = 403, message = "Client not authorized to retrieve artifact", response = Void.class),
-        @ApiResponse(code = 404, message = "Artifact not found", response = Void.class),
+        @ApiResponse(code = 404, message = "ArtifactData not found", response = Void.class),
         @ApiResponse(code = 502, message = "Could not read from external resource", response = Void.class) })
 
     @RequestMapping(value = "/repos/{repository}/artifacts/{artifactid}",
@@ -90,19 +90,19 @@ public interface ReposApi {
     ResponseEntity<StreamingResponseBody> reposArtifactsArtifactidGet(@ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository,@ApiParam(value = "ArtifactInfo ID",required=true ) @PathVariable("artifactid") String artifactid) throws IOException;
 
 
-    @ApiOperation(value = "Update artifact metadata", notes = "", response = ArtifactIndexData.class, tags={  })
+    @ApiOperation(value = "Update artifact metadata", notes = "", response = Artifact.class, tags={  })
     @ApiResponses(value = {
-        @ApiResponse(code = 200, message = "Artifact updated", response = ArtifactIndexData.class),
+        @ApiResponse(code = 200, message = "ArtifactData updated", response = Artifact.class),
         @ApiResponse(code = 400, message = "Invalid input", response = Void.class),
         @ApiResponse(code = 401, message = "Unauthorized client", response = Void.class),
         @ApiResponse(code = 403, message = "Client not authorized to update artifact", response = Void.class),
-        @ApiResponse(code = 404, message = "Artifact not found", response = Void.class) })
+        @ApiResponse(code = 404, message = "ArtifactData not found", response = Void.class) })
 
     @RequestMapping(value = "/repos/{repository}/artifacts/{artifactid}",
         produces = { "application/json" },
         consumes = { "multipart/form-data" },
         method = RequestMethod.PUT)
-    ResponseEntity<String> reposArtifactsArtifactidPut(@ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository, @ApiParam(value = "Artifact ID",required=true ) @PathVariable("artifactid") String artifactid, @ApiParam(value = "New commit status of artifact") @RequestPart(value="committed", required=false)  Boolean committed);
+    ResponseEntity<String> reposArtifactsArtifactidPut(@ApiParam(value = "Repository to add artifact into",required=true ) @PathVariable("repository") String repository, @ApiParam(value = "ArtifactData ID",required=true ) @PathVariable("artifactid") String artifactid, @ApiParam(value = "New commit status of artifact") @RequestPart(value="committed", required=false)  Boolean committed);
 
 
     @ApiOperation(value = "Query repository for artifacts", notes = "", response = Object.class, tags={  })
@@ -122,14 +122,14 @@ public interface ReposApi {
     )
     ResponseEntity<List<String>> reposArtifactsGet(
             @ApiParam(value = "",required=true ) @PathVariable("repository") String repository,
-            @ApiParam(value = "Artifact ID") @RequestParam(value = "artifact", required = false) String artifact,
-            @ApiParam(value = "Artifact AUID") @RequestParam(value = "auid", required = false) String auid,
-            @ApiParam(value = "Artifact URI") @RequestParam(value = "uri", required = false) String uri,
-            @ApiParam(value = "Artifact URI aspect") @RequestParam(value = "aspect", required = false) String aspect,
+            @ApiParam(value = "ArtifactData ID") @RequestParam(value = "artifact", required = false) String artifact,
+            @ApiParam(value = "ArtifactData AUID") @RequestParam(value = "auid", required = false) String auid,
+            @ApiParam(value = "ArtifactData URI") @RequestParam(value = "uri", required = false) String uri,
+            @ApiParam(value = "ArtifactData URI aspect") @RequestParam(value = "aspect", required = false) String aspect,
             @ApiParam(value = "Date and time associated with artifact's content") @RequestParam(value = "timestamp", required = false) Integer timestamp,
             @ApiParam(value = "Date and time of artifact acquistion into repository") @RequestParam(value = "acquired", required = false) Integer acquired,
-            @ApiParam(value = "Artifact content hash") @RequestParam(value = "hash", required = false) String hash,
-            @ApiParam(value = "Artifact committed status", defaultValue = "true") @RequestParam(value = "committed", required = false, defaultValue="true") Boolean committed,
+            @ApiParam(value = "ArtifactData content hash") @RequestParam(value = "hash", required = false) String hash,
+            @ApiParam(value = "ArtifactData committed status", defaultValue = "true") @RequestParam(value = "committed", required = false, defaultValue="true") Boolean committed,
             @ApiParam(value = "Query results will include all aspects if set to true (default: false)", defaultValue = "false") @RequestParam(value = "includeAllAspects", required = false, defaultValue="false") Boolean includeAllAspects,
             @ApiParam(value = "Includes all versions if set (default: false)", defaultValue = "false") @RequestParam(value = "includeAllVersions", required = false, defaultValue="false") Boolean includeAllVersions,
             @ApiParam(value = "Maximum number of results to return (used for pagination)", defaultValue = "100") @RequestParam(value = "limit", required = false, defaultValue="100") Integer limit,
@@ -137,9 +137,9 @@ public interface ReposApi {
     );
 
 
-    @ApiOperation(value = "Create an artifact", notes = "", response = ArtifactIndexData.class, tags={  })
+    @ApiOperation(value = "Create an artifact", notes = "", response = Artifact.class, tags={  })
     @ApiResponses(value = {
-        @ApiResponse(code = 201, message = "Artifact created", response = ArtifactIndexData.class),
+        @ApiResponse(code = 201, message = "ArtifactData created", response = Artifact.class),
         @ApiResponse(code = 302, message = "Duplicate content; artifact not created", response = Void.class),
         @ApiResponse(code = 400, message = "Invalid input", response = Void.class),
         @ApiResponse(code = 401, message = "Unauthorized client", response = Void.class),
@@ -156,8 +156,8 @@ public interface ReposApi {
             @ApiParam(value = "",required=true ) @PathVariable("repository") String repository,
             @ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestPart(value="auid", required=true) String auid,
             @ApiParam(value = "URI represented by this artifact", required=true) @RequestPart(value="uri", required=true) String uri,
-            @ApiParam(value = "Artifact version", required=true) @RequestPart(value="version", required=true) Integer version,
-            @ApiParam(value = "Artifact") @RequestPart(value = "artifact", required=true) MultipartFile artifactPart,
+            @ApiParam(value = "ArtifactData version", required=true) @RequestPart(value="version", required=true) Integer version,
+            @ApiParam(value = "ArtifactData") @RequestPart(value = "artifact", required=true) MultipartFile artifactPart,
             @ApiParam(value = "Aspects") @RequestPart("aspects") MultipartFile... aspectParts
     );
 

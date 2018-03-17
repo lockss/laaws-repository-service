@@ -190,7 +190,7 @@ public class TestReposApiController {
         Object response = controller.reposRepositoryArtifactsPost("test", "xyzzy", "quote", null, null, content, metadata);
         assertThat(response, instanceOf(ResponseEntity.class));
 
-        // Check that an Artifact is encapsulated in the body
+        // Check that an ArtifactData is encapsulated in the body
         Object body = ((ResponseEntity<Object>)response).getBody();
         assertThat(body, instanceOf(AbstractArtifact.class));
 
