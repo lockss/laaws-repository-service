@@ -140,7 +140,7 @@ public class ReposApiController implements ReposApi {
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
             // Retrieve the ArtifactData from the artifact store
-            ArtifactData artifact = repo.getArtifact(repository, artifactId);
+            ArtifactData artifact = repo.getArtifactData(repository, artifactId);
 
             // Setup HTTP response headers
             HttpHeaders headers = new HttpHeaders();
@@ -380,7 +380,7 @@ public class ReposApiController implements ReposApi {
             headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
 
             ArtifactData artifact = ArtifactDataFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
-            artifactId = repo.addArtifact(artifact);
+            artifactId = repo.addArtifactData(artifact);
 
             log.info(String.format("Wrote artifact to %s", artifact.getStorageUrl()));
 
