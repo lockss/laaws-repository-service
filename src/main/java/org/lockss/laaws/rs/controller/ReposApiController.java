@@ -339,7 +339,7 @@ public class ReposApiController implements ReposApi {
      * @param uri
      * @return
      */
-     public ResponseEntity<String> reposArtifactsPost(
+     public ResponseEntity<Artifact> reposArtifactsPost(
             @ApiParam(value = "",required=true ) @PathVariable("repository") String repository,
             @ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestPart(value="auid", required=true) String auid,
             @ApiParam(value = "URI represented by this artifact", required=true) @RequestPart(value="uri", required=true) String uri,
@@ -360,8 +360,6 @@ public class ReposApiController implements ReposApi {
 
         log.info(String.format("Adding artifact %s, %s, %s, %d", repository, auid, uri, version));
 
-        String artifactId = null;
-
         try {
             log.info(String.format("MultipartFile: Type: ArtifactData, Content-type: %s", artifactPart.getContentType()));
 
@@ -379,10 +377,10 @@ public class ReposApiController implements ReposApi {
             HttpHeaders headers = new HttpHeaders();
             headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
 
-            ArtifactData artifact = ArtifactDataFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
-            artifactId = repo.addArtifact(artifact);
+            ArtifactData artifactData = ArtifactDataFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
+            Artifact artifact = repo.addArtifact(artifactData);
 
-            log.info(String.format("Wrote artifact to %s", artifact.getStorageUrl()));
+            log.info(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
 
             // Index artifact into Solr
 //            Artifact id = repo.indexArtifact(artifact);
@@ -412,11 +410,13 @@ public class ReposApiController implements ReposApi {
                 artifactIndexRepository.save(info);
                 */
             }
+
+            return new ResponseEntity<>(artifact, HttpStatus.OK);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Caught IOException while attempting to add an artifact to the repository");
         }
 
-        return new ResponseEntity<>(artifactId, HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     private static Boolean isHttpResponseType(MediaType type) {
