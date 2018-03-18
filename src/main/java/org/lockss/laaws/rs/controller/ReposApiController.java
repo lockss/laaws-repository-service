@@ -380,7 +380,7 @@ public class ReposApiController implements ReposApi {
             headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
 
             ArtifactData artifact = ArtifactDataFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
-            artifactId = repo.addArtifactData(artifact);
+            artifactId = repo.addArtifact(artifact);
 
             log.info(String.format("Wrote artifact to %s", artifact.getStorageUrl()));
 
