@@ -152,7 +152,7 @@ public interface ReposApi {
         consumes = { "multipart/form-data" },
         method = RequestMethod.POST
     )
-    ResponseEntity<String> reposArtifactsPost(
+    ResponseEntity<Artifact> reposArtifactsPost(
             @ApiParam(value = "",required=true ) @PathVariable("repository") String repository,
             @ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestPart(value="auid", required=true) String auid,
             @ApiParam(value = "URI represented by this artifact", required=true) @RequestPart(value="uri", required=true) String uri,
