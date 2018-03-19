@@ -34,6 +34,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactStore;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,11 +83,16 @@ public class TestReposApiController {
     @Autowired
     private MockMvc controller;
 
-    @MockBean
-    private ArtifactIndex artifactIndex;
+//    @MockBean
+//    private ArtifactIndex artifactIndex;
+
+//    @MockBean
+//    private ArtifactStore artifactStore;
 
     @MockBean
-    private ArtifactStore artifactStore;
+    private LockssRepository repo;
+
+
 
 //    @TestConfiguration
 //    public static class RepoControllerTestConfig {
@@ -111,7 +117,7 @@ public class TestReposApiController {
         List<String> collections = new ArrayList<>();
         collections.add("test");
 
-        given(this.artifactIndex.getCollectionIds()).willReturn(collections.iterator());
+        given(this.repo.getCollectionIds()).willReturn(collections.iterator());
 
         this.controller.perform(get("/repos")).andExpect(status().isOk()).andExpect(
                 content().string("[\"test\"]"));
@@ -184,7 +190,7 @@ public class TestReposApiController {
         Object response = controller.reposRepositoryArtifactsPost("test", "xyzzy", "quote", null, null, content, metadata);
         assertThat(response, instanceOf(ResponseEntity.class));
 
-        // Check that an Artifact is encapsulated in the body
+        // Check that an ArtifactData is encapsulated in the body
         Object body = ((ResponseEntity<Object>)response).getBody();
         assertThat(body, instanceOf(AbstractArtifact.class));
 
