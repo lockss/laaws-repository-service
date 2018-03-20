@@ -117,7 +117,7 @@ public class TestReposApiController {
         List<String> collections = new ArrayList<>();
         collections.add("test");
 
-        given(this.repo.getCollectionIds()).willReturn(collections.iterator());
+        given(this.repo.getCollectionIds()).willReturn(collections);
 
         this.controller.perform(get("/repos")).andExpect(status().isOk()).andExpect(
                 content().string("[\"test\"]"));

@@ -81,7 +81,7 @@ public class ReposApiController implements ReposApi {
     public ResponseEntity<List<String>> reposGet() {
         List<String> collectionIds = new ArrayList<>();
         try {
-            repo.getCollectionIds().forEachRemaining(x -> collectionIds.add(x));
+            repo.getCollectionIds().forEach(x -> collectionIds.add(x));
         } catch (IOException e) {
             log.error("IOException was caught trying to enumerate collection IDs");
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
