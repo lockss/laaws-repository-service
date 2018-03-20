@@ -36,8 +36,8 @@ import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
-import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactStore;
-import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactStore;
+import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactDataStore;
+import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -51,8 +51,8 @@ public class LockssRepositoryConfig {
     public LockssRepository createRepository() throws MalformedURLException {
 //        ArtifactIndex index = new VolatileArtifactIndex();
         ArtifactIndex index = new SolrArtifactIndex("http://localhost:8983/solr/test");
-        ArtifactDataStore store = new VolatileWarcArtifactStore();
-//        ArtifactDataStore store = new LocalWarcArtifactStore(new File("repo"));
+        ArtifactDataStore store = new VolatileWarcArtifactDataStore();
+//        ArtifactDataStore store = new LocalWarcArtifactDataStore(new File("repo"));
         return new BaseLockssRepository(index, store);
     }
 }
