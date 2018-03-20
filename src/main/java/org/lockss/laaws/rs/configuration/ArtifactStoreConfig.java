@@ -31,7 +31,7 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactStore;
+import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -43,7 +43,7 @@ public class ArtifactStoreConfig {
     ArtifactIndex index;
 
     @Bean
-    public ArtifactStore setArtifactStore() {
+    public ArtifactDataStore setArtifactStore() {
         // Volatile (memory-only) artifact store (default)
         return new VolatileWarcArtifactStore();
 
