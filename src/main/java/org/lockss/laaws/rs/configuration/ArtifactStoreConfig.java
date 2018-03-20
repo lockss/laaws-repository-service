@@ -31,8 +31,8 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactStore;
-import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactStore;
+import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
+import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,16 +43,16 @@ public class ArtifactStoreConfig {
     ArtifactIndex index;
 
     @Bean
-    public ArtifactStore setArtifactStore() {
+    public ArtifactDataStore setArtifactStore() {
         // Volatile (memory-only) artifact store (default)
-        return new VolatileWarcArtifactStore();
+        return new VolatileWarcArtifactDataStore();
 
         // Local filesystem-based artifact store
-//        return new LocalWarcArtifactStore(index, new File("./repo/"));
+//        return new LocalWarcArtifactDataStore(index, new File("./repo/"));
 
         // Hadoop Distributed File System (HDFS) artifact store
 //        org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration();
 //        conf.set("fs.defaultFS", "hdfs://localhost:9000");
-//        return new HdfsWarcArtifactStore(conf, new Path("/lockss-repo/"), index);
+//        return new HdfsWarcArtifactDataStore(conf, new Path("/lockss-repo/"), index);
     }
 }

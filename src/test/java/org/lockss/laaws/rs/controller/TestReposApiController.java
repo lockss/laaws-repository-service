@@ -36,7 +36,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactStore;
+import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -87,7 +87,7 @@ public class TestReposApiController {
 //    private ArtifactIndex artifactIndex;
 
 //    @MockBean
-//    private ArtifactStore artifactStore;
+//    private ArtifactDataStore artifactStore;
 
     @MockBean
     private LockssRepository repo;
@@ -117,7 +117,7 @@ public class TestReposApiController {
         List<String> collections = new ArrayList<>();
         collections.add("test");
 
-        given(this.repo.getCollectionIds()).willReturn(collections.iterator());
+        given(this.repo.getCollectionIds()).willReturn(collections);
 
         this.controller.perform(get("/repos")).andExpect(status().isOk()).andExpect(
                 content().string("[\"test\"]"));
