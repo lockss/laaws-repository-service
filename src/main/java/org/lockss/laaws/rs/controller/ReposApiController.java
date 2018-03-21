@@ -140,7 +140,7 @@ public class ReposApiController implements ReposApi {
                 return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
             // Retrieve the ArtifactData from the artifact store
-            ArtifactData artifact = repo.getArtifactData(repository, artifactId);
+            ArtifactData artifactData = repo.getArtifactData(repository, artifactId);
 
             // Setup HTTP response headers
             HttpHeaders headers = new HttpHeaders();
@@ -151,7 +151,12 @@ public class ReposApiController implements ReposApi {
                     outputStream -> {
                         try {
                             ArtifactDataUtil.writeHttpResponse(
-                                    ArtifactDataUtil.getHttpResponseFromArtifact(artifact),
+                                    ArtifactDataUtil.getHttpResponseFromArtifact(
+                                            artifactData.getIdentifier(),
+                                            artifactData.getHttpStatus(),
+                                            artifactData.getMetadata(),
+                                            artifactData.getInputStream()
+                                    ),
                                     outputStream
                             );
                         } catch (HttpException e) {
