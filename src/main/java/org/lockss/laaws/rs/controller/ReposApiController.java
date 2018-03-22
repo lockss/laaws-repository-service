@@ -39,10 +39,7 @@ import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.io.index.ArtifactPredicateBuilder;
-import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.model.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -56,9 +53,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -145,7 +140,15 @@ public class ReposApiController implements ReposApi {
             // Setup HTTP response headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
-            // TODO: headers.setContentLength();
+            headers.setContentLength(artifactData.getContentLength());
+
+            // Include LOCKSS repository headers in the HTTP response
+            ArtifactIdentifier id = artifactData.getIdentifier();
+            headers.set(ArtifactConstants.ARTIFACTID_ID_KEY, id.getId());
+            headers.set(ArtifactConstants.ARTIFACTID_COLLECTION_KEY, id.getCollection());
+            headers.set(ArtifactConstants.ARTIFACTID_AUID_KEY, id.getAuid());
+            headers.set(ArtifactConstants.ARTIFACTID_URI_KEY, id.getUri());
+            headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(id.getVersion()));
 
             return new ResponseEntity<>(
                     outputStream -> {
@@ -271,7 +274,7 @@ public class ReposApiController implements ReposApi {
 //        return new ResponseEntity<>(artifacts, HttpStatus.OK);
 
         List<String> artifacts = new ArrayList<String>();
-        artifacts.add("ok");
+        artifacts.add("Not implemented");
         return new ResponseEntity<>(artifacts, HttpStatus.OK);
 
         /*
@@ -353,16 +356,6 @@ public class ReposApiController implements ReposApi {
             @ApiParam(value = "Aspects") @RequestPart("aspects") MultipartFile... aspectParts
      ) {
 
-        // Create a new SolrArtifactIndexData and set some of its properties
-        /*
-        SolrArtifactIndexData artifactMetadata = new SolrArtifactIndexData();
-        artifactMetadata.setCollection(repository);
-        artifactMetadata.setAuid(auid);
-        artifactMetadata.setUri(uri);
-        //artifactMetadata.setVersion(version);
-        artifactMetadata.setCommitted(false);
-        */
-
         log.info(String.format("Adding artifact %s, %s, %s, %d", repository, auid, uri, version));
 
         try {
@@ -378,18 +371,17 @@ public class ReposApiController implements ReposApi {
                 return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
             }
 
-            // Inject version header
-            HttpHeaders headers = new HttpHeaders();
-            headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY, String.valueOf(version));
+            // Convert multipart stream to ArtifactData
+            ArtifactData artifactData = ArtifactDataFactory.fromHttpResponseStream(artifactPart.getInputStream());
 
-            ArtifactData artifactData = ArtifactDataFactory.fromHttpResponseStream(headers, artifactPart.getInputStream());
+            // Set ArtifactData properties from the POST request
+            ArtifactIdentifier id = new ArtifactIdentifier(repository, auid, uri, version);
+            artifactData.setIdentifier(id);
+            artifactData.setContentLength(artifactPart.getSize());
+
             Artifact artifact = repo.addArtifact(artifactData);
 
             log.info(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
-
-            // Index artifact into Solr
-//            Artifact id = repo.indexArtifact(artifact);
-//            artifactId = id.getId();
 
             // TODO: Process artifact's aspects
             for (MultipartFile aspectPart : aspectParts) {
