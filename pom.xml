@@ -167,7 +167,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <dependency>
       <groupId>org.lockss.laaws</groupId>
       <artifactId>laaws-repository-core</artifactId>
-      <version>1.7.0</version>
+      <version>1.8.0-SNAPSHOT</version>
     </dependency>
 
     <dependency>
