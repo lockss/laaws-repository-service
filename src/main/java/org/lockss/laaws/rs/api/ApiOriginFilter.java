@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -35,7 +35,6 @@ import java.io.IOException;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletResponse;
 
-@javax.annotation.Generated(value = "io.swagger.codegen.languages.SpringCodegen", date = "2017-06-09T15:47:21.006-07:00")
 
 public class ApiOriginFilter implements javax.servlet.Filter {
     @Override

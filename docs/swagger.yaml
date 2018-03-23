@@ -85,26 +85,24 @@ paths:
         required: true
         type: "string"
         description: "URI represented by this artifact"
-      - name: "aspect"
+      - name: "version"
         in: "formData"
         required: true
-        type: "string"
-        description: "URI aspect represented by this artifact"
-      - name: "timestamp"
-        in: "formData"
-        required: true
-        type: "string"
-        description: "Date and time of content (e.g., from Last-Modified)"
-      - name: "metadata"
-        in: "formData"
-        required: false
-        type: "file"
-        description: "Content metadata (must be *application/json*)"
+        type: "integer"
+        description: "The version of the URI contained by the artifact"
       - name: "content"
         in: "formData"
         required: true
         type: "file"
         description: "Content byte stream"
+      - name: "aspectParts"
+        in: "formData"
+        required: true
+        type: array
+        collectionFormat: multi
+        items:
+          type: "file"
+        description: "URI aspects represented by this artifact"
       responses:
         201:
           description: "Artifact created"
@@ -119,7 +117,7 @@ paths:
         400:
           description: "Invalid input"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to create artifacts"
         502:
@@ -150,9 +148,9 @@ paths:
         200:
           description: "Artifact created"
           schema:
-            $ref: "#/definitions/artifact"
+            $ref: "#/definitions/streamingResponseBody"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve artifact"
         404:
@@ -179,7 +177,7 @@ paths:
         400:
           description: "Invalid input"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to update artifact"
         404:
@@ -193,7 +191,7 @@ paths:
         200:
           description: "Successfully removed artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to delete artifact"
         404:
@@ -224,7 +222,7 @@ paths:
             items:
               type: "string"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -251,7 +249,7 @@ paths:
             items:
               $ref: "#/definitions/artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -283,7 +281,7 @@ paths:
             items:
               $ref: "#/definitions/artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -315,7 +313,7 @@ paths:
             items:
               $ref: "#/definitions/artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -350,7 +348,7 @@ paths:
           schema:
             $ref: "#/definitions/artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -385,7 +383,7 @@ paths:
           schema:
             $ref: "#/definitions/artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -427,7 +425,7 @@ paths:
             items:
               $ref: "#/definitions/artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -464,7 +462,7 @@ paths:
             items:
               $ref: "#/definitions/artifact"
         401:
-          description: "Unauthorized client"
+          description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
@@ -505,3 +503,6 @@ definitions:
         type: "boolean"
       storageUrl:
         type: "string"
+  streamingResponseBody:
+    type: "object"
+        

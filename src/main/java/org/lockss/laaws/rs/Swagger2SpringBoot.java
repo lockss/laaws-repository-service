@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -42,27 +42,27 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
 // TODO: This disables Spring authentication
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class })
 @EnableSwagger2
-@ComponentScan(basePackages = "org.lockss.laaws.rs")
+@ComponentScan(basePackages = { "org.lockss.laaws.rs", "org.lockss.laaws.rs.api" })
 public class Swagger2SpringBoot implements CommandLineRunner {
 
-    @Override
-    public void run(String... arg0) throws Exception {
-        if (arg0.length > 0 && arg0[0].equals("exitcode")) {
-            throw new ExitException();
-        }
-    }
+  @Override
+  public void run(String... arg0) throws Exception {
+      if (arg0.length > 0 && arg0[0].equals("exitcode")) {
+          throw new ExitException();
+      }
+  }
 
-    public static void main(String[] args) throws Exception {
-        new SpringApplication(Swagger2SpringBoot.class).run(args);
-    }
+  public static void main(String[] args) throws Exception {
+      new SpringApplication(Swagger2SpringBoot.class).run(args);
+  }
 
-    class ExitException extends RuntimeException implements ExitCodeGenerator {
-        private static final long serialVersionUID = 1L;
+  class ExitException extends RuntimeException implements ExitCodeGenerator {
+      private static final long serialVersionUID = 1L;
 
-        @Override
-        public int getExitCode() {
-            return 10;
-        }
+      @Override
+      public int getExitCode() {
+          return 10;
+      }
 
-    }
+  }
 }
