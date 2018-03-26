@@ -302,7 +302,7 @@ public class CollectionsApiController implements CollectionsApi {
       @ApiParam(value = "file detail") @Valid
       @RequestPart("file") MultipartFile content,
       @ApiParam(value = "URI aspects represented by this artifact", required=true)
-      @RequestParam(value="aspects", required=true)  MultipartFile... aspectParts
+      @RequestParam(value="aspects", required=true)  MultipartFile aspectParts
       ) {
 
     log.info(String.format("Adding artifact %s, %s, %s, %d",
@@ -338,9 +338,9 @@ public class CollectionsApiController implements CollectionsApi {
       log.info(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
 
       // TODO: Process artifact's aspects
-      for (MultipartFile aspectPart : aspectParts) {
-	log.warn(String.format("Ignoring MultipartFile: Type: Aspect, Content-type: %s",
-	    aspectPart.getContentType()));
+//      for (MultipartFile aspectPart : aspectParts) {
+//	log.warn(String.format("Ignoring MultipartFile: Type: Aspect, Content-type: %s",
+//	    aspectPart.getContentType()));
 	//log.info(IOUtils.toString(aspectPart.getInputStream()));
 	//log.info(aspectPart.getName());
 
@@ -361,7 +361,7 @@ public class CollectionsApiController implements CollectionsApi {
                 SolrArtifactIndexData info = artifactStore.addArtifact(artifactMetadata, response.getEntity().getContent());
                 artifactIndexRepository.save(info);
 	 */
-      }
+//      }
 
       return new ResponseEntity<>(artifact, HttpStatus.OK);
     } catch (IOException e) {
@@ -388,7 +388,21 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("collectionid") String collectionid,
       @ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true)
       @PathVariable("auid") String auid) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusAuidGet() invoked");
+
+    try {
+      List<Artifact> result = new ArrayList<>();
+      repo.getAllArtifactsAllVersions(collectionid, auid).forEach(result::add);
+      log.info("collectionsCollectionidAusAuidGet(): result.size() = "
+	  + result.size());
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifacts from repository (collectionid: %s, auid: %s): %s",
+	  collectionid, auid, e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
@@ -412,7 +426,22 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("auid") String auid,
       @ApiParam(value = "The prefix to be matched by the artifact URLs", required = true)
       @PathVariable("prefix") String prefix) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusAuidUrlPrefixPrefixGet() invoked");
+
+    try {
+      List<Artifact> result = new ArrayList<>();
+      repo.getAllArtifactsWithPrefixAllVersions(collectionid, auid, prefix)
+      .forEach(result::add);
+      log.info("collectionsCollectionidAusAuidUrlPrefixPrefixGet(): result.size() = "
+	  + result.size());
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifacts from repository (collectionid: %s, auid: %s,"
+	  + " prefix: %s): %s", collectionid, auid, prefix, e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
@@ -436,7 +465,22 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("auid") String auid,
       @ApiParam(value = "The prefix to be matched by the artifact URLs", required = true)
       @PathVariable("prefix") String prefix) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet() invoked");
+
+    try {
+      List<Artifact> result = new ArrayList<>();
+      repo.getAllArtifactsWithPrefix(collectionid, auid, prefix)
+      .forEach(result::add);
+      log.info("collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet(): result.size() = "
+	  + result.size());
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifacts from repository (collectionid: %s, auid: %s,"
+	  + " prefix: %s): %s", collectionid, auid, prefix, e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
@@ -456,7 +500,21 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("collectionid") String collectionid,
       @ApiParam(value = "Identifier of the Archival Unit containing the artifacts", required = true)
       @PathVariable("auid") String auid) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusAuidUrlsGet() invoked");
+
+    try {
+      List<Artifact> result = new ArrayList<>();
+      repo.getAllArtifacts(collectionid, auid).forEach(result::add);
+      log.info("collectionsCollectionidAusAuidUrlsGet(): result.size() = "
+	  + result.size());
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifacts from repository (collectionid: %s, auid: %s): %s",
+	  collectionid, auid, e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
@@ -480,7 +538,22 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("auid") String auid,
       @ApiParam(value = "The URL contained by the artifacts", required = true)
       @PathVariable("url") String url) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusAuidUrlsUrlGet() invoked");
+
+    try {
+      List<Artifact> result = new ArrayList<>();
+      repo.getArtifactAllVersions(collectionid, auid, url)
+      .forEach(result::add);
+      log.info("collectionsCollectionidAusAuidUrlsUrlGet(): result.size() = "
+	  + result.size());
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifacts from repository (collectionid: %s, auid: %s, url: %s):"
+	  + " %s", collectionid, auid, url, e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
@@ -504,7 +577,19 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("auid") String auid,
       @ApiParam(value = "The URL contained by the artifact", required = true)
       @PathVariable("url") String url) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusAuidUrlsUrlLatestGet() invoked");
+
+    try {
+      Artifact result = repo.getArtifact(collectionid, auid, url);
+      log.info("collectionsCollectionidAusAuidUrlsUrlLatestGet(): result " + result);
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifact from repository (collectionid: %s, auid: %s, url: %s):"
+	  + " %s", collectionid, auid, url, e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
@@ -533,7 +618,20 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("url") String url,
       @ApiParam(value = "The version of the URL contained by the artifact", required = true)
       @PathVariable("version") Integer version) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusAuidUrlsUrlVersionGet() invoked");
+
+    try {
+      Artifact result =
+	  repo.getArtifactVersion(collectionid, auid, url, version);
+      log.info("collectionsCollectionidAusAuidUrlsUrlVersionGet(): result " + result);
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifact from repository (collectionid: %s, auid: %s, url: %s, version: %i):"
+	  + " %s", collectionid, auid, url, version, e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
@@ -548,7 +646,21 @@ public class CollectionsApiController implements CollectionsApi {
   public ResponseEntity<List<String>> collectionsCollectionidAusGet(
       @ApiParam(value = "Identifier of the collection containing the Archival Units", required = true)
       @PathVariable("collectionid") String collectionid) {
-    return new ResponseEntity<>(null, HttpStatus.OK);
+    log.info("collectionsCollectionidAusGet() invoked");
+
+    try {
+      List<String> result = new ArrayList<>();
+      repo.getAuIds(collectionid).forEach(result::add);
+      log.info("collectionsCollectionidAusGet(): result.size() = "
+	  + result.size());
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      log.error(String.format("Exception occurred while attempting to retrieve"
+	  + " artifacts from repository (collectionid: %s): %s", collectionid,
+	  e));
+    }
+
+    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   private static Boolean isHttpResponseType(MediaType type) {

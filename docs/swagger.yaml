@@ -48,8 +48,6 @@ tags:
     description: Tasks on the repository collections
 schemes:
 - "http"
-consumes:
-- "application/json"
 produces:
 - "application/json"
 paths:
@@ -98,10 +96,7 @@ paths:
       - name: "aspectParts"
         in: "formData"
         required: true
-        type: array
-        collectionFormat: multi
-        items:
-          type: "file"
+        type: "file"
         description: "URI aspects represented by this artifact"
       responses:
         201:
@@ -186,6 +181,8 @@ paths:
       tags:
         - collections
       summary: "Remove an artifact from the repository"
+      consumes:
+      - "application/json"
       parameters: []
       responses:
         200:
