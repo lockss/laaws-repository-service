@@ -36,6 +36,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.SecurityAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
+import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.util.UrlPathHelper;
 
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
@@ -43,7 +48,8 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
 @SpringBootApplication(exclude = {SecurityAutoConfiguration.class })
 @EnableSwagger2
 @ComponentScan(basePackages = { "org.lockss.laaws.rs", "org.lockss.laaws.rs.api" })
-public class Swagger2SpringBoot implements CommandLineRunner {
+public class Swagger2SpringBoot extends WebMvcConfigurerAdapter
+implements CommandLineRunner {
 
   @Override
   public void run(String... arg0) throws Exception {
@@ -53,7 +59,61 @@ public class Swagger2SpringBoot implements CommandLineRunner {
   }
 
   public static void main(String[] args) throws Exception {
+    System.setProperty("org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "true");
       new SpringApplication(Swagger2SpringBoot.class).run(args);
+  }
+
+  @Override
+  public void configurePathMatch(PathMatchConfigurer configurer) {
+      UrlPathHelper urlPathHelper = new UrlPathHelper();
+      urlPathHelper.setUrlDecode(false);
+      configurer.setUrlPathHelper(urlPathHelper);
+  }
+
+  /**
+   * Sets configuration options common to all the LOCKSS Spring Boot
+   * applications.
+   */
+  protected static void configure() {
+    System.setProperty(
+	"org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "true");
+  }
+
+  /**
+   * Modifier of the behavior of standard Spring MVC.
+   */
+  @Configuration
+  public static class SpringMvcCustomization extends WebMvcConfigurerAdapter {
+    @Override
+    public void configurePathMatch(PathMatchConfigurer configurer) {
+      // Prevent Spring from URL-decoding the context path and request URI,
+      // as both are returned not URL-decoded by the Servlet API.
+      UrlPathHelper urlPathHelper = new UrlPathHelper();
+      urlPathHelper.setUrlDecode(false);
+      configurer.setUrlPathHelper(urlPathHelper);
+
+      // Prevent Spring from interpreting the end of a URL as a file suffix.
+      configurer.setUseSuffixPatternMatch(false);
+      configurer.setUseRegisteredSuffixPatternMatch(false);
+
+      // Prevent Spring from thinking that a URL is the same as the same URL
+      // with a slash appended to it.
+      configurer.setUseTrailingSlashMatch(false);
+    }
+
+    @Override
+    public void configureContentNegotiation(ContentNegotiationConfigurer
+	configurer) {
+      // Prevent Spring from interpreting the end of a URL as a file suffix, or
+      // from interpreting a "format=..." parameter for content type
+      // specification and use only the Accept header for content type
+      // negotiation.
+      configurer.favorPathExtension(false)
+      .favorParameter(false)
+      .ignoreAcceptHeader(false)
+      .useJaf(false)
+      .ignoreUnknownPathExtensions(false);
+    }
   }
 
   class ExitException extends RuntimeException implements ExitCodeGenerator {
