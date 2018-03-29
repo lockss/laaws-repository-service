@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -34,6 +34,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
@@ -55,7 +56,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @RunWith(SpringRunner.class)
-@WebMvcTest(ReposApiController.class)
+@WebMvcTest(CollectionsApiController.class)
 @AutoConfigureMockMvc(secure = false)
 public class TestReposApiController {
     private final static Log log = LogFactory.getLog(TestReposApiController.class);
@@ -119,7 +120,7 @@ public class TestReposApiController {
 
         given(this.repo.getCollectionIds()).willReturn(collections);
 
-        this.controller.perform(get("/repos")).andExpect(status().isOk()).andExpect(
+        this.controller.perform(get("/collections")).andExpect(status().isOk()).andExpect(
                 content().string("[\"test\"]"));
     }
 
