@@ -1,0 +1,505 @@
+# Copyright (c) 2000-2018 Board of Trustees of Leland Stanford Jr. University,
+# all rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its contributors
+# may be used to endorse or promote products derived from this software without
+# specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+swagger: "2.0"
+info:
+  description: "API of the LOCKSS RepositoryService for the LAAWS project"
+  version: "1.0.0"
+  title: "LOCKSS RepositoryService API"
+  termsOfService: "https://www.lockss.org/terms/"
+  contact:
+    name: "Daniel Vargas"
+    url: "https://www.lockss.org/"
+    email: "dlvargas@stanford.edu"
+  license:
+    name: "BSD"
+    url: "https://www.lockss.org/license/"
+host: "laaws.lockss.org:443"
+basePath: "/"
+tags:
+  - name: Default
+    description: Default section
+  - name: collections
+    description: Tasks on the repository collections
+schemes:
+- "http"
+produces:
+- "application/json"
+paths:
+  /collections:
+    get:
+      tags:
+        - collections
+      summary: "Get collection identifiers of the committed artifacts in the\
+        \ repository"
+      parameters: []
+      responses:
+        200:
+          description: "Status 200"
+          schema:
+            type: "array"
+            items:
+              type: "string"
+  /collections/{collectionid}/artifacts:
+    post:
+      tags:
+        - collections
+      summary: "Create an artifact"
+      consumes:
+      - "multipart/form-data"
+      parameters:
+      - name: "auid"
+        in: "formData"
+        required: true
+        type: "string"
+        description: "Archival Unit ID (AUID) of new artifact"
+      - name: "uri"
+        in: "formData"
+        required: true
+        type: "string"
+        description: "URI represented by this artifact"
+      - name: "version"
+        in: "formData"
+        required: true
+        type: "integer"
+        description: "The version of the URI contained by the artifact"
+      - name: "content"
+        in: "formData"
+        required: true
+        type: "file"
+        description: "Content byte stream"
+      - name: "aspectParts"
+        in: "formData"
+        required: true
+        type: "file"
+        description: "URI aspects represented by this artifact"
+      responses:
+        201:
+          description: "Artifact created"
+          schema:
+            $ref: "#/definitions/artifact"
+        302:
+          description: "Duplicate content; artifact not created"
+          headers:
+            Location:
+              type: "string"
+              description: "Repository query URL to duplicate artifacts"
+        400:
+          description: "Invalid input"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to create artifacts"
+        502:
+          description: "Internal error creating artifact"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Collection containing the artifact"
+  /collections/{collectionid}/artifacts/{artifactid}:
+    get:
+      tags:
+        - collections
+      summary: "Get artifact content and metadata"
+      parameters:
+      - name: "Accept"
+        in: "header"
+        required: false
+        type: "string"
+        description: "Content type to return"
+        default: "multipart/related"
+        enum:
+        - "application/http"
+        - "application/warc"
+        - "multipart/related"
+      responses:
+        200:
+          description: "Artifact created"
+          schema:
+            $ref: "#/definitions/streamingResponseBody"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve artifact"
+        404:
+          description: "Artifact not found"
+        502:
+          description: "Could not read from external resource"
+    put:
+      tags:
+        - collections
+      summary: "Update the committed property of an artifact"
+      consumes:
+      - "multipart/form-data"
+      parameters:
+      - name: "committed"
+        in: "formData"
+        required: false
+        type: "boolean"
+        description: "New commit status of artifact"
+      responses:
+        200:
+          description: "Artifact updated"
+          schema:
+            $ref: "#/definitions/artifact"
+        400:
+          description: "Invalid input"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to update artifact"
+        404:
+          description: "Artifact not found"
+    delete:
+      tags:
+        - collections
+      summary: "Remove an artifact from the repository"
+      consumes:
+      - "application/json"
+      parameters: []
+      responses:
+        200:
+          description: "Successfully removed artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to delete artifact"
+        404:
+          description: "Artifact not found"
+        409:
+          description: "Cannot delete committed artifact"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Collection containing the artifact"
+    - name: "artifactid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the artifact"
+  /collections/{collectionid}/aus:
+    get:
+      tags:
+        - collections
+      summary: "Get Archival Unit IDs (AUIDs) in a collection"
+      responses:
+        200:
+          description: "OK"
+          schema:
+            type: "array"
+            items:
+              type: "string"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the Archival Units"
+  /collections/{collectionid}/aus/{auid}:
+    get:
+      tags:
+        - collections
+      summary: "Get committed artifacts of all versions of all URLs in a\
+        \ collection and Archival Unit"
+      responses:
+        200:
+          description: "The requested artifacts"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the artifacts"
+    - name: "auid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the Archival Unit containing the artifacts"
+  /collections/{collectionid}/aus/{auid}/urls:
+    get:
+      tags:
+        - collections
+      summary: "Get committed artifacts of the latest version of all URLs in a\
+        \ collection and Archival Unit"
+      responses:
+        200:
+          description: "The requested artifacts"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the artifacts"
+    - name: "auid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the Archival Unit containing the artifacts"
+  /collections/{collectionid}/aus/{auid}/urls/{url}:
+    get:
+      tags:
+        - collections
+      summary: "Get committed artifacts of all versions of a given URL in a\
+        \ collection and Archival Unit"
+      responses:
+        200:
+          description: "The requested artifacts"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the artifacts"
+    - name: "auid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the Archival Unit containing the artifacts"
+    - name: "url"
+      in: "path"
+      required: true
+      type: "string"
+      description: "The URL contained by the artifacts"
+  /collections/{collectionid}/aus/{auid}/urls/{url}/latest:
+    get:
+      tags:
+        - collections
+      summary: "Get the committed artifact with the latest version of a given\
+        \ URL in a collection and Archival Unit"
+      responses:
+        200:
+          description: "The requested artifact"
+          schema:
+            $ref: "#/definitions/artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the artifact"
+    - name: "auid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the Archival Unit containing the artifact"
+    - name: "url"
+      in: "path"
+      required: true
+      type: "string"
+      description: "The URL contained by the artifact"
+  /collections/{collectionid}/aus/{auid}/urls/{url}/{version}:
+    get:
+      tags:
+        - collections
+      summary: "Get the committed artifact with a given version of a given URL\
+        \ in a collection and Archival Unit"
+      responses:
+        200:
+          description: "The requested artifact"
+          schema:
+            $ref: "#/definitions/artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the artifact"
+    - name: "auid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the Archival Unit containing the artifact"
+    - name: "url"
+      in: "path"
+      required: true
+      type: "string"
+      description: "The URL contained by the artifact"
+    - name: "version"
+      in: "path"
+      required: true
+      type: "integer"
+      description: "The version of the URL contained by the artifact"
+  /collections/{collectionid}/aus/{auid}/url-prefix/{prefix}:
+    get:
+      tags:
+        - collections
+      summary: "Get committed artifacts of all versions of all URLs matching a\
+        \ prefix, in a collection and Archival Unit"
+      responses:
+        200:
+          description: "The requested artifacts"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the artifacts"
+    - name: "auid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the Archival Unit containing the artifacts"
+    - name: "prefix"
+      in: "path"
+      required: true
+      type: "string"
+      description: "The prefix to be matched by the artifact URLs"
+  /collections/{collectionid}/aus/{auid}/url-prefix/{prefix}/latest:
+    get:
+      tags:
+        - collections
+      summary: "Get committed artifacts of the latest version of all URLs\
+        \ matching a prefix, in a collection and Archival Unit"
+      responses:
+        200:
+          description: "The requested artifacts"
+          schema:
+            type: "array"
+            items:
+              $ref: "#/definitions/artifact"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
+    parameters:
+    - name: "collectionid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the collection containing the artifacts"
+    - name: "auid"
+      in: "path"
+      required: true
+      type: "string"
+      description: "Identifier of the Archival Unit containing the artifacts"
+    - name: "prefix"
+      in: "path"
+      required: true
+      type: "string"
+      description: "The prefix to be matched by the artifact URLs"
+definitions:
+  artifact:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+      collection:
+        type: "string"
+      auid:
+        type: "string"
+      uri:
+        type: "string"
+      version:
+        type: "integer"
+      committed:
+        type: "boolean"
+      storageUrl:
+        type: "string"
+  streamingResponseBody:
+    type: "object"
+        
