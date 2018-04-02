@@ -333,7 +333,7 @@ paths:
       required: true
       type: "string"
       description: "The URL contained by the artifacts"
-  /collections/{collectionid}/aus/{auid}/urls/{url}/latest:
+  /collections/{collectionid}/aus/{auid}/urls/latest/{url}:
     get:
       tags:
         - collections
@@ -368,7 +368,7 @@ paths:
       required: true
       type: "string"
       description: "The URL contained by the artifact"
-  /collections/{collectionid}/aus/{auid}/urls/{url}/{version}:
+  /collections/{collectionid}/aus/{auid}/{version}/urls/{url}:
     get:
       tags:
         - collections
@@ -445,7 +445,7 @@ paths:
       required: true
       type: "string"
       description: "The prefix to be matched by the artifact URLs"
-  /collections/{collectionid}/aus/{auid}/url-prefix/{prefix}/latest:
+  /collections/{collectionid}/aus/{auid}/url-prefix/latest/{prefix}:
     get:
       tags:
         - collections
