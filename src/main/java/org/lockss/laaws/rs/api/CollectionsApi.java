@@ -185,7 +185,7 @@ public interface CollectionsApi {
         @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
         @ApiResponse(code = 404, message = "Collection not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/url-prefix/{prefix}",
+    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/url-prefix/{prefix}/**",
         produces = { "application/json" }, 
         method = RequestMethod.GET)
     default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlPrefixPrefixGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The prefix to be matched by the artifact URLs",required=true) @PathVariable("prefix") String prefix) {
@@ -212,7 +212,7 @@ public interface CollectionsApi {
         @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
         @ApiResponse(code = 404, message = "Collection not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/url-prefix/{prefix}/latest",
+    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/url-prefix/latest/{prefix}/**",
         produces = { "application/json" }, 
         method = RequestMethod.GET)
     default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The prefix to be matched by the artifact URLs",required=true) @PathVariable("prefix") String prefix) {
@@ -266,7 +266,7 @@ public interface CollectionsApi {
         @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
         @ApiResponse(code = 404, message = "Collection not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/{url}",
+    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/{url}/**",
         produces = { "application/json" }, 
         method = RequestMethod.GET)
     default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlsUrlGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifacts",required=true) @PathVariable("url") String url) {
@@ -293,7 +293,7 @@ public interface CollectionsApi {
         @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
         @ApiResponse(code = 404, message = "Collection not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/{url}/latest",
+    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/latest/{url}/**",
         produces = { "application/json" }, 
         method = RequestMethod.GET)
     default ResponseEntity<Artifact> collectionsCollectionidAusAuidUrlsUrlLatestGet(@ApiParam(value = "Identifier of the collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifact",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifact",required=true) @PathVariable("url") String url) {
@@ -320,10 +320,10 @@ public interface CollectionsApi {
         @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
         @ApiResponse(code = 404, message = "Collection not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/{url}/{version}",
+    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/{version}/urls/{url}/**",
         produces = { "application/json" }, 
         method = RequestMethod.GET)
-    default ResponseEntity<Artifact> collectionsCollectionidAusAuidUrlsUrlVersionGet(@ApiParam(value = "Identifier of the collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifact",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifact",required=true) @PathVariable("url") String url,@ApiParam(value = "The version of the URL contained by the artifact",required=true) @PathVariable("version") Integer version) {
+    default ResponseEntity<Artifact> collectionsCollectionidAusAuidUrlsUrlVersionGet(@ApiParam(value = "Identifier of the collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifact",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The version of the URL contained by the artifact",required=true) @PathVariable("version") Integer version,@ApiParam(value = "The URL contained by the artifact",required=true) @PathVariable("url") String url) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
             if (getAcceptHeader().get().contains("application/json")) {
                 try {

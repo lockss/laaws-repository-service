@@ -53,15 +53,16 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import org.springframework.web.util.UriUtils;
 
-@Controller
+@RestController
 public class CollectionsApiController implements CollectionsApi {
   private final static Log log = LogFactory.getLog(CollectionsApiController.class);
   public static final String APPLICATION_HTTP_RESPONSE_VALUE =
@@ -430,27 +431,35 @@ public class CollectionsApiController implements CollectionsApi {
       @ApiParam(value = "The prefix to be matched by the artifact URLs", required = true)
       @PathVariable("prefix") String prefix) {
     log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixGet() "
-	+ "collectionid = " + collectionid + ", auid = " + auid + ", prefix = "
-	+ prefix);
+	+ "collectionid = " + collectionid + ", auid = " + auid);
+
+    String fullPrefix =
+	request.getRequestURL().toString().split("/url-prefix/")[1];
+    if (log.isDebugEnabled()) log.debug("fullPrefix = " + fullPrefix);
+
+    String decodedPrefix = null;
 
     try {
+      decodedPrefix = UriUtils.decode(fullPrefix, "UTF-8");
+      if (log.isDebugEnabled()) log.debug("decodedPrefix = " + decodedPrefix);
+
       List<Artifact> result = new ArrayList<>();
-      repo.getAllArtifactsWithPrefixAllVersions(collectionid, auid, prefix)
-      .forEach(result::add);
+      repo.getAllArtifactsWithPrefixAllVersions(collectionid, auid,
+	  decodedPrefix).forEach(result::add);
       log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixGet(): "
 	  + "result.size() = " + result.size());
       return new ResponseEntity<>(result, HttpStatus.OK);
     } catch (Exception e) {
       log.error(String.format("Exception occurred while attempting to retrieve"
 	  + " artifacts from repository (collectionid: %s, auid: %s,"
-	  + " prefix: %s): %s", collectionid, auid, prefix, e));
+	  + " prefix: %s): %s", collectionid, auid, decodedPrefix, e));
     }
 
     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/url-prefix/{prefix}/latest:
+   * GET /collections/{collectionid}/aus/{auid}/url-prefix/latest/{prefix}:
    * Get committed artifacts of the latest version of all URLs matching a
    * prefix, in a collection and Archival Unit.
    *
@@ -471,12 +480,20 @@ public class CollectionsApiController implements CollectionsApi {
       @ApiParam(value = "The prefix to be matched by the artifact URLs", required = true)
       @PathVariable("prefix") String prefix) {
     log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet() "
-	+ "collectionid = " + collectionid + ", auid = " + auid + ", prefix = "
-	+ prefix);
+	+ "collectionid = " + collectionid + ", auid = " + auid);
+
+    String fullPrefix =
+	request.getRequestURL().toString().split("/url-prefix/latest/")[1];
+    if (log.isDebugEnabled()) log.debug("fullPrefix = " + fullPrefix);
+
+    String decodedPrefix = null;
 
     try {
+      decodedPrefix = UriUtils.decode(fullPrefix, "UTF-8");
+      if (log.isDebugEnabled()) log.debug("decodedPrefix = " + decodedPrefix);
+
       List<Artifact> result = new ArrayList<>();
-      repo.getAllArtifactsWithPrefix(collectionid, auid, prefix)
+      repo.getAllArtifactsWithPrefix(collectionid, auid, decodedPrefix)
       .forEach(result::add);
       log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet(): "
 	  + "result.size() = " + result.size());
@@ -484,7 +501,7 @@ public class CollectionsApiController implements CollectionsApi {
     } catch (Exception e) {
       log.error(String.format("Exception occurred while attempting to retrieve"
 	  + " artifacts from repository (collectionid: %s, auid: %s,"
-	  + " prefix: %s): %s", collectionid, auid, prefix, e));
+	  + " prefix: %s): %s", collectionid, auid, decodedPrefix, e));
     }
 
     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -547,11 +564,19 @@ public class CollectionsApiController implements CollectionsApi {
       @ApiParam(value = "The URL contained by the artifacts", required = true)
       @PathVariable("url") String url) {
     log.debug("collectionsCollectionidAusAuidUrlsUrlGet() collectionid = "
-	+ collectionid + ", auid = " + auid + ", url = " + url);
+	+ collectionid + ", auid = " + auid);
+
+    String fullUrl = request.getRequestURL().toString().split("/urls/")[1];
+    if (log.isDebugEnabled()) log.debug("fullUrl = " + fullUrl);
+
+    String decodedUrl = null;
 
     try {
+      decodedUrl = UriUtils.decode(fullUrl, "UTF-8");
+      if (log.isDebugEnabled()) log.debug("decodedUrl = " + decodedUrl);
+
       List<Artifact> result = new ArrayList<>();
-      repo.getArtifactAllVersions(collectionid, auid, url)
+      repo.getArtifactAllVersions(collectionid, auid, decodedUrl)
       .forEach(result::add);
       log.debug("collectionsCollectionidAusAuidUrlsUrlGet(): result.size() = "
 	  + result.size());
@@ -559,14 +584,14 @@ public class CollectionsApiController implements CollectionsApi {
     } catch (Exception e) {
       log.error(String.format("Exception occurred while attempting to retrieve"
 	  + " artifacts from repository (collectionid: %s, auid: %s, url: %s):"
-	  + " %s", collectionid, auid, url, e));
+	  + " %s", collectionid, auid, decodedUrl, e));
     }
 
     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/urls/{url}/latest:
+   * GET /collections/{collectionid}/aus/{auid}/urls/latest/{url}:
    * Get the committed artifact with the latest version of a given URL in a
    * collection and Archival Unit.
    *
@@ -587,24 +612,33 @@ public class CollectionsApiController implements CollectionsApi {
       @ApiParam(value = "The URL contained by the artifact", required = true)
       @PathVariable("url") String url) {
     log.debug("collectionsCollectionidAusAuidUrlsUrlLatestGet() collectionid = "
-	+ collectionid + ", auid = " + auid + ", url = " + url);
+	+ collectionid + ", auid = " + auid);
+
+    String fullUrl =
+	request.getRequestURL().toString().split("/urls/latest/")[1];
+    if (log.isDebugEnabled()) log.debug("fullUrl = " + fullUrl);
+
+    String decodedUrl = null;
 
     try {
-      Artifact result = repo.getArtifact(collectionid, auid, url);
+      decodedUrl = UriUtils.decode(fullUrl, "UTF-8");
+      if (log.isDebugEnabled()) log.debug("decodedUrl = " + decodedUrl);
+
+      Artifact result = repo.getArtifact(collectionid, auid, decodedUrl);
       log.debug("collectionsCollectionidAusAuidUrlsUrlLatestGet(): result "
 	  + result);
       return new ResponseEntity<>(result, HttpStatus.OK);
     } catch (Exception e) {
       log.error(String.format("Exception occurred while attempting to retrieve"
 	  + " artifact from repository (collectionid: %s, auid: %s, url: %s):"
-	  + " %s", collectionid, auid, url, e));
+	  + " %s", collectionid, auid, decodedUrl, e));
     }
 
     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/urls/{url}/{version}:
+   * GET /collections/{collectionid}/aus/{auid}/{version}/urls/{url}:
    * Get the committed artifact with a given version of a given URL in a
    * collection and Archival Unit.
    *
@@ -612,10 +646,10 @@ public class CollectionsApiController implements CollectionsApi {
    *          A String with the name of the collection containing the artifact.
    * @param auid
    *          A String with the Archival Unit ID (AUID) of artifact.
-   * @param url
-   *          A String with the URL.
    * @param version
    *          An Integer with the version.
+   * @param url
+   *          A String with the URL.
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
@@ -624,17 +658,25 @@ public class CollectionsApiController implements CollectionsApi {
       @PathVariable("collectionid") String collectionid,
       @ApiParam(value = "Identifier of the Archival Unit containing the artifact", required = true)
       @PathVariable("auid") String auid,
-      @ApiParam(value = "The URL contained by the artifact", required = true)
-      @PathVariable("url") String url,
       @ApiParam(value = "The version of the URL contained by the artifact", required = true)
-      @PathVariable("version") Integer version) {
+      @PathVariable("version") Integer version,
+      @ApiParam(value = "The URL contained by the artifact", required = true)
+      @PathVariable("url") String url) {
     log.debug("collectionsCollectionidAusAuidUrlsUrlVersionGet()"
-	+ "collectionid = " + collectionid + ", auid = " + auid + ", url = "
-	+ url + ", version = " + version);
+	+ "collectionid = " + collectionid + ", auid = " + auid
+	+ ", version = " + version);
+
+    String fullUrl = request.getRequestURL().toString().split("/urls/")[1];
+    if (log.isDebugEnabled()) log.debug("fullUrl = " + fullUrl);
+
+    String decodedUrl = null;
 
     try {
+      decodedUrl = UriUtils.decode(fullUrl, "UTF-8");
+      if (log.isDebugEnabled()) log.debug("decodedUrl = " + decodedUrl);
+
       Artifact result =
-	  repo.getArtifactVersion(collectionid, auid, url, version);
+	  repo.getArtifactVersion(collectionid, auid, decodedUrl, version);
       log.debug("collectionsCollectionidAusAuidUrlsUrlVersionGet(): result "
 	  + result);
       return new ResponseEntity<>(result, HttpStatus.OK);
