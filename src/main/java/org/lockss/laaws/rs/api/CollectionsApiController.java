@@ -41,6 +41,7 @@ import javax.validation.Valid;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpException;
+import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
@@ -60,7 +61,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
-import org.springframework.web.util.UriUtils;
 
 @RestController
 public class CollectionsApiController implements CollectionsApi {
@@ -92,18 +92,24 @@ public class CollectionsApiController implements CollectionsApi {
    */
   @Override
   public ResponseEntity<List<String>> collectionsGet() {
-    log.debug("collectionsGet() invoked");
+    log.debug("collectionsGet(): Invoked");
     List<String> collectionIds = new ArrayList<>();
     try {
       Iterable<String> ids = repo.getCollectionIds();
-      log.debug("ids.iterator().hasNext() = " + ids.iterator().hasNext());
+      log.debug("collectionsGet(): ids.iterator().hasNext() = "
+	  + ids.iterator().hasNext());
       ids.forEach(x -> collectionIds.add(x));
     } catch (IOException e) {
-      log.error("IOException was caught trying to enumerate collection IDs");
-      return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+      String errorMessage =
+	  "IOException was caught trying to enumerate collection IDs";
+
+      log.warn(errorMessage);
+
+      throw new LockssRestServiceException(errorMessage, e,
+	  HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    log.debug("collectionIds = " + collectionIds);
+    log.debug("collectionsGet(): collectionIds = " + collectionIds);
     return new ResponseEntity<>(collectionIds, HttpStatus.OK);
   }
 
@@ -126,20 +132,37 @@ public class CollectionsApiController implements CollectionsApi {
       ) {
     try {
       // Check that the artifact exists
-      if (!repo.artifactExists(artifactid))
-	return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+      if (!repo.artifactExists(artifactid)) {
+	String errorMessage = "The artifact to be deleted does not exist";
+	log.warn(errorMessage);
+
+	String parsedRequest = String.format("collectionid: %s, artifactid: %s",
+	    collectionid, artifactid);
+
+	log.warn("Parsed request: " + parsedRequest);
+
+	throw new LockssRestServiceException(errorMessage, HttpStatus.NOT_FOUND,
+	    parsedRequest);
+      }
 
       // Remove the artifact from the artifact store and index
       repo.deleteArtifact(collectionid, artifactid);
       return new ResponseEntity<>(HttpStatus.OK);
 
     } catch (IOException e) {
-      log.error(String.format(
+      String errorMessage = String.format(
 	  "IOException occurred while attempting to delete artifact from repository (artifactId: %s)",
-	  artifactid
-	  ));
+	  artifactid);
 
-      return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+      log.warn(errorMessage, e);
+
+      String parsedRequest = String.format("collectionid: %s, artifactid: %s",
+	  collectionid, artifactid);
+   
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, e,
+	  HttpStatus.INTERNAL_SERVER_ERROR, parsedRequest);
     }
   }
 
@@ -167,8 +190,19 @@ public class CollectionsApiController implements CollectionsApi {
 
     try {
       // Make sure the artifact exists
-      if (!repo.artifactExists(artifactid))
-	return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+      if (!repo.artifactExists(artifactid)) {
+	String errorMessage = "The artifact to be retrieved does not exist";
+	log.warn(errorMessage);
+
+	String parsedRequest = String.format(
+	    "collectionid: %s, artifactid: %s, accept: %s",
+	    collectionid, artifactid, accept);
+
+	log.warn("Parsed request: " + parsedRequest);
+
+	throw new LockssRestServiceException(errorMessage, HttpStatus.NOT_FOUND,
+	    parsedRequest);
+      }
 
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData =
@@ -210,13 +244,20 @@ public class CollectionsApiController implements CollectionsApi {
 	  HttpStatus.OK
 	  );
     } catch (IOException e) {
-      log.error(String.format(
-	  "IOException occurred while attempting to retrieve artifact from repository (artifactId: %s): %s",
-	  artifactid,
-	  e
-	  ));
+      String errorMessage = String.format(
+	  "IOException occurred while attempting to retrieve artifact from repository (artifactId: %s)",
+	  artifactid);
 
-      return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+      log.warn(errorMessage, e);
+
+      String parsedRequest = String.format(
+	  "collectionid: %s, artifactid: %s, accept: %s",
+	  collectionid, artifactid, accept);
+   
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, e,
+	  HttpStatus.INTERNAL_SERVER_ERROR, parsedRequest);
     }
   }
 
@@ -244,13 +285,35 @@ public class CollectionsApiController implements CollectionsApi {
       @RequestParam(value="committed", required=false)  Boolean committed
       ) {
     // Return bad request if new commit status has not been passed
-    if (committed == null)
-      return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+    if (committed == null) {
+      String errorMessage = "The committed status cannot be null";
+      log.warn(errorMessage);
+
+      String parsedRequest = String.format(
+	  "collectionid: %s, artifactid: %s, committed: %s",
+	  collectionid, artifactid, committed);
+
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, HttpStatus.BAD_REQUEST,
+	  parsedRequest);
+    }
 
     try {
       // Make sure that the artifact exists
-      if (!repo.artifactExists(artifactid))
-	return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+      if (!repo.artifactExists(artifactid)) {
+	String errorMessage = "The artifact to be updated does not exist";
+	log.warn(errorMessage);
+
+	String parsedRequest = String.format(
+	    "collectionid: %s, artifactid: %s, committed: %s",
+	    collectionid, artifactid, committed);
+
+	log.warn("Parsed request: " + parsedRequest);
+
+	throw new LockssRestServiceException(errorMessage, HttpStatus.NOT_FOUND,
+	    parsedRequest);
+      }
 
       log.info(String.format(
 	  "Updating commit status for %s (%s -> %s)",
@@ -262,13 +325,20 @@ public class CollectionsApiController implements CollectionsApi {
       // Record the commit status in storage
       repo.commitArtifact(collectionid, artifactid);
     } catch (IOException e) {
-      log.error(String.format(
-	  "IOException occurred while attempting to update artifact metadata (artifactId: %s): %s",
-	  artifactid,
-	  e
-	  ));
+      String errorMessage = String.format(
+	  "IOException occurred while attempting to update artifact metadata (artifactId: %s)",
+	  artifactid);
 
-      return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+      log.warn(errorMessage, e);
+
+      String parsedRequest = String.format(
+	  "collectionid: %s, artifactid: %s, committed: %s",
+	  collectionid, artifactid, committed);
+   
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, e,
+	  HttpStatus.INTERNAL_SERVER_ERROR, parsedRequest);
     }
 
     return new ResponseEntity<>(HttpStatus.OK);
@@ -318,12 +388,21 @@ public class CollectionsApiController implements CollectionsApi {
       // Only accept artifact encoded within an HTTP response
       if (!isHttpResponseType(MediaType.parseMediaType(content
 	  .getContentType()))) {
-
-	log.error(String.format("Failed to add artifact; expected %s but got %s",
+	String errorMessage = String.format(
+	    "Failed to add artifact; expected %s but got %s",
 	    APPLICATION_HTTP_RESPONSE,
-	    MediaType.parseMediaType(content.getContentType())));
+	    MediaType.parseMediaType(content.getContentType()));
 
-	return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+	log.warn(errorMessage);
+
+	String parsedRequest = String.format(
+	    "collectionid: %s, auid: %s, uri: %s, version: %s",
+	    collectionid, auid, uri, version);
+
+	log.warn("Parsed request: " + parsedRequest);
+
+	throw new LockssRestServiceException(errorMessage,
+	    HttpStatus.BAD_REQUEST, parsedRequest);
       }
 
       // Convert multipart stream to ArtifactData
@@ -368,325 +447,271 @@ public class CollectionsApiController implements CollectionsApi {
 
       return new ResponseEntity<>(artifact, HttpStatus.OK);
     } catch (IOException e) {
-      log.error("Caught IOException while attempting to add an artifact to the repository");
-    }
+      String errorMessage =
+	  "Caught IOException while attempting to add an artifact to the repository";
 
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+      log.warn(errorMessage, e);
+
+      String parsedRequest = String.format(
+	  "collectionid: %s, auid: %s, uri: %s, version: %s",
+	  collectionid, auid, uri, version);
+   
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, e,
+	  HttpStatus.INTERNAL_SERVER_ERROR, parsedRequest);
+    }
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}:
-   * Get committed artifacts of all versions of all URLs in a collection and
-   * Archival Unit.
+   * GET /collections/{collectionid}/aus/{auid}/artifacts:
+   * Get committed artifacts in a collection and Archival Unit.
    *
    * @param collectionid
    *          A String with the name of the collection containing the artifact.
    * @param auid
    *          A String with the Archival Unit ID (AUID) of artifact.
+   * @param url
+   *          A String with the URL contained by the artifacts.
+   * @param urlPrefix
+   *          A String with the prefix to be matched by the artifact URLs.
+   * @param version
+   *          An Integer with the version of the URL contained by the artifacts.
    * @return a {@code ResponseEntity<List<Artifact>>}.
    */
   @Override
-  public ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidGet(
+  public ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidArtifactsGet(
       @ApiParam(value = "Identifier of the collection containing the artifacts",required=true)
       @PathVariable("collectionid") String collectionid,
       @ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true)
-      @PathVariable("auid") String auid) {
-    log.debug("collectionsCollectionidAusAuidGet() collectionid = "
-      + collectionid + ", auid = " + auid);
+      @PathVariable("auid") String auid,
+      @ApiParam(value = "The URL contained by the artifacts") @Valid
+      @RequestParam(value = "url", required = false) String url,
+      @ApiParam(value = "The prefix to be matched by the artifact URLs") @Valid
+      @RequestParam(value = "urlPrefix", required = false) String urlPrefix,
+      @ApiParam(value = "The version of the URL contained by the artifacts")
+      @Valid
+      @RequestParam(value = "version", required = false) String version) {
+    log.debug("collectionsCollectionidAusAuidGet(): collectionid = "
+      + collectionid + ", auid = " + auid + ", url = " + url + ", urlPrefix = "
+      + urlPrefix + ", version = " + version);
+
+    boolean isLatestVersion =
+	version == null || version.toLowerCase().equals("latest");
+
+    boolean isAllVersions =
+	version != null && version.toLowerCase().equals("all");
+
+    if (urlPrefix != null && url != null) {
+      String errorMessage =
+	  "The 'urlPrefix' and 'url' arguments are mutually exclusive";
+
+      log.warn(errorMessage);
+
+      String parsedRequest = String.format(
+	  "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s",
+	  collectionid, auid, url, urlPrefix, version);
+     
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, HttpStatus.BAD_REQUEST,
+	  parsedRequest);
+    }
+
+    boolean isSpecificVersion = !isAllVersions && !isLatestVersion;
+    boolean isAllUrls = url == null && urlPrefix == null;
+
+    if (isSpecificVersion && (isAllUrls || urlPrefix != null)) {
+      String errorMessage =
+	  "A specific 'version' argument requires a 'url' argument";
+
+      log.warn(errorMessage);
+
+      String parsedRequest = String.format(
+	  "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s",
+	  collectionid, auid, url, urlPrefix, version);
+     
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, HttpStatus.BAD_REQUEST,
+	  parsedRequest);
+    }
+
+    int numericVersion = 0;
+
+    if (isSpecificVersion) {
+      try {
+	numericVersion = Integer.parseInt(version);
+
+	if (numericVersion <= 0) {
+	  String errorMessage =
+	      "The 'version' argument is not a positive integer";
+
+	  log.warn(errorMessage);
+
+	  String parsedRequest = String.format(
+	      "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s",
+	      collectionid, auid, url, urlPrefix, version);
+
+	  log.warn("Parsed request: " + parsedRequest);
+
+	  throw new LockssRestServiceException(errorMessage,
+	      HttpStatus.BAD_REQUEST, parsedRequest);
+	}
+      } catch (NumberFormatException nfe) {
+	String errorMessage =
+	    "The 'version' argument is not a positive integer";
+
+	log.warn(errorMessage);
+
+	String parsedRequest = String.format(
+	    "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s",
+	    collectionid, auid, url, urlPrefix, version);
+
+	log.warn("Parsed request: " + parsedRequest);
+
+	throw new LockssRestServiceException(errorMessage,
+	    HttpStatus.BAD_REQUEST, parsedRequest);
+      }
+    }
 
     try {
       List<Artifact> result = new ArrayList<>();
-      repo.getAllArtifactsAllVersions(collectionid, auid).forEach(result::add);
+
+      if (isAllUrls && isAllVersions) {
+	log.debug("collectionsCollectionidAusAuidGet(): "
+	    + "All versions of all URLs");
+	repo.getAllArtifactsAllVersions(collectionid, auid)
+	.forEach(result::add);
+      } else if (urlPrefix != null && isAllVersions) {
+	log.debug("collectionsCollectionidAusAuidGet(): "
+	    + "All versions of all URLs matching a prefix");
+	repo.getAllArtifactsWithPrefixAllVersions(collectionid, auid,
+	    urlPrefix).forEach(result::add);
+      } else if (url != null && isAllVersions) {
+	log.debug("collectionsCollectionidAusAuidGet(): "
+	    + "All versions of a URL");
+	repo.getArtifactAllVersions(collectionid, auid, url)
+	.forEach(result::add);
+      } else if (isAllUrls && isLatestVersion) {
+	log.debug("collectionsCollectionidAusAuidGet(): "
+	    + "Latest versions of all URLs");
+	repo.getAllArtifacts(collectionid, auid).forEach(result::add);
+      } else if (urlPrefix != null && isLatestVersion) {
+	log.debug("collectionsCollectionidAusAuidGet(): "
+	    + "Latest versions of all URLs matching a prefix");
+	repo.getAllArtifactsWithPrefix(collectionid, auid, urlPrefix)
+	.forEach(result::add);
+      } else if (url != null && isLatestVersion) {
+	log.debug("collectionsCollectionidAusAuidGet(): "
+	    + "Latest version of a URL");
+	Artifact artifact = repo.getArtifact(collectionid, auid, url);
+	log.debug("collectionsCollectionidAusAuidGet(): artifact = "
+	    + artifact);
+
+	if (artifact != null) {
+	  result.add(artifact);
+	}
+      } else if (url != null && numericVersion > 0) {
+	log.debug("collectionsCollectionidAusAuidGet(): "
+	    + "Given version of a URL");
+	Artifact artifact =
+	    repo.getArtifactVersion(collectionid, auid, url, numericVersion);
+	log.debug("collectionsCollectionidAusAuidGet(): artifact = "
+	    + artifact);
+
+	if (artifact != null) {
+	  result.add(artifact);
+	}
+      } else {
+	String errorMessage = "The request could not be understood";
+
+	log.warn(errorMessage);
+
+	String parsedRequest = String.format(
+	    "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s",
+	    collectionid, auid, url, urlPrefix, version);
+
+	log.warn("Parsed request: " + parsedRequest);
+
+	throw new LockssRestServiceException(errorMessage,
+	    HttpStatus.BAD_REQUEST, parsedRequest);
+      }
+
       log.debug("collectionsCollectionidAusAuidGet(): result.size() = "
 	  + result.size());
+
       return new ResponseEntity<>(result, HttpStatus.OK);
     } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifacts from repository (collectionid: %s, auid: %s): %s",
-	  collectionid, auid, e));
-    }
+      String errorMessage =
+	  "Unexpected exception caught while attempting to retrieve artifacts";
 
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+	log.warn(errorMessage, e);
+
+	String parsedRequest = String.format(
+	    "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s",
+	    collectionid, auid, url, urlPrefix, version);
+
+	log.warn("Parsed request: " + parsedRequest);
+
+	throw new LockssRestServiceException(errorMessage, e,
+	    HttpStatus.INTERNAL_SERVER_ERROR, parsedRequest);
+    }
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/url-prefix/{prefix}:
-   * Get committed artifacts of all versions of all URLs matching a prefix, in a
-   * collection and Archival Unit.
+   * GET /collections/{collectionid}/aus/{auid}/size:
+   * Get the size of Archival Unit artifacts in a collection.
    *
    * @param collectionid
-   *          A String with the name of the collection containing the artifact.
+   *          A String with the name of the collection containing the Archival
+   *          Unit.
    * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
-   * @param prefix
-   *          A String with the URL prefix.
-   * @return a {@code ResponseEntity<List<Artifact>>}.
-   */
-  @Override
-  public ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlPrefixPrefixGet(
-      @ApiParam(value = "Identifier of the collection containing the artifacts", required = true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifacts", required = true)
-      @PathVariable("auid") String auid,
-      @ApiParam(value = "The prefix to be matched by the artifact URLs", required = true)
-      @PathVariable("prefix") String prefix) {
-    log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixGet() "
-	+ "collectionid = " + collectionid + ", auid = " + auid);
-
-    String fullPrefix =
-	request.getRequestURL().toString().split("/url-prefix/")[1];
-    if (log.isDebugEnabled()) log.debug("fullPrefix = " + fullPrefix);
-
-    String decodedPrefix = null;
-
-    try {
-      decodedPrefix = UriUtils.decode(fullPrefix, "UTF-8");
-      if (log.isDebugEnabled()) log.debug("decodedPrefix = " + decodedPrefix);
-
-      List<Artifact> result = new ArrayList<>();
-      repo.getAllArtifactsWithPrefixAllVersions(collectionid, auid,
-	  decodedPrefix).forEach(result::add);
-      log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixGet(): "
-	  + "result.size() = " + result.size());
-      return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifacts from repository (collectionid: %s, auid: %s,"
-	  + " prefix: %s): %s", collectionid, auid, decodedPrefix, e));
-    }
-
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-  }
-
-  /**
-   * GET /collections/{collectionid}/aus/{auid}/url-prefix/latest/{prefix}:
-   * Get committed artifacts of the latest version of all URLs matching a
-   * prefix, in a collection and Archival Unit.
-   *
-   * @param collectionid
-   *          A String with the name of the collection containing the artifact.
-   * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
-   * @param prefix
-   *          A String with the URL prefix.
-   * @return a {@code ResponseEntity<List<Artifact>>}.
-   */
-  @Override
-  public ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet(
-      @ApiParam(value = "Identifier of the collection containing the artifacts", required = true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifacts", required = true)
-      @PathVariable("auid") String auid,
-      @ApiParam(value = "The prefix to be matched by the artifact URLs", required = true)
-      @PathVariable("prefix") String prefix) {
-    log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet() "
-	+ "collectionid = " + collectionid + ", auid = " + auid);
-
-    String fullPrefix =
-	request.getRequestURL().toString().split("/url-prefix/latest/")[1];
-    if (log.isDebugEnabled()) log.debug("fullPrefix = " + fullPrefix);
-
-    String decodedPrefix = null;
-
-    try {
-      decodedPrefix = UriUtils.decode(fullPrefix, "UTF-8");
-      if (log.isDebugEnabled()) log.debug("decodedPrefix = " + decodedPrefix);
-
-      List<Artifact> result = new ArrayList<>();
-      repo.getAllArtifactsWithPrefix(collectionid, auid, decodedPrefix)
-      .forEach(result::add);
-      log.debug("collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet(): "
-	  + "result.size() = " + result.size());
-      return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifacts from repository (collectionid: %s, auid: %s,"
-	  + " prefix: %s): %s", collectionid, auid, decodedPrefix, e));
-    }
-
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-  }
-
-  /**
-   * GET /collections/{collectionid}/aus/{auid}/urls:
-   * Get committed artifacts of the latest version of all URLs in a collection
-   * and Archival Unit.
-   *
-   * @param collectionid
-   *          A String with the name of the collection containing the artifact.
-   * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
-   * @return a {@code ResponseEntity<List<Artifact>>}.
-   */
-  @Override
-  public ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlsGet(
-      @ApiParam(value = "Identifier of the collection containing the artifacts", required = true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifacts", required = true)
-      @PathVariable("auid") String auid) {
-    log.debug("collectionsCollectionidAusAuidUrlsGet() collectionid = "
-      + collectionid + ", auid = " + auid);
-
-    try {
-      List<Artifact> result = new ArrayList<>();
-      repo.getAllArtifacts(collectionid, auid).forEach(result::add);
-      log.debug("collectionsCollectionidAusAuidUrlsGet(): result.size() = "
-	  + result.size());
-      return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifacts from repository (collectionid: %s, auid: %s): %s",
-	  collectionid, auid, e));
-    }
-
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-  }
-
-  /**
-   * GET /collections/{collectionid}/aus/{auid}/urls/{url}:
-   * Get committed artifacts of all versions of a given URL in a collection and
-   * Archival Unit.
-   *
-   * @param collectionid
-   *          A String with the name of the collection containing the artifact.
-   * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
+   *          A String with the Archival Unit ID (AUID).
    * @param url
-   *          A String with the URL.
-   * @return a {@code ResponseEntity<List<Artifact>>}.
-   */
-  @Override
-  public ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlsUrlGet(
-      @ApiParam(value = "Identifier of the collection containing the artifacts", required = true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifacts", required = true)
-      @PathVariable("auid") String auid,
-      @ApiParam(value = "The URL contained by the artifacts", required = true)
-      @PathVariable("url") String url) {
-    log.debug("collectionsCollectionidAusAuidUrlsUrlGet() collectionid = "
-	+ collectionid + ", auid = " + auid);
-
-    String fullUrl = request.getRequestURL().toString().split("/urls/")[1];
-    if (log.isDebugEnabled()) log.debug("fullUrl = " + fullUrl);
-
-    String decodedUrl = null;
-
-    try {
-      decodedUrl = UriUtils.decode(fullUrl, "UTF-8");
-      if (log.isDebugEnabled()) log.debug("decodedUrl = " + decodedUrl);
-
-      List<Artifact> result = new ArrayList<>();
-      repo.getArtifactAllVersions(collectionid, auid, decodedUrl)
-      .forEach(result::add);
-      log.debug("collectionsCollectionidAusAuidUrlsUrlGet(): result.size() = "
-	  + result.size());
-      return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifacts from repository (collectionid: %s, auid: %s, url: %s):"
-	  + " %s", collectionid, auid, decodedUrl, e));
-    }
-
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-  }
-
-  /**
-   * GET /collections/{collectionid}/aus/{auid}/urls/latest/{url}:
-   * Get the committed artifact with the latest version of a given URL in a
-   * collection and Archival Unit.
-   *
-   * @param collectionid
-   *          A String with the name of the collection containing the artifact.
-   * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
-   * @param url
-   *          A String with the URL.
-   * @return a {@code ResponseEntity<Artifact>}.
-   */
-  @Override
-  public ResponseEntity<Artifact> collectionsCollectionidAusAuidUrlsUrlLatestGet(
-      @ApiParam(value = "Identifier of the collection containing the artifact", required = true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifact", required = true)
-      @PathVariable("auid") String auid,
-      @ApiParam(value = "The URL contained by the artifact", required = true)
-      @PathVariable("url") String url) {
-    log.debug("collectionsCollectionidAusAuidUrlsUrlLatestGet() collectionid = "
-	+ collectionid + ", auid = " + auid);
-
-    String fullUrl =
-	request.getRequestURL().toString().split("/urls/latest/")[1];
-    if (log.isDebugEnabled()) log.debug("fullUrl = " + fullUrl);
-
-    String decodedUrl = null;
-
-    try {
-      decodedUrl = UriUtils.decode(fullUrl, "UTF-8");
-      if (log.isDebugEnabled()) log.debug("decodedUrl = " + decodedUrl);
-
-      Artifact result = repo.getArtifact(collectionid, auid, decodedUrl);
-      log.debug("collectionsCollectionidAusAuidUrlsUrlLatestGet(): result "
-	  + result);
-      return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifact from repository (collectionid: %s, auid: %s, url: %s):"
-	  + " %s", collectionid, auid, decodedUrl, e));
-    }
-
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-  }
-
-  /**
-   * GET /collections/{collectionid}/aus/{auid}/{version}/urls/{url}:
-   * Get the committed artifact with a given version of a given URL in a
-   * collection and Archival Unit.
-   *
-   * @param collectionid
-   *          A String with the name of the collection containing the artifact.
-   * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
+   *          A String with the URL contained by the artifacts.
+   * @param urlPrefix
+   *          A String with the prefix to be matched by the artifact URLs.
    * @param version
-   *          An Integer with the version.
-   * @param url
-   *          A String with the URL.
-   * @return a {@code ResponseEntity<Artifact>}.
+   *          An Integer with the version of the URL contained by the artifacts.
+   * @return a Long{@code ResponseEntity<Long>}.
    */
   @Override
-  public ResponseEntity<Artifact> collectionsCollectionidAusAuidUrlsUrlVersionGet(
-      @ApiParam(value = "Identifier of the collection containing the artifact", required = true)
+  public ResponseEntity<Long> collectionsCollectionidAusAuidSizeGet(
+      @ApiParam(value = "Identifier of the collection containing the artifacts",required=true)
       @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifact", required = true)
+      @ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true)
       @PathVariable("auid") String auid,
-      @ApiParam(value = "The version of the URL contained by the artifact", required = true)
-      @PathVariable("version") Integer version,
-      @ApiParam(value = "The URL contained by the artifact", required = true)
-      @PathVariable("url") String url) {
-    log.debug("collectionsCollectionidAusAuidUrlsUrlVersionGet()"
-	+ "collectionid = " + collectionid + ", auid = " + auid
-	+ ", version = " + version);
-
-    String fullUrl = request.getRequestURL().toString().split("/urls/")[1];
-    if (log.isDebugEnabled()) log.debug("fullUrl = " + fullUrl);
-
-    String decodedUrl = null;
+      @ApiParam(value = "The URL contained by the artifacts") @Valid
+      @RequestParam(value = "url", required = false) String url,
+      @ApiParam(value = "The prefix to be matched by the artifact URLs") @Valid
+      @RequestParam(value = "urlPrefix", required = false) String urlPrefix,
+      @ApiParam(value = "The version of the URL contained by the artifacts")
+      @Valid
+      @RequestParam(value = "version", required = false) String version) {
+    log.debug("collectionsCollectionidAusAuidSizeGet(): "
+	+ collectionid + ", auid = " + auid + ", url = " + url
+	+ ", urlPrefix = " + urlPrefix + ", version = " + version);
 
     try {
-      decodedUrl = UriUtils.decode(fullUrl, "UTF-8");
-      if (log.isDebugEnabled()) log.debug("decodedUrl = " + decodedUrl);
-
-      Artifact result =
-	  repo.getArtifactVersion(collectionid, auid, decodedUrl, version);
-      log.debug("collectionsCollectionidAusAuidUrlsUrlVersionGet(): result "
-	  + result);
+      Long result = repo.auSize(collectionid, auid);
+      log.debug("collectionsCollectionidAusAuidSizeGet(): result = " + result);
       return new ResponseEntity<>(result, HttpStatus.OK);
     } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifact from repository (collectionid: %s, auid: %s, url: %s, version: %i):"
-	  + " %s", collectionid, auid, url, version, e));
-    }
+      String errorMessage =
+	  "Unexpected exception caught while attempting to get artifacts size";
 
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+      log.warn(errorMessage, e);
+
+      String parsedRequest = String.format(
+	  "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s",
+	  collectionid, auid, url, urlPrefix, version);
+
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, e,
+	  HttpStatus.INTERNAL_SERVER_ERROR, parsedRequest);
+    }
   }
 
   /**
@@ -701,7 +726,8 @@ public class CollectionsApiController implements CollectionsApi {
   public ResponseEntity<List<String>> collectionsCollectionidAusGet(
       @ApiParam(value = "Identifier of the collection containing the Archival Units", required = true)
       @PathVariable("collectionid") String collectionid) {
-    log.debug("collectionsCollectionidAusGet() collectionid = " + collectionid);
+    log.debug("collectionsCollectionidAusGet(): collectionid = "
+      + collectionid);
 
     try {
       List<String> result = new ArrayList<>();
@@ -710,12 +736,18 @@ public class CollectionsApiController implements CollectionsApi {
 	  + result.size());
       return new ResponseEntity<>(result, HttpStatus.OK);
     } catch (Exception e) {
-      log.error(String.format("Exception occurred while attempting to retrieve"
-	  + " artifacts from repository (collectionid: %s): %s", collectionid,
-	  e));
-    }
+      String errorMessage =
+	  "Unexpected exception caught while attempting to get AU ids";
 
-    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+      log.warn(errorMessage, e);
+
+      String parsedRequest = String.format("collectionid: %s", collectionid);
+
+      log.warn("Parsed request: " + parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage, e,
+	  HttpStatus.INTERNAL_SERVER_ERROR, parsedRequest);
+    }
   }
 
   private static Boolean isHttpResponseType(MediaType type) {

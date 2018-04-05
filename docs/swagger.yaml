@@ -232,76 +232,11 @@ paths:
       required: true
       type: "string"
       description: "Identifier of the collection containing the Archival Units"
-  /collections/{collectionid}/aus/{auid}:
+  /collections/{collectionid}/aus/{auid}/artifacts:
     get:
       tags:
         - collections
-      summary: "Get committed artifacts of all versions of all URLs in a\
-        \ collection and Archival Unit"
-      responses:
-        200:
-          description: "The requested artifacts"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/artifact"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "Collection not found"
-        502:
-          description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the collection containing the artifacts"
-    - name: "auid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the Archival Unit containing the artifacts"
-  /collections/{collectionid}/aus/{auid}/urls:
-    get:
-      tags:
-        - collections
-      summary: "Get committed artifacts of the latest version of all URLs in a\
-        \ collection and Archival Unit"
-      responses:
-        200:
-          description: "The requested artifacts"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/artifact"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "Collection not found"
-        502:
-          description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the collection containing the artifacts"
-    - name: "auid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the Archival Unit containing the artifacts"
-  /collections/{collectionid}/aus/{auid}/urls/{url}:
-    get:
-      tags:
-        - collections
-      summary: "Get committed artifacts of all versions of a given URL in a\
-        \ collection and Archival Unit"
+      summary: "Get committed artifacts in a collection and Archival Unit"
       responses:
         200:
           description: "The requested artifacts"
@@ -329,98 +264,31 @@ paths:
       type: "string"
       description: "Identifier of the Archival Unit containing the artifacts"
     - name: "url"
-      in: "path"
-      required: true
+      in: "query"
+      required: false
       type: "string"
       description: "The URL contained by the artifacts"
-  /collections/{collectionid}/aus/{auid}/urls/latest/{url}:
-    get:
-      tags:
-        - collections
-      summary: "Get the committed artifact with the latest version of a given\
-        \ URL in a collection and Archival Unit"
-      responses:
-        200:
-          description: "The requested artifact"
-          schema:
-            $ref: "#/definitions/artifact"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "Collection not found"
-        502:
-          description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
+    - name: "urlPrefix"
+      in: "query"
+      required: false
       type: "string"
-      description: "Identifier of the collection containing the artifact"
-    - name: "auid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the Archival Unit containing the artifact"
-    - name: "url"
-      in: "path"
-      required: true
-      type: "string"
-      description: "The URL contained by the artifact"
-  /collections/{collectionid}/aus/{auid}/{version}/urls/{url}:
-    get:
-      tags:
-        - collections
-      summary: "Get the committed artifact with a given version of a given URL\
-        \ in a collection and Archival Unit"
-      responses:
-        200:
-          description: "The requested artifact"
-          schema:
-            $ref: "#/definitions/artifact"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "Collection not found"
-        502:
-          description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the collection containing the artifact"
-    - name: "auid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the Archival Unit containing the artifact"
-    - name: "url"
-      in: "path"
-      required: true
-      type: "string"
-      description: "The URL contained by the artifact"
+      description: "The prefix to be matched by the artifact URLs"
     - name: "version"
-      in: "path"
-      required: true
-      type: "integer"
-      description: "The version of the URL contained by the artifact"
-  /collections/{collectionid}/aus/{auid}/url-prefix/{prefix}:
+      in: "query"
+      required: false
+      type: "string"
+      description: "The version of the URL contained by the artifacts"
+  /collections/{collectionid}/aus/{auid}/size:
     get:
       tags:
         - collections
-      summary: "Get committed artifacts of all versions of all URLs matching a\
-        \ prefix, in a collection and Archival Unit"
+      summary: "Get the size of Archival Unit artifacts in a collection"
       responses:
         200:
-          description: "The requested artifacts"
+          description: "The size of the artifacts"
           schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/artifact"
+            type: "integer"
+            format: "int64"
         401:
           description: "Unauthorized request"
         403:
@@ -440,48 +308,21 @@ paths:
       required: true
       type: "string"
       description: "Identifier of the Archival Unit containing the artifacts"
-    - name: "prefix"
-      in: "path"
-      required: true
+    - name: "url"
+      in: "query"
+      required: false
+      type: "string"
+      description: "The URL contained by the artifacts"
+    - name: "urlPrefix"
+      in: "query"
+      required: false
       type: "string"
       description: "The prefix to be matched by the artifact URLs"
-  /collections/{collectionid}/aus/{auid}/url-prefix/latest/{prefix}:
-    get:
-      tags:
-        - collections
-      summary: "Get committed artifacts of the latest version of all URLs\
-        \ matching a prefix, in a collection and Archival Unit"
-      responses:
-        200:
-          description: "The requested artifacts"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/artifact"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "Collection not found"
-        502:
-          description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
+    - name: "version"
+      in: "query"
+      required: false
       type: "string"
-      description: "Identifier of the collection containing the artifacts"
-    - name: "auid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the Archival Unit containing the artifacts"
-    - name: "prefix"
-      in: "path"
-      required: true
-      type: "string"
-      description: "The prefix to be matched by the artifact URLs"
+      description: "The version of the URL contained by the artifacts"
 definitions:
   artifact:
     type: "object"
