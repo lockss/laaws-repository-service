@@ -37,8 +37,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   <parent>
     <groupId>org.lockss</groupId>
-    <artifactId>lockss-spring-parent-pom</artifactId>
-    <version>1.6.0</version>
+    <artifactId>lockss-parent-pom</artifactId>
+    <version>1.7.0</version>
     <relativePath />
   </parent>
 
@@ -59,27 +59,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   <properties>
     <spring-data-solr.version>2.1.3.RELEASE</spring-data-solr.version>
+    <skipSpringBootRepackage>false</skipSpringBootRepackage>
   </properties>
 
   <dependencies>
 
     <dependency>
+      <groupId>org.lockss</groupId>
+      <artifactId>lockss-junit4-bundle</artifactId>
+      <version>${lockss.junit4.bundleVersion}</version>
+      <type>pom</type>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.lockss</groupId>
+      <artifactId>lockss-spring-bundle</artifactId>
+      <version>${lockss.spring.bundleVersion}</version>
+      <type>pom</type>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpcore</artifactId>
       <version>4.4.6</version>
-    </dependency>
-
-    <!--SpringFox dependencies -->
-    <dependency>
-      <groupId>io.springfox</groupId>
-      <artifactId>springfox-swagger2</artifactId>
-      <version>${springfox-version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>io.springfox</groupId>
-      <artifactId>springfox-swagger-ui</artifactId>
-      <version>${springfox-version}</version>
     </dependency>
 
     <dependency>
@@ -96,9 +99,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     </dependency>
 
     <dependency>
-      <groupId>org.apache.solr</groupId>
-      <artifactId>solr-solrj</artifactId>
-      <version>6.6.0</version>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>1.7.21</version>    
     </dependency>
 
   </dependencies>
