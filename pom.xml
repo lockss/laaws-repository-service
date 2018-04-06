@@ -44,7 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   <groupId>org.lockss.laaws</groupId>
   <artifactId>laaws-repository-service</artifactId>
-  <version>1.7.0-SNAPSHOT</version>
+  <version>1.8.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   
   <name>laaws-repository-service</name>
@@ -85,7 +85,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <dependency>
       <groupId>org.lockss.laaws</groupId>
       <artifactId>laaws-repository-core</artifactId>
-      <version>1.11.3</version>
+      <version>1.11.4</version>
+      <exclusions>
+        <!-- eventually brings servlet-api 2.5 but spring-test needs 3.0.1 or better -->
+        <exclusion>
+          <groupId>javax.servlet</groupId>
+          <artifactId>servlet-api</artifactId>  
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
