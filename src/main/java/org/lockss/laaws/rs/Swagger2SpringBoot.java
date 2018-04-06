@@ -59,7 +59,8 @@ implements CommandLineRunner {
   }
 
   public static void main(String[] args) throws Exception {
-    System.setProperty("org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "true");
+    System.setProperty(
+	"org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "true");
       new SpringApplication(Swagger2SpringBoot.class).run(args);
   }
 
@@ -68,15 +69,6 @@ implements CommandLineRunner {
       UrlPathHelper urlPathHelper = new UrlPathHelper();
       urlPathHelper.setUrlDecode(false);
       configurer.setUrlPathHelper(urlPathHelper);
-  }
-
-  /**
-   * Sets configuration options common to all the LOCKSS Spring Boot
-   * applications.
-   */
-  protected static void configure() {
-    System.setProperty(
-	"org.apache.tomcat.util.buf.UDecoder.ALLOW_ENCODED_SLASH", "true");
   }
 
   /**

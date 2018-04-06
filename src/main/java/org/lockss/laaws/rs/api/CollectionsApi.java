@@ -134,11 +134,11 @@ public interface CollectionsApi {
         produces = { "application/json" }, 
         consumes = { "multipart/form-data" },
         method = RequestMethod.POST)
-    default ResponseEntity<Artifact> collectionsCollectionidArtifactsPost(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestParam(value="auid", required=true)  String auid,@ApiParam(value = "URI represented by this artifact", required=true) @RequestParam(value="uri", required=true)  String uri,@ApiParam(value = "The version of the URI contained by the artifact", required=true) @RequestParam(value="version", required=true)  Integer version,@ApiParam(value = "file detail") @Valid @RequestPart("file") MultipartFile content,@ApiParam(value = "URI aspects represented by this artifact", required=true) @RequestParam(value="aspects", required=true)  MultipartFile aspectParts) {
+    default ResponseEntity<Artifact> collectionsCollectionidArtifactsPost(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestParam(value="auid", required=true)  String auid,@ApiParam(value = "URI represented by this artifact", required=true) @RequestParam(value="uri", required=true)  String uri,@ApiParam(value = "file detail") @Valid @RequestPart("file") MultipartFile content,@ApiParam(value = "file detail") @Valid @RequestPart("file") MultipartFile aspectParts) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
             if (getAcceptHeader().get().contains("application/json")) {
                 try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("{  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}", Artifact.class), HttpStatus.NOT_IMPLEMENTED);
+                    return new ResponseEntity<>(getObjectMapper().get().readValue("{  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"storageUrl\" : \"storageUrl\"}", Artifact.class), HttpStatus.NOT_IMPLEMENTED);
                 } catch (IOException e) {
                     log.error("Couldn't serialize response for content type application/json", e);
                     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -151,17 +151,17 @@ public interface CollectionsApi {
     }
 
 
-    @ApiOperation(value = "Get committed artifacts of all versions of all URLs in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidGet", notes = "", response = Artifact.class, responseContainer = "List", tags={ "collections", })
+    @ApiOperation(value = "Get committed artifacts in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidArtifactsGet", notes = "", response = Artifact.class, responseContainer = "List", tags={ "collections", })
     @ApiResponses(value = { 
         @ApiResponse(code = 200, message = "The requested artifacts", response = Artifact.class, responseContainer = "List"),
         @ApiResponse(code = 401, message = "Unauthorized request"),
         @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
         @ApiResponse(code = 404, message = "Collection not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}",
+    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/artifacts",
         produces = { "application/json" }, 
         method = RequestMethod.GET)
-    default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid) {
+    default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidArtifactsGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifacts") @Valid @RequestParam(value = "url", required = false) String url,@ApiParam(value = "The prefix to be matched by the artifact URLs") @Valid @RequestParam(value = "urlPrefix", required = false) String urlPrefix,@ApiParam(value = "The version of the URL contained by the artifacts") @Valid @RequestParam(value = "version", required = false) String version) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
             if (getAcceptHeader().get().contains("application/json")) {
                 try {
@@ -178,156 +178,21 @@ public interface CollectionsApi {
     }
 
 
-    @ApiOperation(value = "Get committed artifacts of all versions of all URLs matching a prefix, in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidUrlPrefixPrefixGet", notes = "", response = Artifact.class, responseContainer = "List", tags={ "collections", })
+    @ApiOperation(value = "Get the size of Archival Unit artifacts in a collection", nickname = "collectionsCollectionidAusAuidSizeGet", notes = "", response = Long.class, tags={ "collections", })
     @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "The requested artifacts", response = Artifact.class, responseContainer = "List"),
+        @ApiResponse(code = 200, message = "The size of the artifacts", response = Long.class),
         @ApiResponse(code = 401, message = "Unauthorized request"),
         @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
         @ApiResponse(code = 404, message = "Collection not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/url-prefix/{prefix}",
+    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/size",
         produces = { "application/json" }, 
         method = RequestMethod.GET)
-    default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlPrefixPrefixGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The prefix to be matched by the artifact URLs",required=true) @PathVariable("prefix") String prefix) {
+    default ResponseEntity<Long> collectionsCollectionidAusAuidSizeGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifacts") @Valid @RequestParam(value = "url", required = false) String url,@ApiParam(value = "The prefix to be matched by the artifact URLs") @Valid @RequestParam(value = "urlPrefix", required = false) String urlPrefix,@ApiParam(value = "The version of the URL contained by the artifacts") @Valid @RequestParam(value = "version", required = false) String version) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
             if (getAcceptHeader().get().contains("application/json")) {
                 try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("[ {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}, {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"} ]", List.class), HttpStatus.NOT_IMPLEMENTED);
-                } catch (IOException e) {
-                    log.error("Couldn't serialize response for content type application/json", e);
-                    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            }
-        } else {
-            log.warn("ObjectMapper or HttpServletRequest not configured in default CollectionsApi interface so no example is generated");
-        }
-        return new ResponseEntity<>(HttpStatus.NOT_IMPLEMENTED);
-    }
-
-
-    @ApiOperation(value = "Get committed artifacts of the latest version of all URLs matching a prefix, in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet", notes = "", response = Artifact.class, responseContainer = "List", tags={ "collections", })
-    @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "The requested artifacts", response = Artifact.class, responseContainer = "List"),
-        @ApiResponse(code = 401, message = "Unauthorized request"),
-        @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
-        @ApiResponse(code = 404, message = "Collection not found"),
-        @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/url-prefix/{prefix}/latest",
-        produces = { "application/json" }, 
-        method = RequestMethod.GET)
-    default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlPrefixPrefixLatestGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The prefix to be matched by the artifact URLs",required=true) @PathVariable("prefix") String prefix) {
-        if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
-            if (getAcceptHeader().get().contains("application/json")) {
-                try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("[ {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}, {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"} ]", List.class), HttpStatus.NOT_IMPLEMENTED);
-                } catch (IOException e) {
-                    log.error("Couldn't serialize response for content type application/json", e);
-                    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            }
-        } else {
-            log.warn("ObjectMapper or HttpServletRequest not configured in default CollectionsApi interface so no example is generated");
-        }
-        return new ResponseEntity<>(HttpStatus.NOT_IMPLEMENTED);
-    }
-
-
-    @ApiOperation(value = "Get committed artifacts of the latest version of all URLs in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidUrlsGet", notes = "", response = Artifact.class, responseContainer = "List", tags={ "collections", })
-    @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "The requested artifacts", response = Artifact.class, responseContainer = "List"),
-        @ApiResponse(code = 401, message = "Unauthorized request"),
-        @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
-        @ApiResponse(code = 404, message = "Collection not found"),
-        @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls",
-        produces = { "application/json" }, 
-        method = RequestMethod.GET)
-    default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlsGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid) {
-        if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
-            if (getAcceptHeader().get().contains("application/json")) {
-                try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("[ {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}, {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"} ]", List.class), HttpStatus.NOT_IMPLEMENTED);
-                } catch (IOException e) {
-                    log.error("Couldn't serialize response for content type application/json", e);
-                    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            }
-        } else {
-            log.warn("ObjectMapper or HttpServletRequest not configured in default CollectionsApi interface so no example is generated");
-        }
-        return new ResponseEntity<>(HttpStatus.NOT_IMPLEMENTED);
-    }
-
-
-    @ApiOperation(value = "Get committed artifacts of all versions of a given URL in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidUrlsUrlGet", notes = "", response = Artifact.class, responseContainer = "List", tags={ "collections", })
-    @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "The requested artifacts", response = Artifact.class, responseContainer = "List"),
-        @ApiResponse(code = 401, message = "Unauthorized request"),
-        @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
-        @ApiResponse(code = 404, message = "Collection not found"),
-        @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/{url}",
-        produces = { "application/json" }, 
-        method = RequestMethod.GET)
-    default ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidUrlsUrlGet(@ApiParam(value = "Identifier of the collection containing the artifacts",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifacts",required=true) @PathVariable("url") String url) {
-        if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
-            if (getAcceptHeader().get().contains("application/json")) {
-                try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("[ {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}, {  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"} ]", List.class), HttpStatus.NOT_IMPLEMENTED);
-                } catch (IOException e) {
-                    log.error("Couldn't serialize response for content type application/json", e);
-                    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            }
-        } else {
-            log.warn("ObjectMapper or HttpServletRequest not configured in default CollectionsApi interface so no example is generated");
-        }
-        return new ResponseEntity<>(HttpStatus.NOT_IMPLEMENTED);
-    }
-
-
-    @ApiOperation(value = "Get the committed artifact with the latest version of a given URL in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidUrlsUrlLatestGet", notes = "", response = Artifact.class, tags={ "collections", })
-    @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "The requested artifact", response = Artifact.class),
-        @ApiResponse(code = 401, message = "Unauthorized request"),
-        @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
-        @ApiResponse(code = 404, message = "Collection not found"),
-        @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/{url}/latest",
-        produces = { "application/json" }, 
-        method = RequestMethod.GET)
-    default ResponseEntity<Artifact> collectionsCollectionidAusAuidUrlsUrlLatestGet(@ApiParam(value = "Identifier of the collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifact",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifact",required=true) @PathVariable("url") String url) {
-        if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
-            if (getAcceptHeader().get().contains("application/json")) {
-                try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("{  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}", Artifact.class), HttpStatus.NOT_IMPLEMENTED);
-                } catch (IOException e) {
-                    log.error("Couldn't serialize response for content type application/json", e);
-                    return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            }
-        } else {
-            log.warn("ObjectMapper or HttpServletRequest not configured in default CollectionsApi interface so no example is generated");
-        }
-        return new ResponseEntity<>(HttpStatus.NOT_IMPLEMENTED);
-    }
-
-
-    @ApiOperation(value = "Get the committed artifact with a given version of a given URL in a collection and Archival Unit", nickname = "collectionsCollectionidAusAuidUrlsUrlVersionGet", notes = "", response = Artifact.class, tags={ "collections", })
-    @ApiResponses(value = { 
-        @ApiResponse(code = 200, message = "The requested artifact", response = Artifact.class),
-        @ApiResponse(code = 401, message = "Unauthorized request"),
-        @ApiResponse(code = 403, message = "Client not authorized to retrieve data"),
-        @ApiResponse(code = 404, message = "Collection not found"),
-        @ApiResponse(code = 502, message = "Could not read from external resource") })
-    @RequestMapping(value = "/collections/{collectionid}/aus/{auid}/urls/{url}/{version}",
-        produces = { "application/json" }, 
-        method = RequestMethod.GET)
-    default ResponseEntity<Artifact> collectionsCollectionidAusAuidUrlsUrlVersionGet(@ApiParam(value = "Identifier of the collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the Archival Unit containing the artifact",required=true) @PathVariable("auid") String auid,@ApiParam(value = "The URL contained by the artifact",required=true) @PathVariable("url") String url,@ApiParam(value = "The version of the URL contained by the artifact",required=true) @PathVariable("version") Integer version) {
-        if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
-            if (getAcceptHeader().get().contains("application/json")) {
-                try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("{  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}", Artifact.class), HttpStatus.NOT_IMPLEMENTED);
+                    return new ResponseEntity<>(getObjectMapper().get().readValue("0", Long.class), HttpStatus.NOT_IMPLEMENTED);
                 } catch (IOException e) {
                     log.error("Couldn't serialize response for content type application/json", e);
                     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
