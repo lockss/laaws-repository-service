@@ -83,11 +83,6 @@ paths:
         required: true
         type: "string"
         description: "URI represented by this artifact"
-      - name: "version"
-        in: "formData"
-        required: true
-        type: "integer"
-        description: "The version of the URI contained by the artifact"
       - name: "content"
         in: "formData"
         required: true

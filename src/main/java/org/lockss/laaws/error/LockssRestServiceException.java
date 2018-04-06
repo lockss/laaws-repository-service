@@ -44,7 +44,7 @@ public class LockssRestServiceException extends RuntimeException {
   private HttpStatus httpStatus;
 
   // The HTTP request parsed by the service. 
-  private String parsedRequest = "";
+  private String parsedRequest;
 
   // The UTC date and time of the exception.
   private LocalDateTime utcTimestamp; 
@@ -109,12 +109,12 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
-   * @param message
-   *          A String with the detail message.
    * @param httpStatus
    *          An HttpStatus with the HTTP response status.
+   * @param message
+   *          A String with the detail message.
    */
-  public LockssRestServiceException(String message, HttpStatus httpStatus) {
+  public LockssRestServiceException(HttpStatus httpStatus, String message) {
     super(message);
     this.httpStatus = httpStatus;
   }
@@ -122,14 +122,14 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
-   * @param message
-   *          A String with the detail message.
    * @param httpStatus
    *          An HttpStatus with the HTTP response status.
+   * @param message
+   *          A String with the detail message.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    */
-  public LockssRestServiceException(String message, HttpStatus httpStatus,
+  public LockssRestServiceException(HttpStatus httpStatus, String message,
       String parsedRequest) {
     super(message);
     this.httpStatus = httpStatus;
@@ -139,16 +139,16 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
-   * @param message
-   *          A String with the detail message.
    * @param httpStatus
    *          An HttpStatus with the HTTP response status.
+   * @param message
+   *          A String with the detail message.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    * @param utcTimestamp
    *          A LocalDateTime with the exception date and time.
    */
-  public LockssRestServiceException(String message, HttpStatus httpStatus,
+  public LockssRestServiceException(HttpStatus httpStatus, String message,
       String parsedRequest, LocalDateTime utcTimestamp) {
     super(message);
     this.httpStatus = httpStatus;
@@ -159,15 +159,15 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
+   * @param httpStatus
+   *          An HttpStatus with the HTTP response status.
    * @param message
    *          A String with the detail message.
    * @param cause
    *          A Throwable with the cause.
-   * @param httpStatus
-   *          An HttpStatus with the HTTP response status.
    */
-  public LockssRestServiceException(String message, Throwable cause,
-      HttpStatus httpStatus) {
+  public LockssRestServiceException(HttpStatus httpStatus, String message,
+      Throwable cause) {
     super(message, cause);
     this.httpStatus = httpStatus;
   }
@@ -175,17 +175,17 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
+   * @param httpStatus
+   *          An HttpStatus with the HTTP response status.
    * @param message
    *          A String with the detail message.
    * @param cause
    *          A Throwable with the cause.
-   * @param httpStatus
-   *          An HttpStatus with the HTTP response status.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    */
-  public LockssRestServiceException(String message, Throwable cause,
-      HttpStatus httpStatus, String parsedRequest) {
+  public LockssRestServiceException(HttpStatus httpStatus, String message,
+      Throwable cause, String parsedRequest) {
     super(message, cause);
     this.httpStatus = httpStatus;
     this.parsedRequest = parsedRequest;
@@ -194,19 +194,19 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
+   * @param httpStatus
+   *          An HttpStatus with the HTTP response status.
    * @param message
    *          A String with the detail message.
    * @param cause
    *          A Throwable with the cause.
-   * @param httpStatus
-   *          An HttpStatus with the HTTP response status.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    * @param utcTimestamp
    *          A LocalDateTime with the exception date and time.
    */
-  public LockssRestServiceException(String message, Throwable cause,
-      HttpStatus httpStatus, String parsedRequest, LocalDateTime utcTimestamp) {
+  public LockssRestServiceException(HttpStatus httpStatus, String message,
+      Throwable cause, String parsedRequest, LocalDateTime utcTimestamp) {
     super(message, cause);
     this.httpStatus = httpStatus;
     this.parsedRequest = parsedRequest;
@@ -216,12 +216,12 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
-   * @param cause
-   *          A Throwable with the cause.
    * @param httpStatus
    *          An HttpStatus with the HTTP response status.
+   * @param cause
+   *          A Throwable with the cause.
    */
-  public LockssRestServiceException(Throwable cause, HttpStatus httpStatus) {
+  public LockssRestServiceException(HttpStatus httpStatus, Throwable cause) {
     super(cause);
     this.httpStatus = httpStatus;
   }
@@ -229,14 +229,14 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
-   * @param cause
-   *          A Throwable with the cause.
    * @param httpStatus
    *          An HttpStatus with the HTTP response status.
+   * @param cause
+   *          A Throwable with the cause.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    */
-  public LockssRestServiceException(Throwable cause, HttpStatus httpStatus,
+  public LockssRestServiceException(HttpStatus httpStatus, Throwable cause,
       String parsedRequest) {
     super(cause);
     this.httpStatus = httpStatus;
@@ -246,16 +246,16 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
-   * @param cause
-   *          A Throwable with the cause.
    * @param httpStatus
    *          An HttpStatus with the HTTP response status.
+   * @param cause
+   *          A Throwable with the cause.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    * @param utcTimestamp
    *          A LocalDateTime with the exception date and time.
    */
-  public LockssRestServiceException(Throwable cause, HttpStatus httpStatus,
+  public LockssRestServiceException(HttpStatus httpStatus, Throwable cause, 
       String parsedRequest, LocalDateTime utcTimestamp) {
     super(cause);
     this.httpStatus = httpStatus;
@@ -266,6 +266,8 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
+   * @param httpStatus
+   *          An HttpStatus with the HTTP response status.
    * @param message
    *          A String with the detail message.
    * @param cause
@@ -274,12 +276,9 @@ public class LockssRestServiceException extends RuntimeException {
    *          A boolean indicating whether suppression is enabled.
    * @param writableStackTrace
    *          A boolean indicating whether the stack trace should be writable.
-   * @param httpStatus
-   *          An HttpStatus with the HTTP response status.
    */
-  protected LockssRestServiceException(String message, Throwable cause,
-      boolean enableSuppression, boolean writableStackTrace,
-      HttpStatus httpStatus) {
+  protected LockssRestServiceException(HttpStatus httpStatus, String message,
+      Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
     super(message, cause, enableSuppression, writableStackTrace);
     this.httpStatus = httpStatus;
   }
@@ -287,6 +286,8 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
+   * @param httpStatus
+   *          An HttpStatus with the HTTP response status.
    * @param message
    *          A String with the detail message.
    * @param cause
@@ -295,14 +296,12 @@ public class LockssRestServiceException extends RuntimeException {
    *          A boolean indicating whether suppression is enabled.
    * @param writableStackTrace
    *          A boolean indicating whether the stack trace should be writable.
-   * @param httpStatus
-   *          An HttpStatus with the HTTP response status.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    */
-  protected LockssRestServiceException(String message, Throwable cause,
-      boolean enableSuppression, boolean writableStackTrace,
-      HttpStatus httpStatus, String parsedRequest) {
+  protected LockssRestServiceException(HttpStatus httpStatus, String message,
+      Throwable cause, boolean enableSuppression, boolean writableStackTrace,
+      String parsedRequest) {
     super(message, cause, enableSuppression, writableStackTrace);
     this.httpStatus = httpStatus;
     this.parsedRequest = parsedRequest;
@@ -311,6 +310,8 @@ public class LockssRestServiceException extends RuntimeException {
   /**
    * Constructor.
    *
+   * @param httpStatus
+   *          An HttpStatus with the HTTP response status.
    * @param message
    *          A String with the detail message.
    * @param cause
@@ -319,16 +320,14 @@ public class LockssRestServiceException extends RuntimeException {
    *          A boolean indicating whether suppression is enabled.
    * @param writableStackTrace
    *          A boolean indicating whether the stack trace should be writable.
-   * @param httpStatus
-   *          An HttpStatus with the HTTP response status.
    * @param parsedRequest
    *          A String with a copy of the parsed HTTP request contents.
    * @param utcTimestamp
    *          A LocalDateTime with the exception date and time.
    */
-  protected LockssRestServiceException(String message, Throwable cause,
-      boolean enableSuppression, boolean writableStackTrace,
-      HttpStatus httpStatus, String parsedRequest, LocalDateTime utcTimestamp) {
+  protected LockssRestServiceException(HttpStatus httpStatus, String message,
+      Throwable cause, boolean enableSuppression, boolean writableStackTrace,
+      String parsedRequest, LocalDateTime utcTimestamp) {
     super(message, cause, enableSuppression, writableStackTrace);
     this.httpStatus = httpStatus;
     this.parsedRequest = parsedRequest;

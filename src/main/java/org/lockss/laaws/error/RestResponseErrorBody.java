@@ -48,58 +48,80 @@ import javax.xml.bind.annotation.XmlType;
 // The root element name as per the {@code application/vnd.error} specification.
 @XmlRootElement(name = "errors")
 public class RestResponseErrorBody
-implements Iterable<RestResponseErrorBody.Error> {
+implements Iterable<RestResponseErrorBody.RestResponseError> {
 
-  // The name of individual errors.
+  // The element name of individual errors.
   @XmlElement(name = "error")
-  private final List<Error> errors;
+  private final List<RestResponseError> errors;
 
   /**
    * Protected default constructor to allow JAXB marshalling.
    */
   protected RestResponseErrorBody() {
-    this.errors = new ArrayList<Error>();
+    this.errors = new ArrayList<RestResponseError>();
   }
 
   /**
    * Constructor.
+   *
+   * @param message
+   *          A String with the detail message.
+   * @param parsedRequest
+   *          A String with a copy of the parsed HTTP request contents.
    */
   public RestResponseErrorBody(String message, String parsedRequest) {
-    this(new Error(message, parsedRequest));
+    this(new RestResponseError(message, parsedRequest));
   }
 
   /**
    * Constructor.
+   *
+   * @param message
+   *          A String with the detail message.
+   * @param parsedRequest
+   *          A String with a copy of the parsed HTTP request contents.
+   * @param utcTimestamp
+   *          A LocalDateTime with the exception date and time.
    */
   public RestResponseErrorBody(String message, String parsedRequest,
       LocalDateTime utcTimestamp) {
-    this(new Error(message, parsedRequest, utcTimestamp));
+    this(new RestResponseError(message, parsedRequest, utcTimestamp));
   }
 
   /**
    * Constructor.
+   *
+   * @param error
+   *          An Error to be included in the body.
    */
-  public RestResponseErrorBody(Error error) {
+  public RestResponseErrorBody(RestResponseError error) {
+    this.errors = new ArrayList<RestResponseError>();
 
-    if (error == null) {
-      throw new IllegalArgumentException("Error must not be null");
+    if (error != null) {
+      this.errors.add(error);
     }
-
-    this.errors = new ArrayList<Error>();
-    this.errors.add(error);
   }
 
   /**
    * Constructor.
+   *
+   * @param exception
+   *          A LockssRestServiceException with the data to be included in the
+   *          body.
    */
   public RestResponseErrorBody(LockssRestServiceException exception) {
-    this(new Error(exception.getMessage(), exception.getParsedRequest(),
-	exception.getUtcTimestamp()));
+    this(new RestResponseError(exception.getMessage(),
+	exception.getParsedRequest(), exception.getUtcTimestamp()));
   }
 
   /**
+   * Adds an error.
+   *
+   * @param error
+   *          A RestResponseError with the error to be added.
+   * @return a RestResponseErrorBody with this object.
    */
-  public RestResponseErrorBody add(Error error) {
+  public RestResponseErrorBody add(RestResponseError error) {
     this.errors.add(error);
     return this;
   }
@@ -108,12 +130,12 @@ implements Iterable<RestResponseErrorBody.Error> {
    * Dummy method to allow JsonValue to be configured.
    */
   @JsonValue
-  private List<Error> getErrors() {
+  private List<RestResponseError> getErrors() {
     return errors;
   }
 
   @Override
-  public Iterator<RestResponseErrorBody.Error> iterator() {
+  public Iterator<RestResponseErrorBody.RestResponseError> iterator() {
     return this.errors.iterator();
   }
 
@@ -129,7 +151,6 @@ implements Iterable<RestResponseErrorBody.Error> {
 
   @Override
   public boolean equals(Object obj) {
-
     if (this == obj) {
       return true;
     }
@@ -146,68 +167,89 @@ implements Iterable<RestResponseErrorBody.Error> {
    * A single error.
    */
   @XmlType
-  public static class Error {
+  public static class RestResponseError {
+    // The error message.
+    @XmlElement @JsonProperty private String message = "(null)";
 
-    @XmlElement @JsonProperty private final String message;
-    @XmlElement @JsonProperty private final String parsedRequest;
+    // The HTTP request parsed by the REST service. 
+    @XmlElement @JsonProperty private String parsedRequest = "(null)";
+
+    // The UTC date and time of the error.
     @XmlElement @JsonProperty private LocalDateTime utcTimestamp =
 	LocalDateTime.now(Clock.systemUTC()); 
 
     /**
      * Protected default constructor to allow JAXB marshalling.
      */
-    protected Error() {
-      this.message = null;
-      this.parsedRequest = null;
+    protected RestResponseError() {
     }
 
     /**
      * Constructor.
+     *
+     * @param message
+     *          A String with the detail message.
+     * @param parsedRequest
+     *          A String with a copy of the parsed HTTP request contents.
      */
-    public Error(String message, String parsedRequest) {
-
-      if (message == null || message.trim().isEmpty()) {
-	throw new IllegalArgumentException("message must not be null or empty");
+    public RestResponseError(String message, String parsedRequest) {
+      if (message != null) {
+	this.message = message;
       }
 
-      if (parsedRequest == null) {
-	throw new IllegalArgumentException("parsedRequest must not be null");
+      if (parsedRequest != null) {
+	this.parsedRequest = parsedRequest;
       }
-
-      this.message = message;
-      this.parsedRequest = parsedRequest;
     }
 
     /**
      * Constructor.
+     *
+     * @param message
+     *          A String with the detail message.
+     * @param parsedRequest
+     *          A String with a copy of the parsed HTTP request contents.
+     * @param utcTimestamp
+     *          A LocalDateTime with the error date and time.
      */
-    public Error(String message, String parsedRequest,
+    public RestResponseError(String message, String parsedRequest,
 	LocalDateTime utcTimestamp) {
-
-      if (message == null || message.trim().isEmpty()) {
-	throw new IllegalArgumentException("message must not be null or empty");
+      if (message != null) {
+	this.message = message;
       }
 
-      if (parsedRequest == null) {
-	throw new IllegalArgumentException("parsedRequest must not be null");
+      if (parsedRequest != null) {
+	this.parsedRequest = parsedRequest;
       }
-
-      this.message = message;
-      this.parsedRequest = parsedRequest;
 
       if (utcTimestamp != null) {
 	this.utcTimestamp = utcTimestamp;
       }
     }
 
+    /**
+     * Provides the error message.
+     * 
+     * @return a String with the error message.
+     */
     public String getMessage() {
       return message;
     }
 
+    /**
+     * Provides a copy of the parsed HTTP request contents.
+     * 
+     * @return a String with a copy of the parsed HTTP request contents.
+     */
     public String getParsedRequest() {
       return parsedRequest;
     }
 
+    /**
+     * Provides the error date and time.
+     * 
+     * @return a LocalDateTime with the error date and time.
+     */
     public LocalDateTime getUtcTimestamp() {
       return utcTimestamp;
     }
@@ -220,7 +262,6 @@ implements Iterable<RestResponseErrorBody.Error> {
 
     @Override
     public int hashCode() {
-
       int result = 17;
 
       result += 31 * message.hashCode();
@@ -232,16 +273,15 @@ implements Iterable<RestResponseErrorBody.Error> {
 
     @Override
     public boolean equals(Object obj) {
-
       if (obj == this) {
 	return true;
       }
 
-      if (!(obj instanceof Error)) {
+      if (!(obj instanceof RestResponseError)) {
 	return false;
       }
 
-      Error other = (Error)obj;
+      RestResponseError other = (RestResponseError)obj;
 
       return this.message.equals(other.message)
 	  && this.parsedRequest.equals(other.parsedRequest)

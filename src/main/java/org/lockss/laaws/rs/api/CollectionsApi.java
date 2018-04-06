@@ -134,11 +134,11 @@ public interface CollectionsApi {
         produces = { "application/json" }, 
         consumes = { "multipart/form-data" },
         method = RequestMethod.POST)
-    default ResponseEntity<Artifact> collectionsCollectionidArtifactsPost(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestParam(value="auid", required=true)  String auid,@ApiParam(value = "URI represented by this artifact", required=true) @RequestParam(value="uri", required=true)  String uri,@ApiParam(value = "The version of the URI contained by the artifact", required=true) @RequestParam(value="version", required=true)  Integer version,@ApiParam(value = "file detail") @Valid @RequestPart("file") MultipartFile content,@ApiParam(value = "file detail") @Valid @RequestPart("file") MultipartFile aspectParts) {
+    default ResponseEntity<Artifact> collectionsCollectionidArtifactsPost(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true) @RequestParam(value="auid", required=true)  String auid,@ApiParam(value = "URI represented by this artifact", required=true) @RequestParam(value="uri", required=true)  String uri,@ApiParam(value = "file detail") @Valid @RequestPart("file") MultipartFile content,@ApiParam(value = "file detail") @Valid @RequestPart("file") MultipartFile aspectParts) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
             if (getAcceptHeader().get().contains("application/json")) {
                 try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("{  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"version\" : 0,  \"storageUrl\" : \"storageUrl\"}", Artifact.class), HttpStatus.NOT_IMPLEMENTED);
+                    return new ResponseEntity<>(getObjectMapper().get().readValue("{  \"auid\" : \"auid\",  \"committed\" : true,  \"id\" : \"id\",  \"collection\" : \"collection\",  \"uri\" : \"uri\",  \"storageUrl\" : \"storageUrl\"}", Artifact.class), HttpStatus.NOT_IMPLEMENTED);
                 } catch (IOException e) {
                     log.error("Couldn't serialize response for content type application/json", e);
                     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
