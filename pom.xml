@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <parent>
     <groupId>org.lockss</groupId>
     <artifactId>lockss-parent-pom</artifactId>
-    <version>1.7.0</version>
+    <version>1.8.0-SNAPSHOT</version>
     <relativePath />
   </parent>
 
@@ -60,6 +60,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <properties>
     <spring-data-solr.version>2.1.3.RELEASE</spring-data-solr.version>
     <skipSpringBootRepackage>false</skipSpringBootRepackage>
+    <skipDocker>false</skipDocker>
   </properties>
 
   <dependencies>
