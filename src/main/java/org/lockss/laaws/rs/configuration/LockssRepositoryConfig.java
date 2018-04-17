@@ -35,39 +35,76 @@ import org.apache.commons.logging.LogFactory;
 import org.lockss.laaws.rs.core.BaseLockssRepository;
 import org.lockss.laaws.rs.core.LocalLockssRepository;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import java.io.File;
 import java.net.MalformedURLException;
+import java.net.URL;
 
 @Configuration
 public class LockssRepositoryConfig {
   private final static Log log =
       LogFactory.getLog(LockssRepositoryConfig.class);
 
-  @Value("${repo.local.path}")
-  private String repoLocalPath;
+  @Value("${repo.spec}")
+  private String repositorySpecification;
 
-    @Bean
-    public LockssRepository createRepository() throws MalformedURLException {
-      log.info("repoLocalPath = " + repoLocalPath);
+  @Bean
+  public LockssRepository createRepository() throws MalformedURLException {
+    if (log.isDebugEnabled())
+      log.debug("repositorySpecification = " + repositorySpecification);
 
-      if (repoLocalPath == null || repoLocalPath.trim().isEmpty()) {
-//        ArtifactIndex index = new VolatileArtifactIndex();
-        ArtifactIndex index = new SolrArtifactIndex("http://localhost:8983/solr/test");
-        ArtifactDataStore store = new VolatileWarcArtifactDataStore();
-//        ArtifactDataStore store = new LocalWarcArtifactDataStore(new File("repo"));
-        return new BaseLockssRepository(index, store);
-      } else {
-        LocalLockssRepository localRepo =
-            new LocalLockssRepository(new File(repoLocalPath));
-        return localRepo;
-      }
+    // Check whether a volatile implementation is configured. 
+    if (repositorySpecification == null
+	|| repositorySpecification.trim().isEmpty()
+	|| repositorySpecification.trim().equalsIgnoreCase("volatile")) {
+      // Yes: Return it.
+      return createVolatileRepository();
     }
+
+    // No: Parse the repository specification.
+    String[] specParts = repositorySpecification.split(":", 2);
+
+    // Get the type of implementation configured.
+    String repositoryType = specParts[0].trim().toLowerCase();
+    if (log.isDebugEnabled()) log.debug("repositoryType = " + repositoryType);
+
+    // Check whether a local implementation is configured. 
+    if ("local".equals(repositoryType)) {
+      // Yes: Get the configured filesystem path.
+      String repositoryLocalPath = specParts[1];
+      if (log.isDebugEnabled())
+	log.debug("repositoryLocalPath = " + repositoryLocalPath);
+      return new LocalLockssRepository(new File(repositoryLocalPath));
+      // No: Check whether a REST implementation is configured. 
+    } else if ("rest".equals(repositoryType)) {
+      // Yes: Get the configured URL.
+      String repositoryRestUrl = specParts[1];
+      if (log.isDebugEnabled())
+	log.debug("repositoryRestUrl = " + repositoryRestUrl);
+      return new RestLockssRepository(new URL(repositoryRestUrl));
+    }
+
+    // Handle an unknown repository specification.
+    log.warn("Unknown repository specification '" + repositorySpecification
+	+ "': Falling back to a volatile implementation");
+    return createVolatileRepository();
+  }
+
+  /**
+   * Provides a newly-created volatile implementation of a LOCKSS repository.
+   * 
+   * @return a LockssRepository with a volatile implementation.
+   */
+  private LockssRepository createVolatileRepository() {
+    if (log.isDebugEnabled())
+      log.debug("Creating volatile implementation of repository");
+    return new BaseLockssRepository(
+	new SolrArtifactIndex("http://localhost:8983/solr/test"),
+	new VolatileWarcArtifactDataStore());
+  }
 }
