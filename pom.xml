@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <parent>
     <groupId>org.lockss</groupId>
     <artifactId>lockss-parent-pom</artifactId>
-    <version>1.8.0-SNAPSHOT</version>
+    <version>1.9.0-SNAPSHOT</version>
     <relativePath />
   </parent>
 
@@ -50,7 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <name>laaws-repository-service</name>
   <description>LOCKSS repository service</description>
 
-  <!-- Must be in every lockss-parent-pom/lockss-spring-parent-pom descendant -->
+  <!-- Must be in every lockss-parent-pom descendant -->
   <scm>
     <connection>${scmConnection}</connection>
     <developerConnection>${scmDeveloperConnection}</developerConnection>
@@ -89,7 +89,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <dependency>
       <groupId>org.lockss.laaws</groupId>
       <artifactId>laaws-repository-core</artifactId>
-      <version>1.11.4</version>
+      <version>${lockss.repository-core.version}</version>
       <exclusions>
         <!-- eventually brings servlet-api 2.5 but spring-test needs 3.0.1 or better -->
         <exclusion>
