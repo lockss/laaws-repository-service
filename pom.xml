@@ -94,7 +94,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <!-- eventually brings servlet-api 2.5 but spring-test needs 3.0.1 or better -->
         <exclusion>
           <groupId>javax.servlet</groupId>
-          <artifactId>servlet-api</artifactId>  
+          <artifactId>servlet-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- also depend on test JAR -->
+    <dependency>
+      <groupId>org.lockss.laaws</groupId>
+      <artifactId>laaws-repository-core</artifactId>
+      <version>${lockss.repository-core.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+      <exclusions>
+        <!-- see above -->
+        <exclusion>
+          <groupId>javax.servlet</groupId>
+          <artifactId>servlet-api</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
