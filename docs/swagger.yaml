@@ -90,7 +90,7 @@ paths:
         description: "Content byte stream"
       - name: "aspectParts"
         in: "formData"
-        required: true
+        required: false
         type: "file"
         description: "URI aspects represented by this artifact"
       responses:
