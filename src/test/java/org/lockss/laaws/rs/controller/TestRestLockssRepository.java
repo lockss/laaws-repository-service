@@ -43,8 +43,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 
@@ -65,8 +63,7 @@ public class TestRestLockssRepository extends AbstractLockssRepositoryTest {
     @TestConfiguration
     static class TestLockssRepositoryConfig {
         @Bean
-        @Primary
-        public LockssRepository createLockssRepository() {
+        public LockssRepository createRepository() {
             return new VolatileLockssRepository();
         }
     }
