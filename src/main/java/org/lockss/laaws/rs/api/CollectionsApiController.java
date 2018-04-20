@@ -141,10 +141,10 @@ public class CollectionsApiController implements CollectionsApi {
 
     try {
       // Check that the collection exists.
-      validateCollectionId(collectionid, parsedRequest);
+//      validateCollectionId(collectionid, parsedRequest);
 
       // Check that the artifact exists
-      validateArtifactExists(artifactid,
+      validateArtifactExists(collectionid, artifactid,
 	  "The artifact to be deleted does not exist", parsedRequest);
 
       // Remove the artifact from the artifact store and index
@@ -195,10 +195,10 @@ public class CollectionsApiController implements CollectionsApi {
 		artifactid, collectionid));
 
       // Check that the collection exists.
-      validateCollectionId(collectionid, parsedRequest);
+//      validateCollectionId(collectionid, parsedRequest);
 
       // Check that the artifact exists
-      validateArtifactExists(artifactid,
+      validateArtifactExists(collectionid, artifactid,
 	  "The artifact to be retrieved does not exist", parsedRequest);
 
       // Retrieve the ArtifactData from the artifact store
@@ -209,7 +209,8 @@ public class CollectionsApiController implements CollectionsApi {
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(
 	  MediaType.parseMediaType("application/http; msgtype=response"));
-      headers.setContentLength(artifactData.getContentLength());
+      // TODO: Set correct content length
+//      headers.setContentLength(artifactData.getContentLength());
 
       // Include LOCKSS repository headers in the HTTP response
       ArtifactIdentifier id = artifactData.getIdentifier();
@@ -220,6 +221,10 @@ public class CollectionsApiController implements CollectionsApi {
       headers.set(ArtifactConstants.ARTIFACTID_URI_KEY, id.getUri());
       headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY,
 	  String.valueOf(id.getVersion()));
+      headers.set(
+              ArtifactConstants.ARTIFACT_STATE_COMMITTED,
+              String.valueOf(artifactData.getRepositoryMetadata().getCommitted())
+      );
 
       return new ResponseEntity<>(
 	  outputStream -> {
@@ -296,16 +301,16 @@ public class CollectionsApiController implements CollectionsApi {
       }
 
       // Check that the collection exists.
-      validateCollectionId(collectionid, parsedRequest);
+//      validateCollectionId(collectionid, parsedRequest);
 
       // Check that the artifact exists
-      validateArtifactExists(artifactid,
+      validateArtifactExists(collectionid, artifactid,
 	  "The artifact to be updated does not exist", parsedRequest);
 
       log.info(String.format(
 	  "Updating commit status for %s (%s -> %s)",
 	  artifactid,
-	  repo.isArtifactCommitted(artifactid),
+	  repo.isArtifactCommitted(collectionid, artifactid),
 	  committed
 	  ));
 
@@ -353,10 +358,10 @@ public class CollectionsApiController implements CollectionsApi {
       @RequestParam(value="auid", required=true)  String auid,
       @ApiParam(value = "URI represented by this artifact", required=true)
       @RequestParam(value="uri", required=true)  String uri,
-      @ApiParam(value = "file detail") @Valid
-      @RequestPart("file") MultipartFile content,
-      @ApiParam(value = "URI aspects represented by this artifact", required=true)
-      @RequestParam(value="aspects", required=true)  MultipartFile aspectParts
+      @ApiParam(value = "file detail", required=true) @Valid
+      @RequestPart("content") MultipartFile content,
+      @ApiParam(value = "URI aspects represented by this artifact")
+      @RequestPart(value="aspectsParts")  MultipartFile... aspectParts
       ) {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, uri: %s, requestUrl: %s",
@@ -834,9 +839,9 @@ public class CollectionsApiController implements CollectionsApi {
     log.debug("uri '" + uri + "' is valid.");
   }
 
-  private void validateArtifactExists(String artifactid, String errorMessage,
+  private void validateArtifactExists(String collectionid, String artifactid, String errorMessage,
       String parsedRequest) throws IOException {
-    if (!repo.artifactExists(artifactid)) {
+    if (!repo.artifactExists(collectionid, artifactid)) {
       log.warn(errorMessage);
       log.warn("Parsed request: " + parsedRequest);
 
