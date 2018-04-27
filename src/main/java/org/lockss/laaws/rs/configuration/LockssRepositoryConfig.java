@@ -45,7 +45,7 @@ import java.io.File;
 import java.net.URL;
 
 /**
- * Spring configuration class and beans controlling the
+ * Spring configuration beans for the configuration of the Repository Service's internal repository.
  */
 @Configuration
 public class LockssRepositoryConfig {
