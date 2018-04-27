@@ -32,49 +32,61 @@ package org.lockss.laaws.rs.configuration;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
-import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
+import org.apache.hadoop.fs.Path;
+import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
+import org.lockss.laaws.rs.io.storage.hdfs.HdfsWarcArtifactDataStore;
+import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactDataStore;
+import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.data.hadoop.config.annotation.builders.HadoopConfigBuilder;
 
 import javax.annotation.Resource;
+import java.io.File;
 
 /**
- * Spring configuration beans for the configuration of the Repository Service's internal artifact index.
+ * Spring configuration beans for the configuration of the Repository Service's internal artifact data store.
  */
 @Configuration
-public class ArtifactIndexConfig {
-    private final static Log log = LogFactory.getLog(ArtifactIndexConfig.class);
-    private final static String INDEX_SPEC_KEY = "repo.index.spec";
-    private final static String SOLR_URL_KEY = "repo.index.solr.solrUrl";
+public class ArtifactDataStoreConfig {
+    private final static Log log = LogFactory.getLog(ArtifactDataStoreConfig.class);
+
+    private final static String DATASTORE_SPEC_KEY = "repo.datastore.spec";
+    private final static String HDFS_SERVER_KEY = "repo.datastore.hdfs.server";
+    private final static String HDFS_BASEDIR_KEY = "repo.datastore.hdfs.basedir";
+    private final static String LOCAL_BASEDIR_KEY = "repo.datastore.local.basedir";
 
     @Resource
     private Environment env;
 
     @Bean
-    public ArtifactIndex setArtifactIndex() {
-        String indexSpec = env.getProperty(INDEX_SPEC_KEY);
+    public ArtifactDataStore setArtifactStore() throws Exception {
+        String datastoreSpec = env.getProperty(DATASTORE_SPEC_KEY);
 
-        log.info(String.format("indexSpec = %s", indexSpec));
+        log.info(String.format("datastoreSpec = %s", datastoreSpec));
 
-        if (indexSpec != null) {
-            switch (indexSpec.trim().toLowerCase()) {
-                case "solr":
-                    return new SolrArtifactIndex(env.getProperty(SOLR_URL_KEY));
+        if (datastoreSpec != null) {
+            switch (datastoreSpec.trim().toLowerCase()) {
+                case "hdfs":
+                    HadoopConfigBuilder config = new HadoopConfigBuilder();
+                    config.fileSystemUri(env.getProperty(HDFS_SERVER_KEY));
+                    return new HdfsWarcArtifactDataStore(config.build(), new Path(env.getProperty(HDFS_BASEDIR_KEY)));
+
+                case "local":
+                    return new LocalWarcArtifactDataStore(new File(env.getProperty(LOCAL_BASEDIR_KEY)));
 
                 case "volatile":
-                    return new VolatileArtifactIndex();
+                    return new VolatileWarcArtifactDataStore();
 
                 default:
-                    String errMsg = String.format("Unknown index specification '%s'", indexSpec);
+                    String errMsg = String.format("Unknown data store specification '%s'", datastoreSpec);
                     log.error(errMsg);
                     throw new IllegalArgumentException(errMsg);
             }
         }
 
-        log.warn("No artifact index specification set; setting ArtifactIndex bean to null");
+        log.warn("No artifact store specification set; setting ArtifactDataStore bean to null");
         return null;
     }
 }
