@@ -32,79 +32,111 @@ package org.lockss.laaws.rs.configuration;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.lockss.laaws.rs.core.BaseLockssRepository;
-import org.lockss.laaws.rs.core.LocalLockssRepository;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
-import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
-import org.springframework.beans.factory.annotation.Value;
+import org.lockss.laaws.rs.core.*;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+
+import javax.annotation.Resource;
 import java.io.File;
-import java.net.MalformedURLException;
 import java.net.URL;
 
+/**
+ * Spring configuration class and beans controlling the
+ */
 @Configuration
 public class LockssRepositoryConfig {
-  private final static Log log =
-      LogFactory.getLog(LockssRepositoryConfig.class);
+    private final static Log log = LogFactory.getLog(LockssRepositoryConfig.class);
+    private final static String REPO_SPEC_KEY = "repo.spec";
 
-  @Value("${repo.spec}")
-  private String repositorySpecification;
+    @Autowired
+    ArtifactDataStore store;
 
-  @Bean
-  public LockssRepository createRepository() throws MalformedURLException {
-    if (log.isDebugEnabled())
-      log.debug("repositorySpecification = " + repositorySpecification);
+    @Autowired
+    ArtifactIndex index;
 
-    // Check whether a volatile implementation is configured. 
-    if (repositorySpecification == null
-	|| repositorySpecification.trim().isEmpty()
-	|| repositorySpecification.trim().equalsIgnoreCase("volatile")) {
-      // Yes: Return it.
-      return createVolatileRepository();
+    @Resource
+    private Environment env;
+
+    @Bean
+    public LockssRepository createRepository() throws Exception {
+        String repositorySpecification = env.getProperty(REPO_SPEC_KEY);
+
+        if (log.isDebugEnabled()) {
+            log.debug(String.format(
+                    "Starting internal LOCKSS repository (repositorySpecification = %s)",
+                    repositorySpecification
+            ));
+        }
+
+        if (repositorySpecification != null) {
+            switch (repositorySpecification.trim().toLowerCase()) {
+                case "volatile":
+                    return LockssRepositoryFactory.createVolatileRepository();
+
+                case "custom":
+                    // Configure artifact index and data store individually using Spring beans (see their
+                    // configuration beans in)the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
+                    // respectively.
+                    return new BaseLockssRepository(index, store);
+
+                default: {
+                    if (!(repositorySpecification.indexOf(':') < 0)) {
+                        String[] specParts = repositorySpecification.split(":", 2);
+
+                        // Get the type of implementation configured.
+                        String repositoryType = specParts[0].trim().toLowerCase();
+
+                        if (log.isDebugEnabled())
+                            log.debug("repositoryType = " + repositoryType);
+
+                        // Check whether a local implementation is configured.
+                        switch (repositoryType) {
+                            case "local": {
+                                // Yes: Get the configured filesystem path.
+                                String repositoryLocalPath = specParts[1];
+
+                                if (log.isDebugEnabled())
+                                    log.debug("repositoryLocalPath = " + repositoryLocalPath);
+
+                                return new LocalLockssRepository(new File(repositoryLocalPath));
+                            }
+
+                            case "rest": {
+                                String repositoryRestUrl = specParts[1];
+
+                                if (log.isDebugEnabled())
+                                    log.debug("repositoryRestUrl = " + repositoryRestUrl);
+
+                                return new RestLockssRepository(new URL(repositoryRestUrl));
+                            }
+
+                            default: {
+                                String errMsg = String.format(
+                                        "Unknown repository type '%s'; cannot continue",
+                                        repositoryType
+                                );
+                                log.error(errMsg);
+                                throw new IllegalArgumentException(errMsg);
+                            }
+                        }
+                    }
+
+                    // Unknown repository specification
+                    String errMsg = String.format(
+                            "Unknown repository specification '%s'; cannot continue",
+                            repositorySpecification
+                    );
+                    log.error(errMsg);
+                    throw new IllegalArgumentException(errMsg);
+                }
+            }
+        }
+
+        log.warn("No internal LOCKSS repository specified; using volatile implementation");
+        return LockssRepositoryFactory.createVolatileRepository();
     }
-
-    // No: Parse the repository specification.
-    String[] specParts = repositorySpecification.split(":", 2);
-
-    // Get the type of implementation configured.
-    String repositoryType = specParts[0].trim().toLowerCase();
-    if (log.isDebugEnabled()) log.debug("repositoryType = " + repositoryType);
-
-    // Check whether a local implementation is configured. 
-    if ("local".equals(repositoryType)) {
-      // Yes: Get the configured filesystem path.
-      String repositoryLocalPath = specParts[1];
-      if (log.isDebugEnabled())
-	log.debug("repositoryLocalPath = " + repositoryLocalPath);
-      return new LocalLockssRepository(new File(repositoryLocalPath));
-      // No: Check whether a REST implementation is configured. 
-    } else if ("rest".equals(repositoryType)) {
-      // Yes: Get the configured URL.
-      String repositoryRestUrl = specParts[1];
-      if (log.isDebugEnabled())
-	log.debug("repositoryRestUrl = " + repositoryRestUrl);
-      return new RestLockssRepository(new URL(repositoryRestUrl));
-    }
-
-    // Handle an unknown repository specification.
-    log.warn("Unknown repository specification '" + repositorySpecification
-	+ "': Falling back to a volatile implementation");
-    return createVolatileRepository();
-  }
-
-  /**
-   * Provides a newly-created volatile implementation of a LOCKSS repository.
-   * 
-   * @return a LockssRepository with a volatile implementation.
-   */
-  private LockssRepository createVolatileRepository() {
-    if (log.isDebugEnabled())
-      log.debug("Creating volatile implementation of repository");
-    return new BaseLockssRepository(
-	new SolrArtifactIndex("http://localhost:8983/solr/test"),
-	new VolatileWarcArtifactDataStore());
-  }
 }
