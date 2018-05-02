@@ -64,19 +64,29 @@ public class ArtifactDataStoreConfig {
     public ArtifactDataStore setArtifactStore() throws Exception {
         String datastoreSpec = env.getProperty(DATASTORE_SPEC_KEY);
 
-        log.info(String.format("datastoreSpec = %s", datastoreSpec));
-
         if (datastoreSpec != null) {
             switch (datastoreSpec.trim().toLowerCase()) {
                 case "hdfs":
+                    String hdfsServer = env.getProperty(HDFS_SERVER_KEY);
+                    String hdfsBaseDir = env.getProperty(HDFS_BASEDIR_KEY);
+
+                    log.info(String.format(
+                            "Configuring HDFS artifact data store [%s, %s]",
+                            hdfsServer,
+                            hdfsBaseDir
+                    ));
+
                     HadoopConfigBuilder config = new HadoopConfigBuilder();
-                    config.fileSystemUri(env.getProperty(HDFS_SERVER_KEY));
-                    return new HdfsWarcArtifactDataStore(config.build(), new Path(env.getProperty(HDFS_BASEDIR_KEY)));
+                    config.fileSystemUri(hdfsServer);
+                    return new HdfsWarcArtifactDataStore(config.build(), new Path(hdfsBaseDir));
 
                 case "local":
-                    return new LocalWarcArtifactDataStore(new File(env.getProperty(LOCAL_BASEDIR_KEY)));
+                    String baseDir = env.getProperty(LOCAL_BASEDIR_KEY);
+                    log.info(String.format("Configuring local filesystem artifact data store [%s]", baseDir));
+                    return new LocalWarcArtifactDataStore(new File(baseDir));
 
                 case "volatile":
+                    log.info("Configuring volatile artifact data store");
                     return new VolatileWarcArtifactDataStore();
 
                 default:
