@@ -78,7 +78,7 @@ public class ArtifactDataStoreConfig {
 
                     HadoopConfigBuilder config = new HadoopConfigBuilder();
                     config.fileSystemUri(hdfsServer);
-                    return new HdfsWarcArtifactDataStore(config.build(), new Path(hdfsBaseDir));
+                    return new HdfsWarcArtifactDataStore(config.build(), hdfsBaseDir);
 
                 case "local":
                     String baseDir = env.getProperty(LOCAL_BASEDIR_KEY);

@@ -51,6 +51,7 @@ import java.net.URL;
 public class LockssRepositoryConfig {
     private final static Log log = LogFactory.getLog(LockssRepositoryConfig.class);
     private final static String REPO_SPEC_KEY = "repo.spec";
+    private final static String REPO_PERSISTINDEXNAME_KEY = "repo.persistIndexName";
 
     @Autowired
     ArtifactDataStore store;
@@ -64,12 +65,15 @@ public class LockssRepositoryConfig {
     @Bean
     public LockssRepository createRepository() throws Exception {
         String repositorySpecification = env.getProperty(REPO_SPEC_KEY);
-
+        String repositoryPersistIndexName = env.getProperty(REPO_PERSISTINDEXNAME_KEY);
         if (log.isDebugEnabled()) {
             log.debug(String.format(
                     "Starting internal LOCKSS repository (repositorySpecification = %s)",
                     repositorySpecification
             ));
+            log.debug(String.format("repositoryPersistIndexName = %s)",
+                repositoryPersistIndexName
+        ));
         }
 
         if (repositorySpecification != null) {
@@ -102,7 +106,7 @@ public class LockssRepositoryConfig {
                                 if (log.isDebugEnabled())
                                     log.debug("repositoryLocalPath = " + repositoryLocalPath);
 
-                                return new LocalLockssRepository(new File(repositoryLocalPath));
+                                return new LocalLockssRepository(new File(repositoryLocalPath), repositoryPersistIndexName);
                             }
 
                             case "rest": {
