@@ -209,7 +209,8 @@ public class CollectionsApiController implements CollectionsApi {
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(
 	  MediaType.parseMediaType("application/http; msgtype=response"));
-      // TODO: Set correct content length
+
+      // TODO: Set to content length of the HTTP response entity body (i.e., the HTTP response encoding the artifact)
 //      headers.setContentLength(artifactData.getContentLength());
 
       // Include LOCKSS repository headers in the HTTP response
@@ -314,10 +315,9 @@ public class CollectionsApiController implements CollectionsApi {
 	  committed
 	  ));
 
-      // Record the commit status in storage
-      repo.commitArtifact(collectionid, artifactid);
-
-      return new ResponseEntity<>(HttpStatus.OK);
+      // Record the commit status in storage and return the new representation in the response entity body
+      Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
+      return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
