@@ -115,13 +115,11 @@ public class TestRestLockssRepository extends LTC5 {
   protected static String NO_URL = "no_url";
   protected static String NO_ARTID = "not an artifact ID";
 
-  // Sets of coll, au, url.  Last one in each differs only in case from
-  // previous, to check case-sensitivity
+  // Sets of coll, au, url for combinatoric tests.  Last one in each
+  // differs only in case from previous, to check case-sensitivity
   protected static String[] COLLS = {COLL1, COLL2, "Coll2"};
   protected static String[] AUIDS = {AUID1, AUID2, "Auid2"};
   protected static String[] URLS = {URL1, URL2, URL2.toUpperCase()};
-
-
 
     @LocalServerPort
     private int port;
@@ -165,6 +163,21 @@ public class TestRestLockssRepository extends LTC5 {
     }
 
   @Test
+  public void testArtifactSizes() throws IOException {
+    for (int size = 0; size < MAX_INCR_FILE; size += 100) {
+      testArtifactSize(size);
+    }
+  }
+
+  public void testArtifactSize(int size) throws IOException {
+    ArtSpec spec = ArtSpec.forCollAuUrl(COLL1, AUID1, URL1 + size)
+      .toCommit(true).setContentLength(size);
+    Artifact newArt = addUncommitted(spec);
+    Artifact commArt = commit(spec, newArt);
+    assertData(spec, commArt);
+  }
+
+  @Test
   public void testAddArtifact() throws IOException {
     // Illegal arguments
     assertThrowsMatch(IllegalArgumentException.class,
@@ -178,25 +191,10 @@ public class TestRestLockssRepository extends LTC5 {
     }
 
     // legal use of addArtifact is tested in the normal course of setting
-    // up variants, and by testArticleSizes(), but for the sake of
+    // up variants, and by testArtifactSizes(), but for the sake of
     // completeness ...
 
     ArtSpec spec = new ArtSpec().setUrl("https://mr/ed/").setContent(CONTENT1);
-    Artifact newArt = addUncommitted(spec);
-    Artifact commArt = commit(spec, newArt);
-    assertData(spec, commArt);
-  }
-
-  @Test
-  public void testArticleSizes() throws IOException {
-    for (int size = 0; size < MAX_INCR_FILE; size += 100) {
-      testArticleSize(size);
-    }
-  }
-
-  public void testArticleSize(int size) throws IOException {
-    ArtSpec spec = ArtSpec.forCollAuUrl(COLL1, AUID1, URL1 + size)
-      .toCommit(true);
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
     assertData(spec, commArt);
@@ -222,19 +220,10 @@ public class TestRestLockssRepository extends LTC5 {
 
   @Test
   public void testNoSideEffect() throws IOException {
-    testAllNoSideEffect();
-    instantiateScanario(getVariantSpecs("commit1"));
-    testAllNoSideEffect();
-    instantiateScanario(getVariantSpecs("uncommit1"));
-    testAllNoSideEffect();
-    instantiateScanario(getVariantSpecs("url3"));
-    testAllNoSideEffect();
-    instantiateScanario(getVariantSpecs("url3unc"));
-    testAllNoSideEffect();
-    instantiateScanario(getVariantSpecs("disjoint"));
-    testAllNoSideEffect();
-    instantiateScanario(getVariantSpecs("overlap"));
-    testAllNoSideEffect();
+    for (StdVariants var : StdVariants.values()) {
+      instantiateScanario(var.toString());
+      testAllNoSideEffect();
+    }
   }
 
   public void testAllNoSideEffect() throws IOException {
@@ -254,7 +243,7 @@ public class TestRestLockssRepository extends LTC5 {
   }
 
   @Test
-  public void testAll() throws IOException {
+  public void testModifications() throws IOException {
     testCommitArtifact();
     testDeleteArtifact();
     instantiateScanario(getVariantSpecs("commit1"));
@@ -262,6 +251,7 @@ public class TestRestLockssRepository extends LTC5 {
     instantiateScanario(getVariantSpecs("disjoint"));
     testCommitArtifact();
     testDeleteArtifact();
+    testAllNoSideEffect();
   }
 
   public void testGetArtifact() throws IOException {
@@ -309,6 +299,7 @@ public class TestRestLockssRepository extends LTC5 {
 		      () -> {repository.getArtifactData(COLL1, null);});
 
     // Artifact not found
+    // XXX should this throw?
     assertNull(repository.getArtifactData(COLL1, NO_ARTID));
 
     ArtSpec cspec = anyCommittedSpec();
@@ -463,12 +454,8 @@ public class TestRestLockssRepository extends LTC5 {
 // 						    commSpec.getArtifactId());});
       Artifact dupArt = repository.commitArtifact(commSpec.getCollection(),
 						  commSpec.getArtifactId());
-      if (WRONG) {
-	assertNull(dupArt);
-      } else {
-	assertEquals(commArt, dupArt);
-	assertData(commSpec, dupArt);
-      }
+      assertEquals(commArt, dupArt);
+      assertData(commSpec, dupArt);
     }
   }
 
@@ -558,6 +545,7 @@ public class TestRestLockssRepository extends LTC5 {
 	assertFalse(repository.artifactExists(uspec.getCollection(),
 					      uspec.getArtifactId()));
 	assertNull(getArtifact(repository, uspec));
+	delFromAll(uspec);
 	assertEquals(totsize,
 		     (long)repository.auSize(uspec.getCollection(),
 					     uspec.getAuid()),
@@ -602,7 +590,7 @@ public class TestRestLockssRepository extends LTC5 {
 
     // Combination of coll and au id that both exist, but have no artifacts
     // in common
-    Pair<String,String> collau = collAuMistmatch();
+    Pair<String,String> collau = collAuMismatch();
     if (collau != null) {
       assertEmpty(repository.getAllArtifacts(collau.getLeft(),
 					     collau.getRight()));
@@ -647,7 +635,7 @@ public class TestRestLockssRepository extends LTC5 {
 
     // Combination of coll and au id that both exist, but have no artifacts
     // in common
-    Pair<String,String> collau = collAuMistmatch();
+    Pair<String,String> collau = collAuMismatch();
     if (collau != null) {
       assertEmpty(repository.getAllArtifactsWithPrefix(collau.getLeft(),
 						       collau.getRight(),
@@ -684,7 +672,7 @@ public class TestRestLockssRepository extends LTC5 {
     }
     // Combination of coll and au id that both exist, but have no artifacts
     // in common
-    Pair<String,String> collau = collAuMistmatch();
+    Pair<String,String> collau = collAuMismatch();
     if (collau != null) {
       assertEmpty(repository.getAllArtifactsAllVersions(collau.getLeft(),
 							collau.getRight()));
@@ -727,7 +715,7 @@ public class TestRestLockssRepository extends LTC5 {
 
     // Combination of coll and au id that both exist, but have no artifacts
     // in common
-    Pair<String,String> collau = collAuMistmatch();
+    Pair<String,String> collau = collAuMismatch();
     if (collau != null) {
       assertEmpty(repository.getAllArtifactsWithPrefixAllVersions(collau.getLeft(),
 						       collau.getRight(),
@@ -760,7 +748,7 @@ public class TestRestLockssRepository extends LTC5 {
     Stream<ArtSpec> s =
       committedSpecStream().filter(distinctByKey(ArtSpec::artButVerKey));
     for (ArtSpec urlSpec : (Iterable<ArtSpec>)s::iterator) {
-      assertArtList(orderedAll()
+      assertArtList(orderedAllCommitted()
 		    .filter(spec -> spec.sameArtButVer(urlSpec)),
 		    repository.getArtifactAllVersions(urlSpec.getCollection(),
 						      urlSpec.getAuid(),
@@ -789,28 +777,15 @@ public class TestRestLockssRepository extends LTC5 {
     }
 
     // Try getAuIds() on collections that have no committed artifacts
-
-    // All the collection ids in the repo
-    List<String> allCollections = addedSpecStream()
-      .map(ArtSpec::getCollection)
-      .distinct()
-      .collect(Collectors.toList());
-
-    // All the collection ids that have committed artifacts
-    List<String> collectionsWithCommittedArt = orderedAll()
-      .map(ArtSpec::getCollection)
-      .distinct()
-      .collect(Collectors.toList());
-
-    for (String coll : CollectionUtils.subtract(allCollections,
-						collectionsWithCommittedArt)) {
+    for (String coll : CollectionUtils.subtract(addedCollections(),
+						addedCommittedCollections())) {
       assertEmpty(repository.getAuIds(coll));
     }
   }
 
   public void testGetCollectionIds() throws IOException {
     Iterator<String> expColl =
-      orderedAll()
+      orderedAllCommitted()
       .map(ArtSpec::getCollection)
       .distinct()
       .iterator();
@@ -859,26 +834,37 @@ public class TestRestLockssRepository extends LTC5 {
   // SCENARIOS
 
   protected enum StdVariants {
-    empty, commit1, uncommit1, url3, url3unc, disjoint, grid3x3x3,
+    empty, commit1, uncommit1, url3, url3unc, disjoint,
+    grid3x3x3, grid3x3x3x3,
   }
 
+  /** Return a list of ArtSpecs for the initial conditions for the named
+   * variant */
   public List<ArtSpec> getVariantSpecs(String variant) throws IOException {
     List<ArtSpec> res = new ArrayList<ArtSpec>();
     switch (variant) {
+    case "no_variant":
+      // Not a variant test
+      break;
     case "empty":
+      // Empty repository
       break;
     case "commit1":
+      // One committed artifact
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
       break;
     case "uncommit1":
+      // One uncommitted artifact
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1));
       break;
     case "url3":
+      // Three committed versions
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
       break;
     case "url3unc":
+      // Mix of committed and uncommitted, two URLs
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
@@ -888,6 +874,7 @@ public class TestRestLockssRepository extends LTC5 {
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL2));
       break;
     case "disjoint":
+      // Different URLs in different collections and AUs
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
@@ -897,6 +884,7 @@ public class TestRestLockssRepository extends LTC5 {
       res.add(ArtSpec.forCollAuUrl(COLL2, AUID2, URL2));
       break;
     case "overlap":
+      // Same URLs in different collections and AUs
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1));
       res.add(ArtSpec.forCollAuUrl(COLL1, AUID1, URL1).toCommit(true));
@@ -912,16 +900,37 @@ public class TestRestLockssRepository extends LTC5 {
       res.add(ArtSpec.forCollAuUrl(COLL2, AUID2, URL2));
       break;
     case "grid3x3x3":
-      boolean toCommit = false;
-      for (String coll : COLLS) {
-	for (String auid : AUIDS) {
-	  for (String url : URLS) {
-	    res.add(ArtSpec.forCollAuUrl(coll, auid, url).toCommit(toCommit));
-	    toCommit = !toCommit;
+      // Combinatorics of collection, AU, URL
+      {
+	boolean toCommit = false;
+	for (String coll : COLLS) {
+	  for (String auid : AUIDS) {
+	    for (String url : URLS) {
+	      res.add(ArtSpec.forCollAuUrl(coll, auid, url).toCommit(toCommit));
+	      toCommit = !toCommit;
+	    }
 	  }
 	}
       }
       break;
+    case "grid3x3x3x3":
+      // Combinatorics of collection, AU, URL w/ multiple versions
+      {
+	boolean toCommit = false;
+	for (int ix = 1; ix <= 3; ix++) {
+	  for (String coll : COLLS) {
+	    for (String auid : AUIDS) {
+	      for (String url : URLS) {
+		res.add(ArtSpec.forCollAuUrl(coll, auid, url).toCommit(toCommit));
+		toCommit = !toCommit;
+	      }
+	    }
+	  }
+	}
+      }
+      break;
+    default:
+      fail("getVariantSpecs called with unknown variant name: " + variant);
     }
     return res;
   }
@@ -931,7 +940,8 @@ public class TestRestLockssRepository extends LTC5 {
 
   // Assertions
 
-    void assertData(ArtSpec spec, Artifact art) throws IOException {
+  /** Assert that the Artifact matches the ArtSpec */
+  void assertData(ArtSpec spec, Artifact art) throws IOException {
     assertNotNull(art, "Comparing with " + spec);
     assertEquals(spec.getCollection(), art.getCollection());
     assertEquals(spec.getAuid(), art.getAuid());
@@ -962,7 +972,9 @@ public class TestRestLockssRepository extends LTC5 {
     assertEquals(exp.toString(), line.toString());
   }
 
+  /** Assert that the ArtifactData matches the ArtSpec */
   void assertData(ArtSpec spec, ArtifactData ad) throws IOException {
+    assertNotNull(ad, "Didn't find ArticleData for: " + spec);
     assertEquals(spec.getStatusLine(), ad.getHttpStatus());
     if (WRONG) {
       assertEquals(-1, ad.getContentLength());
@@ -971,12 +983,13 @@ public class TestRestLockssRepository extends LTC5 {
     }
     assertSameBytes(spec.getInputStream(), ad.getInputStream(),
 		    spec.getContentLength());
+    // XXX with RepoSvc, returned headers are a superset of what we stored
     assertTrue(RepoUtil.mapFromHttpHeaders(ad.getMetadata()).entrySet().containsAll(spec.getHeaders().entrySet()));
 //     assertEquals(RepoUtil.mapFromHttpHeaders(ad.getMetadata()),
 // 		 spec.getHeaders().entrySet());
   }
 
-
+  /** Assert that the sequence of Artifacts matches the stream of ArtSpecs */
   void assertArtList(Stream<ArtSpec> expSpecs, Iterable<Artifact> arts)
       throws IOException {
     Iterator<ArtSpec> specIter = expSpecs.iterator();
@@ -996,11 +1009,17 @@ public class TestRestLockssRepository extends LTC5 {
   // utilities
 
 
+  // Add Artifacts to the repository as specified by the named scenario
+  void instantiateScanario(String name) throws IOException {
+    log.info("Adding scenario: " + name);
+    instantiateScanario(getVariantSpecs(name));
+  }
+
   // Add Artifacts to the repository as specified by the ArtSpecs
   void instantiateScanario(List<ArtSpec> scenario) throws IOException {
     for (ArtSpec spec : scenario) {
       Artifact art = addUncommitted(spec);
-      if (spec.isDoCommit()) {
+      if (spec.isToCommit()) {
 	commit(spec, art);
       }
     }      
@@ -1029,6 +1048,14 @@ public class TestRestLockssRepository extends LTC5 {
     return addedSpecs.stream()
       .filter(spec -> spec.isCommitted())
       .map(ArtSpec::getAuid)
+      .distinct()
+      .collect(Collectors.toList());
+  }
+
+  List<String> addedCommittedUrls() {
+    return addedSpecs.stream()
+      .filter(spec -> spec.isCommitted())
+      .map(ArtSpec::getUrl)
       .distinct()
       .collect(Collectors.toList());
   }
@@ -1075,7 +1102,7 @@ public class TestRestLockssRepository extends LTC5 {
       .filter(spec -> !spec.isCommitted());
   }
 
-  Stream<ArtSpec> orderedAll() {
+  Stream<ArtSpec> orderedAllCommitted() {
     return committedSpecStream()
       .sorted();
   }
@@ -1115,10 +1142,16 @@ public class TestRestLockssRepository extends LTC5 {
     return uncommittedSpecStream().findAny().orElse(null);
   }
 
+  ArtSpec anyUncommittedSpecButVer() {
+    return uncommittedSpecStream()
+      .filter(spec -> !highestCommittedVerSpec.containsKey(spec.artButVerKey()))
+      .findAny().orElse(null);
+  }
+
 
   // Find a collection and an au that each have artifacts, but don't have
   // any artifacts in common
-  Pair<String,String> collAuMistmatch() {
+  Pair<String,String> collAuMismatch() {
     Set<Pair<String,String>> set = new HashSet<Pair<String,String>>();
     for (String coll : addedCommittedCollections()) {
       for (String auid : addedCommittedAuids()) {
@@ -1149,8 +1182,10 @@ public class TestRestLockssRepository extends LTC5 {
 
   // Delete ArtSpec from record of what we've added to the repository,
   // adjust highest version maps accordingly
-  void delFromAll(ArtSpec spec) {
-    addedSpecs.remove(spec);
+  protected void delFromAll(ArtSpec spec) {
+    if (! addedSpecs.remove(spec)) {
+      fail("Wasn't removed from addedSpecs: " + spec);
+    }
     String key = spec.artButVerKey();
     if (highestVerSpec.get(key) == spec) {
       ArtSpec newHigh = highestVer(spec, addedSpecStream());
@@ -1198,8 +1233,7 @@ public class TestRestLockssRepository extends LTC5 {
 
   Artifact addUncommitted(ArtSpec spec) throws IOException {
     if (!spec.hasContent()) {
-      spec.setContent(RandomStringUtils.randomAlphabetic(0, MAX_RANDOM_FILE));
-      log.info("gen content");
+      spec.generateContent();
     }
     log.info("adding: " + spec);
     
@@ -1207,7 +1241,7 @@ public class TestRestLockssRepository extends LTC5 {
     Artifact newArt = repository.addArtifact(ad);
     assertNotNull(newArt);
 
-//     assertData(spec, newArt);
+    assertData(spec, newArt);
     long expVers = expectedVersions(spec);
     assertEquals(expVers + 1, (int)newArt.getVersion(),
 		 "version of " + newArt);
@@ -1223,11 +1257,8 @@ public class TestRestLockssRepository extends LTC5 {
     assertTrue(repository.artifactExists(spec.getCollection(), newArtId));
 
     Artifact oldArt = getArtifact(repository, spec);
-    if (expVers > 0) {
-      // this test valid only when a single version exists
-//       assertData(spec, oldArt);
-      
-    } else {
+    if (expVers == 0) {
+      // this test valid only when no other versions exist ArtSpec
       assertNull(oldArt);
     }
     spec.setVersion(newArt.getVersion());
@@ -1246,10 +1277,6 @@ public class TestRestLockssRepository extends LTC5 {
     String artId = art.getId();
     log.info("committing: " + art);
     Artifact commArt = repository.commitArtifact(spec.getCollection(), artId);
-    if (WRONG) {
-      assertNull(commArt);
-      commArt = getArtifact(repository, spec);
-    }
     assertNotNull(commArt);
     if (spec.getExpVer() > 0) {
       assertEquals(spec.getExpVer(), (int)commArt.getVersion());
@@ -1301,7 +1328,7 @@ public class TestRestLockssRepository extends LTC5 {
     Collections.addAll(res, neverFoundArtSpecs);
 
     // Include an uncommitted artifact, if any
-    ArtSpec uncSpec = anyUncommittedSpec();
+    ArtSpec uncSpec = anyUncommittedSpecButVer();
     if (uncSpec != null) {
       log.info("adding an uncommitted spec: " + uncSpec);
       res.add(uncSpec);
@@ -1316,22 +1343,41 @@ public class TestRestLockssRepository extends LTC5 {
       res.add(commSpec.copy().setUrl("NO_" + commSpec.getUrl()));
 
       // and with existing but different collection, au
-      ArtSpec differentColl = committedSpecStream()
-	.filter(s -> !s.getCollection().equals(commSpec.getCollection()))
-	.findAny().orElse(null);
-      if (differentColl != null) {
-	ArtSpec dcspec =
-	  commSpec.copy().setCollection(differentColl.getCollection());
-	log.info("adding a different collection spec: " + dcspec);
-	res.add(dcspec);
+      diff_coll:
+      for (ArtSpec auUrl : committedSpecStream()
+	     .filter(distinctByKey(s -> s.getUrl() + "|" + s.getAuid()))
+	     .collect(Collectors.toList())) {
+	for (String coll : addedCommittedCollections()) {
+	  ArtSpec a = auUrl.copy().setCollection(coll);
+	  if (!highestCommittedVerSpec.containsKey(a.artButVerKey())) {
+	    res.add(a);
+	    break diff_coll;
+	  }
+	}
       }
-      ArtSpec differentAu = committedSpecStream()
-	.filter(s -> !s.getAuid().equals(commSpec.getAuid()))
-	.findAny().orElse(null);
-      if (differentAu != null) {
-	ArtSpec daspec = commSpec.copy().setAuid(differentAu.getAuid());
-	log.info("adding a different au spec: " + daspec);
-	res.add(daspec);
+      diff_au:
+      for (ArtSpec auUrl : committedSpecStream()
+	     .filter(distinctByKey(s -> s.getUrl() + "|" + s.getCollection()))
+	     .collect(Collectors.toList())) {
+	for (String auid : addedCommittedAuids()) {
+	  ArtSpec a = auUrl.copy().setAuid(auid);
+	  if (!highestCommittedVerSpec.containsKey(a.artButVerKey())) {
+	    res.add(a);
+	    break diff_au;
+	  }
+	}
+      }
+      diff_url:
+      for (ArtSpec auUrl : committedSpecStream()
+	     .filter(distinctByKey(s -> s.getAuid() + "|" + s.getCollection()))
+	     .collect(Collectors.toList())) {
+	for (String url : addedCommittedUrls()) {
+	  ArtSpec a = auUrl.copy().setUrl(url);
+	  if (!highestCommittedVerSpec.containsKey(a.artButVerKey())) {
+	    res.add(a);
+	    break diff_url;
+	  }
+	}
       }
 
       // and with correct coll, au, url but non-existent version
