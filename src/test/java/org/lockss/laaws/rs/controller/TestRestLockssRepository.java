@@ -31,46 +31,38 @@
 package org.lockss.laaws.rs.controller;
 
 import java.io.*;
-import java.util.*;
-import java.util.stream.*;
-import java.util.function.*;
 import java.net.URL;
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.*;
 
-import org.apache.commons.io.*;
-import org.apache.commons.lang3.*;
+import org.apache.commons.collections4.*;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.*;
 import org.apache.commons.logging.*;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.IteratorUtils;
-
-import org.apache.http.ProtocolVersion;
-import org.apache.http.StatusLine;
+import org.apache.http.*;
 import org.apache.http.message.BasicStatusLine;
-import org.springframework.http.HttpHeaders;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runner.RunWith;
+import org.lockss.laaws.rs.core.*;
+import org.lockss.laaws.rs.core.AbstractLockssRepositoryTest.ArtSpec;
+import org.lockss.laaws.rs.model.*;
+import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.context.*;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.http.HttpHeaders;
-
-import org.lockss.laaws.rs.core.*;
-import org.lockss.laaws.rs.model.*;
-import org.lockss.util.test.*;
-import static org.lockss.laaws.rs.core.AbstractLockssRepositoryTest.ArtSpec;
 
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class TestRestLockssRepository extends LTC5 {
+public class TestRestLockssRepository extends LockssTestCase5 {
   private final static Log log =
     LogFactory.getLog(TestRestLockssRepository.class);
 
