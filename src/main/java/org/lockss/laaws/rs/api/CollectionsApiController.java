@@ -228,24 +228,13 @@ public class CollectionsApiController implements CollectionsApi {
       );
 
       return new ResponseEntity<>(
-	  outputStream -> {
-	    try {
-	      ArtifactDataUtil.writeHttpResponse(
-		  ArtifactDataUtil.getHttpResponseFromArtifact(
-		      artifactData.getIdentifier(),
-		      artifactData.getHttpStatus(),
-		      artifactData.getMetadata(),
-		      artifactData.getInputStream()
-		      ),
-		  outputStream
-		  );
-	    } catch (HttpException e) {
-	      e.printStackTrace();
-	    }
-	  },
-	  headers,
-	  HttpStatus.OK
-	  );
+              outputStream -> ArtifactDataUtil.writeHttpResponse(
+                      ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData),
+                      outputStream
+              ),
+              headers,
+              HttpStatus.OK
+      );
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
