@@ -41,7 +41,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.http.HttpException;
 import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
@@ -215,17 +214,19 @@ public class CollectionsApiController implements CollectionsApi {
 
       // Include LOCKSS repository headers in the HTTP response
       ArtifactIdentifier id = artifactData.getIdentifier();
-      headers.set(ArtifactConstants.ARTIFACTID_ID_KEY, id.getId());
-      headers.set(ArtifactConstants.ARTIFACTID_COLLECTION_KEY,
+      headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
+      headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY,
 	  id.getCollection());
-      headers.set(ArtifactConstants.ARTIFACTID_AUID_KEY, id.getAuid());
-      headers.set(ArtifactConstants.ARTIFACTID_URI_KEY, id.getUri());
-      headers.set(ArtifactConstants.ARTIFACTID_VERSION_KEY,
+      headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
+      headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
+      headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY,
 	  String.valueOf(id.getVersion()));
       headers.set(
               ArtifactConstants.ARTIFACT_STATE_COMMITTED,
               String.valueOf(artifactData.getRepositoryMetadata().getCommitted())
       );
+      headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(artifactData.getContentLength()));
+      headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, artifactData.getContentDigest());
 
       return new ResponseEntity<>(
               outputStream -> ArtifactDataUtil.writeHttpResponse(
