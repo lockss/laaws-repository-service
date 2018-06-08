@@ -221,10 +221,17 @@ public class CollectionsApiController implements CollectionsApi {
       headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
       headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY,
 	  String.valueOf(id.getVersion()));
+
       headers.set(
               ArtifactConstants.ARTIFACT_STATE_COMMITTED,
               String.valueOf(artifactData.getRepositoryMetadata().getCommitted())
       );
+
+      headers.set(
+              ArtifactConstants.ARTIFACT_STATE_DELETED,
+              String.valueOf(artifactData.getRepositoryMetadata().getDeleted())
+      );
+
       headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(artifactData.getContentLength()));
       headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, artifactData.getContentDigest());
 
