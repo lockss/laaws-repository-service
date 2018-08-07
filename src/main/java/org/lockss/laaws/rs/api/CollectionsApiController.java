@@ -95,6 +95,8 @@ public class CollectionsApiController implements CollectionsApi {
     String parsedRequest = String.format("requestUrl: %s", getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
 
+    checkRepositoryReady(parsedRequest);
+
     try {
       log.debug("Invoked");
       List<String> collectionIds = new ArrayList<>();
@@ -137,6 +139,8 @@ public class CollectionsApiController implements CollectionsApi {
 	"collectionid: %s, artifactid: %s, requestUrl: %s",
 	collectionid, artifactid, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
+
+    checkRepositoryReady(parsedRequest);
 
     try {
       // Check that the collection exists.
@@ -188,6 +192,8 @@ public class CollectionsApiController implements CollectionsApi {
 	"collectionid: %s, artifactid: %s, accept: %s, requestUrl: %s",
 	collectionid, artifactid, accept, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
+
+    checkRepositoryReady(parsedRequest);
 
     try {
       log.info(String.format("Retrieving artifact: %s from collection %s",
@@ -287,6 +293,8 @@ public class CollectionsApiController implements CollectionsApi {
 	collectionid, artifactid, committed, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
 
+    checkRepositoryReady(parsedRequest);
+
     try {
       // Return bad request if new commit status has not been passed
       if (committed == null) {
@@ -364,6 +372,8 @@ public class CollectionsApiController implements CollectionsApi {
 	"collectionid: %s, auid: %s, uri: %s, requestUrl: %s",
 	collectionid, auid, uri, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
+
+    checkRepositoryReady(parsedRequest);
 
     try {
       log.info(String.format("Adding artifact %s, %s, %s",
@@ -480,6 +490,8 @@ public class CollectionsApiController implements CollectionsApi {
 	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
 	collectionid, auid, url, urlPrefix, version, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
+
+    checkRepositoryReady(parsedRequest);
 
     try {
       boolean isLatestVersion =
@@ -658,6 +670,8 @@ public class CollectionsApiController implements CollectionsApi {
 	collectionid, auid, url, urlPrefix, version, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
 
+    checkRepositoryReady(parsedRequest);
+
     try {
       boolean isLatestVersion =
 	  version == null || version.toLowerCase().equals("latest");
@@ -759,6 +773,8 @@ public class CollectionsApiController implements CollectionsApi {
 	collectionid, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
 
+    checkRepositoryReady(parsedRequest);
+
     try {
       // Check that the collection exists.
       validateCollectionId(collectionid, parsedRequest);
@@ -847,6 +863,13 @@ public class CollectionsApiController implements CollectionsApi {
     }
 
     log.debug("artifactid '" + artifactid + "' exists.");
+  }
+
+  private void checkRepositoryReady(String parsedRequest) {
+    if (!repo.isReady()) {
+      String errorMessage = "LOCKSS repository is not ready";
+      throw new LockssRestServiceException(HttpStatus.SERVICE_UNAVAILABLE, errorMessage, parsedRequest);
+    }
   }
 
   @Override
