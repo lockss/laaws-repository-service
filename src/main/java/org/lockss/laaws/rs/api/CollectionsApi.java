@@ -55,8 +55,8 @@ public interface CollectionsApi {
         @ApiResponse(code = 404, message = "Artifact not found"),
         @ApiResponse(code = 409, message = "Cannot delete committed artifact") })
     @RequestMapping(value = "/collections/{collectionid}/artifacts/{artifactid}",
-        produces = { "application/json" }, 
-        consumes = { "application/json" },
+        produces = { "application/json" },
+//        consumes = { "application/json" },
         method = RequestMethod.DELETE)
     default ResponseEntity<Void> collectionsCollectionidArtifactsArtifactidDelete(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the artifact",required=true) @PathVariable("artifactid") String artifactid) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
@@ -75,7 +75,7 @@ public interface CollectionsApi {
         @ApiResponse(code = 404, message = "Artifact not found"),
         @ApiResponse(code = 502, message = "Could not read from external resource") })
     @RequestMapping(value = "/collections/{collectionid}/artifacts/{artifactid}",
-        produces = { "application/json" }, 
+        produces = { "application/json", "application/http" },
         method = RequestMethod.GET)
     default ResponseEntity<StreamingResponseBody> collectionsCollectionidArtifactsArtifactidGet(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the artifact",required=true) @PathVariable("artifactid") String artifactid,@ApiParam(value = "Content type to return" , allowableValues="application/http, application/warc, multipart/related", defaultValue="multipart/related") @RequestHeader(value="Accept", required=false) String accept) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
