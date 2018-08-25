@@ -6,7 +6,7 @@
 package org.lockss.laaws.rs.api;
 
 import org.lockss.laaws.rs.model.Artifact;
-import org.springframework.core.io.Resource;
+import org.lockss.laaws.rs.model.ArtifactData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.annotations.*;
 import org.slf4j.Logger;
@@ -77,11 +77,11 @@ public interface CollectionsApi {
     @RequestMapping(value = "/collections/{collectionid}/artifacts/{artifactid}",
         produces = { "application/json", "application/http" },
         method = RequestMethod.GET)
-    default ResponseEntity<StreamingResponseBody> collectionsCollectionidArtifactsArtifactidGet(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid,@ApiParam(value = "Identifier of the artifact",required=true) @PathVariable("artifactid") String artifactid,@ApiParam(value = "Content type to return" , allowableValues="application/http, application/warc, multipart/related", defaultValue="multipart/related") @RequestHeader(value="Accept", required=false) String accept) {
+    default ResponseEntity<ArtifactData> collectionsCollectionidArtifactsArtifactidGet(@ApiParam(value = "Collection containing the artifact",required=true) @PathVariable("collectionid") String collectionid, @ApiParam(value = "Identifier of the artifact",required=true) @PathVariable("artifactid") String artifactid, @ApiParam(value = "Content type to return" , allowableValues="application/http, application/warc, multipart/related", defaultValue="multipart/related") @RequestHeader(value="Accept", required=false) String accept) {
         if(getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
             if (getAcceptHeader().get().contains("application/json")) {
                 try {
-                    return new ResponseEntity<>(getObjectMapper().get().readValue("{ }", StreamingResponseBody.class), HttpStatus.NOT_IMPLEMENTED);
+                    return new ResponseEntity<>(getObjectMapper().get().readValue("{ }", ArtifactData.class), HttpStatus.NOT_IMPLEMENTED);
                 } catch (IOException e) {
                     log.error("Couldn't serialize response for content type application/json", e);
                     return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);

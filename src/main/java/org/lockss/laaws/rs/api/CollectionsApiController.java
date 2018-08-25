@@ -48,7 +48,6 @@ import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
-import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -60,7 +59,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
 public class CollectionsApiController implements CollectionsApi {
@@ -180,7 +178,7 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a {@code ResponseEntity<StreamingResponseBody>}.
    */
   @Override
-  public ResponseEntity<StreamingResponseBody> collectionsCollectionidArtifactsArtifactidGet(
+  public ResponseEntity<ArtifactData> collectionsCollectionidArtifactsArtifactidGet(
       @ApiParam(value = "Collection containing the artifact",required=true)
       @PathVariable("collectionid") String collectionid,
       @ApiParam(value = "Identifier of the artifact",required=true)
@@ -213,7 +211,7 @@ public class CollectionsApiController implements CollectionsApi {
       // Setup HTTP response headers
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(
-	  MediaType.parseMediaType("application/http; msgtype=response"));
+          MediaType.parseMediaType("application/http; msgtype=response"));
 
       // TODO: Set to content length of the HTTP response entity body (i.e., the HTTP response encoding the artifact)
 //      headers.setContentLength(artifactData.getContentLength());
@@ -222,33 +220,27 @@ public class CollectionsApiController implements CollectionsApi {
       ArtifactIdentifier id = artifactData.getIdentifier();
       headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
       headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY,
-	  id.getCollection());
+          id.getCollection());
       headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
       headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
       headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY,
-	  String.valueOf(id.getVersion()));
+          String.valueOf(id.getVersion()));
 
       headers.set(
-              ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-              String.valueOf(artifactData.getRepositoryMetadata().getCommitted())
+          ArtifactConstants.ARTIFACT_STATE_COMMITTED,
+          String.valueOf(artifactData.getRepositoryMetadata().getCommitted())
       );
 
       headers.set(
-              ArtifactConstants.ARTIFACT_STATE_DELETED,
-              String.valueOf(artifactData.getRepositoryMetadata().getDeleted())
+          ArtifactConstants.ARTIFACT_STATE_DELETED,
+          String.valueOf(artifactData.getRepositoryMetadata().getDeleted())
       );
 
       headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(artifactData.getContentLength()));
       headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, artifactData.getContentDigest());
 
-      return new ResponseEntity<>(
-              outputStream -> ArtifactDataUtil.writeHttpResponse(
-                      ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData),
-                      outputStream
-              ),
-              headers,
-              HttpStatus.OK
-      );
+      // Return the ArtifactData
+      return new ResponseEntity<>(artifactData, headers, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
