@@ -30,6 +30,8 @@
 
 package org.lockss.laaws.rs.converters;
 
+import org.lockss.laaws.rs.model.ArtifactData;
+import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.MediaType;
@@ -38,6 +40,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Type;
 
 public class ArtifactDataMessageConverter extends AbstractGenericHttpMessageConverter {
@@ -52,7 +55,9 @@ public class ArtifactDataMessageConverter extends AbstractGenericHttpMessageConv
 
   @Override
   protected void writeInternal(Object o, Type type, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
-
+    ArtifactData artifactData = (ArtifactData)o;
+    OutputStream outputStream = outputMessage.getBody();
+    ArtifactDataUtil.writeHttpResponse(ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData), outputStream);
   }
 
   @Override
