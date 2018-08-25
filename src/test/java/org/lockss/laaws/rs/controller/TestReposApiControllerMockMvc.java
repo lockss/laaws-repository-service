@@ -33,6 +33,7 @@ package org.lockss.laaws.rs.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.tools.javac.util.ArrayUtils;
 import com.sun.tools.javac.util.List;
+import org.apache.commons.io.IOUtils;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
@@ -292,12 +293,17 @@ public class TestReposApiControllerMockMvc {
         .andExpect(status().isNotFound());
 
     // Create a fake artifact
-    ArtifactData ad1 = randomArtifactData();
+    byte[] content = "hello world".getBytes();
+    ArtifactData ad1 = randomArtifactData(content);
     ad1.getIdentifier().setId("y");
     ad1.setContentDigest("SHA1");
     ad1.setContentLength(5);
     ad1.setRepositoryMetadata(new RepositoryArtifactMetadata(ad1.getIdentifier(), true, false));
 
+
+    String expectedContent = "HTTP/1.1 200 OK\r\n" +
+        "\r\n" +
+        "hello world";
 
     // Attempt delete on existent artifact
 //    when(repository.isReady()).thenReturn(true);
@@ -306,7 +312,7 @@ public class TestReposApiControllerMockMvc {
     mockMvc.perform(get("/collections/x/artifacts/y").accept(MediaType.parseMediaType("application/http")))
         .andDo(print())
         .andExpect(status().isOk())
-    .andExpect(content().bytes("hello".getBytes()));
+    .andExpect(content().bytes(expectedContent.getBytes()));
 
   }
 
@@ -341,6 +347,10 @@ public class TestReposApiControllerMockMvc {
   }
 
   private ArtifactData randomArtifactData() {
+    return randomArtifactData(UUID.randomUUID().toString().getBytes());
+  }
+
+  private ArtifactData randomArtifactData(byte[] content) {
     StatusLine status = new BasicStatusLine(new ProtocolVersion("HTTP", 1,1), 200, "OK");
 
     return makeArtifactData(
@@ -348,11 +358,11 @@ public class TestReposApiControllerMockMvc {
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString(),
         (long) (Math.random() * Long.MAX_VALUE),
-        UUID.randomUUID().toString().getBytes(),
-//        "hello world".getBytes(),
+        content,
         status
     );
   }
+
 
   private ArtifactData randomArtifactData(String collection, String auid) {
     StatusLine status = new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
