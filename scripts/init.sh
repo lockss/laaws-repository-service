@@ -47,4 +47,4 @@ if [ ! -z ${SOLR_HOST} ]; then
 fi
 
 # Start LOCKSS repository
-/usr/bin/java -jar /opt/lockss/spring-app.jar $@
+/usr/bin/java ${JVM_ARGS} -jar /opt/lockss/spring-app.jar $@
