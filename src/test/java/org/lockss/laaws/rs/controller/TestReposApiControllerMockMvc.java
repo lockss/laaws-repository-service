@@ -30,72 +30,49 @@
 
 package org.lockss.laaws.rs.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.tools.javac.util.ArrayUtils;
 import com.sun.tools.javac.util.List;
-import org.apache.commons.io.IOUtils;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.api.CollectionsApi;
-import org.lockss.laaws.rs.api.CollectionsApiController;
-import org.lockss.laaws.rs.api.RepositoryServiceControllerAdvice;
 import org.lockss.laaws.rs.converters.ArtifactDataMessageConverter;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.VolatileLockssRepository;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
+import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
 import org.lockss.util.test.LockssTestCase5;
-import org.mockito.InjectMocks;
-import org.mockito.MockitoAnnotations;
+import org.mockito.ArgumentCaptor;
+import org.mockito.internal.util.reflection.FieldSetter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcBuilderCustomizer;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.json.JacksonTester;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
-import org.springframework.test.context.ContextConfiguration;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.*;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.test.web.servlet.setup.ConfigurableMockMvcBuilder;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.test.web.servlet.setup.MockMvcConfigurer;
-import org.springframework.test.web.servlet.setup.MockMvcConfigurerAdapter;
-import org.springframework.web.context.WebApplicationContext;
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
-import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
-import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
-import org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver;
-import org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.UUID;
 
-import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -103,15 +80,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-//@SpringBootTest
 @WebMvcTest
 @AutoConfigureMockMvc(secure = false)
-@WebAppConfiguration
-public class TestReposApiControllerMockMvc {
+public class TestReposApiControllerMockMvc extends LockssTestCase5 {
   @Autowired
   private MockMvc mockMvc;
 
@@ -119,44 +92,13 @@ public class TestReposApiControllerMockMvc {
   private LockssRepository repository;
 
   @Autowired
-  private CollectionsApiController controller;
-
-  @Autowired
   ApplicationContext appContext;
-
-  @Autowired
-  private WebApplicationContext wac;
-
-  @Before
-  public void setup() {
-//    this.mockMvc = MockMvcBuilders.standaloneSetup(controller)
-//        .setHandlerExceptionResolvers(createExceptionResolver())
-//        .setMessageConverters(new MappingJackson2HttpMessageConverter())
-//        .build();
-  }
-
-  private ExceptionHandlerExceptionResolver createExceptionResolver() {
-    ExceptionHandlerExceptionResolver exceptionResolver = new ExceptionHandlerExceptionResolver() {
-      protected ServletInvocableHandlerMethod getExceptionHandlerMethod(HandlerMethod handlerMethod, Exception exception) {
-        Method method = new ExceptionHandlerMethodResolver(RepositoryServiceControllerAdvice.class).resolveMethod(exception);
-        return new ServletInvocableHandlerMethod(new RepositoryServiceControllerAdvice(), method);
-      }
-    };
-
-    java.util.List<HttpMessageConverter<?>> converters = exceptionResolver.getMessageConverters();
-    converters.add(new MappingJackson2HttpMessageConverter());
-    exceptionResolver.setMessageConverters(converters);
-
-    exceptionResolver.afterPropertiesSet();
-    exceptionResolver.setApplicationContext(appContext);
-    return exceptionResolver;
-  }
 
   @EnableWebMvc
   @TestConfiguration
   public static class TestMockMvcConfig {
     @Bean
-    public WebMvcConfigurerAdapter something() {
+    public WebMvcConfigurerAdapter configureWebMvc() {
       return new WebMvcConfigurerAdapter() {
 //        @Override
 //        public void addReturnValueHandlers(java.util.List<HandlerMethodReturnValueHandler> returnValueHandlers) {
@@ -193,7 +135,6 @@ public class TestReposApiControllerMockMvc {
 //          converters.add(new MappingJackson2HttpMessageConverter());
 //          exceptionResolver.setMessageConverters(converters);
 //
-//
 //          exceptionResolvers.add(exceptionResolver);
 //          super.extendHandlerExceptionResolvers(exceptionResolvers);
 //        }
@@ -201,32 +142,9 @@ public class TestReposApiControllerMockMvc {
     }
   }
 
-
-  /*
-  private static class ReadiableVolatileLockssRepository extends VolatileLockssRepository {
-    boolean ready = false;
-
-    public void setReady(boolean ready) {
-      this.ready = ready;
-    }
-
-    @Override
-    public boolean isReady() {
-      return ready;
-    }
-  }
-
-  @TestConfiguration
-  public static class TestLockssRepositoryConfiguration {
-    @Bean
-    public LockssRepository createRepository() {
-      return new ReadiableVolatileLockssRepository();
-    }
-  }
-  */
-
   @Test
   public void testGetCollections() throws Exception {
+    // Add and commit and artifact to the internal repository
     Artifact a1 = repository.addArtifact(randomArtifactData());
     repository.commitArtifact(a1);
 
@@ -238,13 +156,13 @@ public class TestReposApiControllerMockMvc {
     // Proceed with a ready internal repository
     when(repository.isReady()).thenReturn(true);
 
-    // Check empty
+    // Check controller result with an empty internal repository
     when(repository.getCollectionIds()).thenReturn(Collections.EMPTY_LIST);
     mockMvc.perform(get("/collections"))
         .andExpect(status().isOk())
         .andExpect(content().json("[]"));
 
-    // Check populated
+    // Check controller result with a populated internal repository
     when(repository.getCollectionIds()).thenReturn(List.of("c1","c2"));
     mockMvc.perform(get("/collections"))
         .andExpect(status().isOk())
@@ -261,7 +179,7 @@ public class TestReposApiControllerMockMvc {
     // Proceed with a ready internal repository
     when(repository.isReady()).thenReturn(true);
 
-    // Attempt delete on non-existent artifact
+    // Attempt delete on non-existent artifact; assert we get a 404
     mockMvc.perform(delete("/collections/x/artifacts/y"))
         .andExpect(status().isNotFound());
 
@@ -292,58 +210,72 @@ public class TestReposApiControllerMockMvc {
     mockMvc.perform(get("/collections/x/artifacts/y"))
         .andExpect(status().isNotFound());
 
-    // Create a fake artifact
+    // Create an artifact for the mock repository to return
     byte[] content = "hello world".getBytes();
     ArtifactData ad1 = randomArtifactData(content);
     ad1.getIdentifier().setId("y");
+    ad1.setRepositoryMetadata(new RepositoryArtifactMetadata(ad1.getIdentifier(), true, false));
     ad1.setContentDigest("SHA1");
     ad1.setContentLength(5);
-    ad1.setRepositoryMetadata(new RepositoryArtifactMetadata(ad1.getIdentifier(), true, false));
 
-
-    String expectedContent = "HTTP/1.1 200 OK\r\n" +
-        "\r\n" +
-        "hello world";
+    String expectedContent = "HTTP/1.1 200 OK\r\n\r\nhello world";
 
     // Attempt delete on existent artifact
-//    when(repository.isReady()).thenReturn(true);
     when(repository.artifactExists("x", "y")).thenReturn(true);
     when(repository.getArtifactData("x","y")).thenReturn(ad1);
     mockMvc.perform(get("/collections/x/artifacts/y").accept(MediaType.parseMediaType("application/http")))
-        .andDo(print())
         .andExpect(status().isOk())
-    .andExpect(content().bytes(expectedContent.getBytes()));
-
+        .andExpect(content().bytes(expectedContent.getBytes()));
   }
 
   @Test
-  public void testPostArtifact() throws Exception {
-    if (false) {
-      // TODO: Make an artifact
+  public void testPostArtifact_notReady() throws Exception {
+    when(repository.isReady()).thenReturn(false);
 
-      // TODO: Encode an artifact as a HTTP POST request body
-      byte[] m_encodedArtifact = "A byte[] encoding of an artifact which will be transmitted as the request body of a HTTP POST".getBytes();
+    mockMvc.perform(
+        MockMvcRequestBuilders
+            .fileUpload("/collections/cid1/artifacts")
+            .file(new MockMultipartFile("content", "xyzzy".getBytes()))
+            .contentType(MediaType.parseMediaType("multipart/form-data"))
+//            .param("auid", "auid1")
+            .param("uri", "uri1")
+//    ).andExpect(status().isServiceUnavailable());
+    ).andExpect(status().isInternalServerError());
+  }
 
-      // Call the real addArtifact() method if it is passed an ArtifactData
-      doCallRealMethod().when(repository.addArtifact(isA(ArtifactData.class)));
+  @Test
+  public void testPostArtifact_success() throws Exception {
+//     TODO: Make an artifact
 
-      // Add an artifact via the controller
-      ResultActions result = mockMvc.perform(post("/collections/x/artifacts").contentType(MediaType.parseMediaType("application/http")).content(m_encodedArtifact))
-          .andExpect(status().isOk());
+//     TODO: Encode an artifact as a HTTP POST request body
+    byte[] m_encodedArtifact = "HTTP/1.1 200 OK\r\n\r\nhello world".getBytes();
 
-      // Check that the artifact exists in the internal repository
-      result.andExpect(mvcResult -> {
-        byte[] responseBody = mvcResult.getResponse().getContentAsByteArray();
+    // Proceed with a ready internal repository
+    when(repository.isReady()).thenReturn(true);
 
-        // Extract the collection and artifact ID from the controller's response
-        String artifactId = "ok";
-        String collectionId = "ok";
+    // Setup mock call of addArtifact(ArtifactData); capture the ArtifactData argument so we can verify later
+    ArgumentCaptor<ArtifactData> artifactDataCaptor = ArgumentCaptor.forClass(ArtifactData.class);
+    when(repository.addArtifact(artifactDataCaptor.capture())).thenReturn(new Artifact());
 
-        // Check that the artifact exists in the internal repository
-//        assertTrue(repository.artifactExists(collectionId, artifactId));
-      });
+     // Add an artifact via the controller
+    ResultActions result = mockMvc.perform(
+        MockMvcRequestBuilders.fileUpload("/collections/x/artifacts")
+            .file(new MockMultipartFile("content", "content", "application/http;msgtype=response", m_encodedArtifact))
+            .contentType(MediaType.parseMediaType("multipart/form-data"))
+            .param("auid", "auid1")
+            .param("uri", "uri1")
+    ).andExpect(status().isOk());
+    // TODO: .andExpect(content().bytes(...)); // Verify returned Artifact info
 
-    }
+    // Verify that the controller called LockssRepository#addArtifact(ArtifactData)
+    assertFalse(artifactDataCaptor.getAllValues().isEmpty());
+    assertNotNull(artifactDataCaptor.getValue());
+
+    // Verify that the controller attempted to add the expected ArtifactData to its internal repository
+    ArtifactData addedArtifactData = artifactDataCaptor.getValue();
+    assertNull(addedArtifactData.getIdentifier().getId());
+    assertEquals("auid1", addedArtifactData.getIdentifier().getAuid());
+    assertEquals("uri1", addedArtifactData.getIdentifier().getUri());
   }
 
   private ArtifactData randomArtifactData() {
@@ -362,7 +294,6 @@ public class TestReposApiControllerMockMvc {
         status
     );
   }
-
 
   private ArtifactData randomArtifactData(String collection, String auid) {
     StatusLine status = new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
