@@ -29,8 +29,8 @@
 swagger: "2.0"
 info:
   description: "API of the LOCKSS RepositoryService for the LAAWS project"
-  version: "1.0.0"
-  title: "LOCKSS RepositoryService API"
+  version: "1.9"
+  title: "LOCKSS Repository Service REST API"
   termsOfService: "https://www.lockss.org/terms/"
   contact:
     name: "Daniel Vargas"
