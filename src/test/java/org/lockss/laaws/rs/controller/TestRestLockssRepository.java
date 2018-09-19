@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -32,6 +32,7 @@ package org.lockss.laaws.rs.controller;
 
 import java.io.*;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -166,7 +167,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       .toCommit(true).setContentLength(size);
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
-    assertData(spec, commArt);
+    spec.assertData(repository, commArt);
   }
 
   @Test
@@ -189,7 +190,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     ArtSpec spec = new ArtSpec().setUrl("https://mr/ed/").setContent(CONTENT1);
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
-    assertData(spec, commArt);
+    spec.assertData(repository, commArt);
   }
 
   @Test
@@ -271,9 +272,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // Ensure that a no-version retrieval gets the expected highest version
     for (ArtSpec highSpec : highestCommittedVerSpec.values()) {
       log.info("highSpec: " + highSpec);
-      assertData(highSpec, repository.getArtifact(highSpec.getCollection(),
-						  highSpec.getAuid(),
-						  highSpec.getUrl()));
+      highSpec.assertData(repository, repository.getArtifact(
+	  highSpec.getCollection(),
+	  highSpec.getAuid(),
+	  highSpec.getUrl()));
     }
 
   }
@@ -298,13 +300,13 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     if (cspec != null) {
       ArtifactData ad = repository.getArtifactData(cspec.getCollection(),
 						   cspec.getArtifactId());
-      assertData(cspec, ad);
+      cspec.assertData(repository, ad);
     }
     ArtSpec uspec = anyUncommittedSpec();
     if (uspec != null) {
       ArtifactData ad = repository.getArtifactData(uspec.getCollection(),
 						   uspec.getArtifactId());
-      assertData(uspec, ad);
+      uspec.assertData(repository, ad);
     }
   }
 
@@ -350,7 +352,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     for (ArtSpec spec : addedSpecs) {
       if (spec.isCommitted()) {
 	log.info("s.b. data: " + spec);
-	assertData(spec, getArtifact(repository, spec));
+	spec.assertData(repository, getArtifact(repository, spec));
       } else {
 	log.info("s.b. uncommitted: " + spec);
 	assertNull(getArtifact(repository, spec),
@@ -447,7 +449,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       Artifact dupArt = repository.commitArtifact(commSpec.getCollection(),
 						  commSpec.getArtifactId());
       assertEquals(commArt, dupArt);
-      assertData(commSpec, dupArt);
+      commSpec.assertData(repository, dupArt);
     }
   }
 
@@ -573,7 +575,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       anyColl = coll;
       for (String auid : addedAuids()) {
 	anyAuid = auid;
-	assertArtList((orderedAllAu(coll, auid)
+	ArtSpec.assertArtList(repository, (orderedAllAu(coll, auid)
 		       .filter(distinctByKey(ArtSpec::artButVerKey))),
 		      repository.getAllArtifacts(coll, auid));
 	
@@ -616,7 +618,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // Compare with all URLs matching prefix in each AU
     for (String coll : addedCollections()) {
       for (String auid : addedAuids()) {
-	assertArtList((orderedAllAu(coll, auid)
+	ArtSpec.assertArtList(repository, (orderedAllAu(coll, auid)
 		       .filter(spec -> spec.getUrl().startsWith(PREFIX1))
 		       .filter(distinctByKey(ArtSpec::artButVerKey))),
 		       repository.getAllArtifactsWithPrefix(coll, auid, PREFIX1));
@@ -657,7 +659,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       anyColl = coll;
       for (String auid : addedAuids()) {
 	anyAuid = auid;
-	assertArtList(orderedAllAu(coll, auid),
+	ArtSpec.assertArtList(repository, orderedAllAu(coll, auid),
 		      repository.getAllArtifactsAllVersions(coll, auid));
 	
       }
@@ -697,7 +699,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // Compare with all URLs matching prefix in each AU
     for (String coll : addedCollections()) {
       for (String auid : addedAuids()) {
-	assertArtList((orderedAllAu(coll, auid)
+	ArtSpec.assertArtList(repository, (orderedAllAu(coll, auid)
 		       .filter(spec -> spec.getUrl().startsWith(PREFIX1))),
 		       repository.getAllArtifactsWithPrefixAllVersions(coll, auid, PREFIX1));
 	assertEmpty(repository.getAllArtifactsWithPrefixAllVersions(coll, auid,
@@ -740,7 +742,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     Stream<ArtSpec> s =
       committedSpecStream().filter(distinctByKey(ArtSpec::artButVerKey));
     for (ArtSpec urlSpec : (Iterable<ArtSpec>)s::iterator) {
-      assertArtList(orderedAllCommitted()
+      ArtSpec.assertArtList(repository, orderedAllCommitted()
 		    .filter(spec -> spec.sameArtButVer(urlSpec)),
 		    repository.getArtifactAllVersions(urlSpec.getCollection(),
 						      urlSpec.getAuid(),
@@ -926,77 +928,6 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     }
     return res;
   }
-  
-
-
-
-  // Assertions
-
-  /** Assert that the Artifact matches the ArtSpec */
-  void assertData(ArtSpec spec, Artifact art) throws IOException {
-    assertNotNull(art, "Comparing with " + spec);
-    assertEquals(spec.getCollection(), art.getCollection());
-    assertEquals(spec.getAuid(), art.getAuid());
-    assertEquals(spec.getUrl(), art.getUri());
-    if (spec.getExpVer() >= 0) {
-      assertEquals(spec.getExpVer(), (int)art.getVersion());
-    }
-    ArtifactData ad = repository.getArtifactData(art);
-    assertEquals(art.getIdentifier(), ad.getIdentifier());
-    if (WRONG) {
-      assertEquals(-1, ad.getContentLength());
-    } else {
-      assertEquals(spec.getContentLength(), ad.getContentLength());
-    }
-    assertData(spec, ad);
-
-    ArtifactData ad2 = repository.getArtifactData(spec.getCollection(),
-						  art.getId());
-    if (WRONG) {
-      assertEquals(-1, ad2.getContentLength());
-    } else {
-      assertEquals(spec.getContentLength(), ad2.getContentLength());
-    }
-    assertData(spec, ad2);
-  }
-
-  void assertEquals(StatusLine exp, StatusLine line) {
-    assertEquals(exp.toString(), line.toString());
-  }
-
-  /** Assert that the ArtifactData matches the ArtSpec */
-  void assertData(ArtSpec spec, ArtifactData ad) throws IOException {
-    assertNotNull(ad, "Didn't find ArticleData for: " + spec);
-    assertEquals(spec.getStatusLine(), ad.getHttpStatus());
-    if (WRONG) {
-      assertEquals(-1, ad.getContentLength());
-    } else {
-      assertEquals(spec.getContentLength(), ad.getContentLength());
-    }
-    assertSameBytes(spec.getInputStream(), ad.getInputStream(),
-		    spec.getContentLength());
-    // XXX with RepoSvc, returned headers are a superset of what we stored
-    assertTrue(RepoUtil.mapFromHttpHeaders(ad.getMetadata()).entrySet().containsAll(spec.getHeaders().entrySet()));
-//     assertEquals(RepoUtil.mapFromHttpHeaders(ad.getMetadata()),
-// 		 spec.getHeaders().entrySet());
-  }
-
-  /** Assert that the sequence of Artifacts matches the stream of ArtSpecs */
-  void assertArtList(Stream<ArtSpec> expSpecs, Iterable<Artifact> arts)
-      throws IOException {
-    Iterator<ArtSpec> specIter = expSpecs.iterator();
-    Iterator<Artifact> artIter = arts.iterator();
-    while (specIter.hasNext() && artIter.hasNext()) {
-      ArtSpec spec = specIter.next();
-      Artifact art = artIter.next();
-      assertData(spec, art);
-    }
-    assertFalse(specIter.hasNext());
-    assertFalse(artIter.hasNext());
-  }
-
-
-
 
   // utilities
 
@@ -1101,7 +1032,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
   public static <T> Predicate<T>
     distinctByKey(Function<? super T,Object> keyExtractor) {
-    Set seen = new HashSet();
+    Set<Object> seen = new HashSet<>();
     return t -> seen.add(keyExtractor.apply(t));
   }
 
@@ -1147,12 +1078,13 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     Set<Pair<String,String>> set = new HashSet<Pair<String,String>>();
     for (String coll : addedCommittedCollections()) {
       for (String auid : addedCommittedAuids()) {
-	set.add(new ImmutablePair(coll, auid));
+	set.add(new ImmutablePair<String, String>(coll, auid));
       }
     }
     committedSpecStream()
-      .forEach(spec -> {set.remove(new ImmutablePair(spec.getCollection(),
-						     spec.getAuid()));});
+      .forEach(spec -> {set.remove(
+	  new ImmutablePair<String, String>(spec.getCollection(),
+					    spec.getAuid()));});
     if (set.isEmpty()) {
       return null;
     } else {
@@ -1233,7 +1165,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     Artifact newArt = repository.addArtifact(ad);
     assertNotNull(newArt);
 
-    assertData(spec, newArt);
+    spec.assertData(repository, newArt);
     long expVers = expectedVersions(spec);
     assertEquals(expVers + 1, (int)newArt.getVersion(),
 		 "version of " + newArt);
@@ -1283,7 +1215,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 					      commArt.getId()));
     assertTrue(commArt.getCommitted());
 
-    assertData(spec, commArt);
+    spec.assertData(repository, commArt);
 
     Artifact newArt = getArtifact(repository, spec);
     assertNotNull(newArt);
@@ -1381,7 +1313,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   }
 
   InputStream stringInputStream(String str) {
-    return IOUtils.toInputStream(str);
+    return IOUtils.toInputStream(str, Charset.defaultCharset());
   }
 
 }
