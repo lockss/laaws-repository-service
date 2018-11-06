@@ -2,7 +2,7 @@ FROM openjdk:8-jre
 
 MAINTAINER "Daniel Vargas" <dlvargas@stanford.edu>
 
-EXPOSE 32640
+EXPOSE 24610
 
 ARG JAR_FILE
 
