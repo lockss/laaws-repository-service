@@ -27,19 +27,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-FROM openjdk:8-jre-slim
-
-MAINTAINER "LOCKSS Buildmaster" <buildmaster@lockss.org>
-
-EXPOSE 24610
-
-WORKDIR /opt/lockss
-
-ENTRYPOINT ["/init.sh"]
-
-# Install netcat and add entrypoint script
-RUN apt update && apt -y install netcat
-ADD scripts/init.sh /init.sh
-
-# Add the LOCKSS repository JAR and entrypoint script
-ADD target/current-with-deps.jar /opt/lockss/spring-app.jar
+*
+!Dockerfile
+!target/current-with-deps.jar
