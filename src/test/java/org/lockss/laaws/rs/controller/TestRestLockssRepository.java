@@ -123,7 +123,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     @TestConfiguration
     static class TestLockssRepositoryConfig {
         @Bean
-        public LockssRepository createRepository() {
+        public LockssRepository createRepository() throws IOException {
             return new VolatileLockssRepository();
         }
     }

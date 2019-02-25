@@ -106,7 +106,7 @@ public class LockssRepositoryConfig {
                                 if (log.isDebugEnabled())
                                     log.debug("repositoryLocalPath = " + repositoryLocalPath);
 
-                                return new LocalLockssRepository(new File(repositoryLocalPath), repositoryPersistIndexName);
+                                return LocalLockssRepository.getInstance(new File(repositoryLocalPath), repositoryPersistIndexName);
                             }
 
                             case "rest": {
