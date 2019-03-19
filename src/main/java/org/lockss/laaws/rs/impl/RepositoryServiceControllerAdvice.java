@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2018-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -28,30 +28,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.api;
+package org.lockss.laaws.rs.impl;
 
-import java.io.IOException;
+import org.lockss.laaws.error.SpringControllerAdvice;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 
-import javax.servlet.*;
-import javax.servlet.http.HttpServletResponse;
-
-
-public class ApiOriginFilter implements javax.servlet.Filter {
-    @Override
-    public void doFilter(ServletRequest request, ServletResponse response,
-            FilterChain chain) throws IOException, ServletException {
-        HttpServletResponse res = (HttpServletResponse) response;
-        res.addHeader("Access-Control-Allow-Origin", "*");
-        res.addHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT");
-        res.addHeader("Access-Control-Allow-Headers", "Content-Type");
-        chain.doFilter(request, response);
-    }
-
-    @Override
-    public void destroy() {
-    }
-
-    @Override
-    public void init(FilterConfig filterConfig) throws ServletException {
-    }
+/**
+ * Provides error handling for all the controllers in this directory.
+ */
+@ControllerAdvice
+public class RepositoryServiceControllerAdvice extends SpringControllerAdvice {
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -28,20 +28,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.api;
+package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
-import javax.validation.Valid;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.lockss.laaws.error.LockssRestServiceException;
+import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
@@ -54,17 +53,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
-public class CollectionsApiController implements CollectionsApi {
-  private final static Log log = LogFactory.getLog(CollectionsApiController.class);
+public class CollectionsApiServiceImpl implements CollectionsApiDelegate {
+  private final static Log log =
+      LogFactory.getLog(CollectionsApiServiceImpl.class);
   public static final String APPLICATION_HTTP_RESPONSE_VALUE =
       "application/http;msgtype=response";
   public static final MediaType APPLICATION_HTTP_RESPONSE =
@@ -78,7 +74,7 @@ public class CollectionsApiController implements CollectionsApi {
   private final HttpServletRequest request;
 
   @org.springframework.beans.factory.annotation.Autowired
-  public CollectionsApiController(ObjectMapper objectMapper,
+  public CollectionsApiServiceImpl(ObjectMapper objectMapper,
       HttpServletRequest request) {
     this.objectMapper = objectMapper;
     this.request = request;
@@ -91,7 +87,7 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a List<String> with the collection names.
    */
   @Override
-  public ResponseEntity<List<String>> collectionsGet() {
+  public ResponseEntity<List<String>> getCollections() {
     String parsedRequest = String.format("requestUrl: %s", getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);
 
@@ -129,12 +125,8 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a {@code ResponseEntity<Void>}.
    */
   @Override
-  public ResponseEntity<Void> collectionsCollectionidArtifactsArtifactidDelete(
-      @ApiParam(value = "Collection containing the artifact",required=true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the artifact",required=true)
-      @PathVariable("artifactid") String artifactid
-      ) {
+  public ResponseEntity<Void> deleteArtifact(String collectionid,
+      String artifactid) {
     String parsedRequest = String.format(
 	"collectionid: %s, artifactid: %s, requestUrl: %s",
 	collectionid, artifactid, getFullRequestUrl());
@@ -180,14 +172,8 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a {@code ResponseEntity<StreamingResponseBody>}.
    */
   @Override
-  public ResponseEntity<StreamingResponseBody> collectionsCollectionidArtifactsArtifactidGet(
-      @ApiParam(value = "Collection containing the artifact",required=true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the artifact",required=true)
-      @PathVariable("artifactid") String artifactid,
-      @ApiParam(value = "Content type to return" , allowableValues="application/http, application/warc, multipart/related", defaultValue="multipart/related")
-      @RequestHeader(value="Accept", required=false) String accept
-      ) {
+  public ResponseEntity<StreamingResponseBody> getArtifact(String collectionid,
+      String artifactid, String accept) {
     String parsedRequest = String.format(
 	"collectionid: %s, artifactid: %s, accept: %s, requestUrl: %s",
 	collectionid, artifactid, accept, getFullRequestUrl());
@@ -280,14 +266,8 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity<Artifact> collectionsCollectionidArtifactsArtifactidPut(
-      @ApiParam(value = "Collection containing the artifact",required=true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the artifact",required=true)
-      @PathVariable("artifactid") String artifactid,
-      @ApiParam(value = "New commit status of artifact")
-      @RequestParam(value="committed", required=false)  Boolean committed
-      ) {
+  public ResponseEntity<Artifact> updateArtifact(String collectionid,
+      String artifactid, Boolean committed) {
     String parsedRequest = String.format(
 	"collectionid: %s, artifactid: %s, committed: %s, requestUrl: %s",
 	collectionid, artifactid, committed, getFullRequestUrl());
@@ -356,18 +336,9 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity<Artifact> collectionsCollectionidArtifactsPost(
-      @ApiParam(value = "Collection containing the artifact",required=true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Archival Unit ID (AUID) of new artifact", required=true)
-      @RequestParam(value="auid", required=true)  String auid,
-      @ApiParam(value = "URI represented by this artifact", required=true)
-      @RequestParam(value="uri", required=true)  String uri,
-      @ApiParam(value = "file detail", required=true) @Valid
-      @RequestPart("content") MultipartFile content,
-      @ApiParam(value = "URI aspects represented by this artifact")
-      @RequestPart(value="aspectsParts")  MultipartFile... aspectParts
-      ) {
+  public ResponseEntity<Artifact> createArtifact(String collectionid,
+      String auid, String uri, MultipartFile content, MultipartFile aspectParts)
+  {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, uri: %s, requestUrl: %s",
 	collectionid, auid, uri, getFullRequestUrl());
@@ -474,18 +445,9 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a {@code ResponseEntity<List<Artifact>>}.
    */
   @Override
-  public ResponseEntity<List<Artifact>> collectionsCollectionidAusAuidArtifactsGet(
-      @ApiParam(value = "Identifier of the collection containing the artifacts",required=true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true)
-      @PathVariable("auid") String auid,
-      @ApiParam(value = "The URL contained by the artifacts") @Valid
-      @RequestParam(value = "url", required = false) String url,
-      @ApiParam(value = "The prefix to be matched by the artifact URLs") @Valid
-      @RequestParam(value = "urlPrefix", required = false) String urlPrefix,
-      @ApiParam(value = "The version of the URL contained by the artifacts")
-      @Valid
-      @RequestParam(value = "version", required = false) String version) {
+  public ResponseEntity<List<Artifact>> getCommittedArtifacts(
+      String collectionid, String auid, String url, String urlPrefix,
+      String version) {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
 	collectionid, auid, url, urlPrefix, version, getFullRequestUrl());
@@ -653,18 +615,8 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a Long{@code ResponseEntity<Long>}.
    */
   @Override
-  public ResponseEntity<Long> collectionsCollectionidAusAuidSizeGet(
-      @ApiParam(value = "Identifier of the collection containing the artifacts",required=true)
-      @PathVariable("collectionid") String collectionid,
-      @ApiParam(value = "Identifier of the Archival Unit containing the artifacts",required=true)
-      @PathVariable("auid") String auid,
-      @ApiParam(value = "The URL contained by the artifacts") @Valid
-      @RequestParam(value = "url", required = false) String url,
-      @ApiParam(value = "The prefix to be matched by the artifact URLs") @Valid
-      @RequestParam(value = "urlPrefix", required = false) String urlPrefix,
-      @ApiParam(value = "The version of the URL contained by the artifacts")
-      @Valid
-      @RequestParam(value = "version", required = false) String version) {
+  public ResponseEntity<Long> getArtifactsSize(String collectionid, String auid,
+      String url, String urlPrefix, String version) {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
 	collectionid, auid, url, urlPrefix, version, getFullRequestUrl());
@@ -766,9 +718,7 @@ public class CollectionsApiController implements CollectionsApi {
    * @return a {@code ResponseEntity<List<String>>}.
    */
   @Override
-  public ResponseEntity<List<String>> collectionsCollectionidAusGet(
-      @ApiParam(value = "Identifier of the collection containing the Archival Units", required = true)
-      @PathVariable("collectionid") String collectionid) {
+  public ResponseEntity<List<String>> getAus(String collectionid) {
     String parsedRequest = String.format("collectionid: %s, requestUrl: %s",
 	collectionid, getFullRequestUrl());
     log.debug("Parsed request: " + parsedRequest);

@@ -430,3 +430,6 @@ lib/run-props
 /target/
 /pom.xml.versionsBackup
 /logs
+/src/generated/
+
+.swagger-codegen/
