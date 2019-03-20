@@ -27,5 +27,9 @@ src/main/resources/application.properties
 src/generated/java/org/lockss/laaws/*/Swagger2SpringBoot.java
 src/generated/java/org/lockss/laaws/*/api/ApiException.java
 src/generated/java/org/lockss/laaws/*/api/NotFoundException.java
+src/generated/java/org/lockss/laaws/*/api/StatusApi.java
+src/generated/java/org/lockss/laaws/*/api/StatusApiController.java
+src/generated/java/org/lockss/laaws/*/api/StatusApiDelegate.java
+src/generated/java/org/lockss/laaws/*/model/ApiStatus.java
 src/generated/java/org/lockss/laaws/*/model/Artifact.java
 src/generated/java/org/lockss/laaws/*/model/StreamingResponseBody.java

@@ -326,6 +326,24 @@ paths:
       required: false
       type: "string"
       description: "The version of the URL contained by the artifacts"
+  /status:
+    get:
+      tags:
+      - "status"
+      summary: "Get the status of the service"
+      description: "Get the status of the service"
+      operationId: "getStatus"
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "The status of the service"
+          schema:
+            $ref: "#/definitions/apiStatus"
+        401:
+          description: "Unauthorized"
+        500:
+          description: "Internal Server Error"
 definitions:
   artifact:
     type: "object"
@@ -346,3 +364,17 @@ definitions:
         type: "string"
   streamingResponseBody:
     type: "object"
+  apiStatus:
+    type: "object"
+    required:
+    - "version"
+    - "ready"
+    properties:
+      version:
+        type: "string"
+        description: "The version of the service"
+      ready:
+        type: "boolean"
+        description: "The indication of whether the service is available"
+    description: "The status information of the service"
+    

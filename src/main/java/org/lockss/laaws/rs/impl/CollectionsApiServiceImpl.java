@@ -48,6 +48,8 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
+import org.lockss.laaws.status.model.ApiStatus;
+import org.lockss.spring.status.SpringLockssBaseApiController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -57,13 +59,17 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+/**
+ * Service for accessing the repository artifacts.
+ */
 @RestController
-public class CollectionsApiServiceImpl implements CollectionsApiDelegate {
+public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
+    implements CollectionsApiDelegate {
   private final static Log log =
       LogFactory.getLog(CollectionsApiServiceImpl.class);
-  public static final String APPLICATION_HTTP_RESPONSE_VALUE =
+  private static final String APPLICATION_HTTP_RESPONSE_VALUE =
       "application/http;msgtype=response";
-  public static final MediaType APPLICATION_HTTP_RESPONSE =
+  private static final MediaType APPLICATION_HTTP_RESPONSE =
       MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
 
   @Autowired
@@ -73,6 +79,14 @@ public class CollectionsApiServiceImpl implements CollectionsApiDelegate {
 
   private final HttpServletRequest request;
 
+  /**
+   * Constructor for autowiring.
+   * 
+   * @param objectMapper
+   *          An ObjectMapper for JSON processing.
+   * @param request
+   *          An HttpServletRequest with the HTTP request.
+   */
   @org.springframework.beans.factory.annotation.Autowired
   public CollectionsApiServiceImpl(ObjectMapper objectMapper,
       HttpServletRequest request) {
@@ -830,5 +844,19 @@ public class CollectionsApiServiceImpl implements CollectionsApiDelegate {
   @Override
   public Optional<HttpServletRequest> getRequest() {
     return Optional.ofNullable(request);
+  }
+
+  private static final String API_VERSION = "1.0.0";
+
+  /**
+   * Provides the status object.
+   * 
+   * @return an ApiStatus with the status.
+   */
+  @Override
+  public ApiStatus getApiStatus() {
+    return new ApiStatus()
+      .setVersion(API_VERSION)
+      .setReady(repo.isReady());
   }
 }
