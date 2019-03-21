@@ -124,7 +124,9 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     static class TestLockssRepositoryConfig {
         @Bean
         public LockssRepository createRepository() throws IOException {
-            return new VolatileLockssRepository();
+            LockssRepository repository = new VolatileLockssRepository();
+            repository.initRepository();
+            return repository;
         }
     }
 
