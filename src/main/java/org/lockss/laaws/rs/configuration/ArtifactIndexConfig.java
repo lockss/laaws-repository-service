@@ -55,7 +55,13 @@ public class ArtifactIndexConfig {
 
     @Bean
     public ArtifactIndex setArtifactIndex() {
+        String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
         String indexSpec = env.getProperty(INDEX_SPEC_KEY);
+
+        if (!repoSpec.equals("custom")) {
+            log.warn("Ignoring index specification because a predefined repository specification is being used");
+            return null;
+        }
 
         log.info(String.format("indexSpec = %s", indexSpec));
 
