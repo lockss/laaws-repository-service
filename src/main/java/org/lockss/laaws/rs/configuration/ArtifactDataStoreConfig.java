@@ -32,11 +32,12 @@ package org.lockss.laaws.rs.configuration;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.fs.Path;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.hdfs.HdfsWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -60,9 +61,18 @@ public class ArtifactDataStoreConfig {
     @Resource
     private Environment env;
 
+    @Autowired
+    ArtifactIndex index;
+
     @Bean
     public ArtifactDataStore setArtifactStore() throws Exception {
+        String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
         String datastoreSpec = env.getProperty(DATASTORE_SPEC_KEY);
+
+        if (!repoSpec.equals("custom")) {
+            log.warn("Ignoring data store specification because a predefined repository specification is being used");
+            return null;
+        }
 
         if (datastoreSpec != null) {
             switch (datastoreSpec.trim().toLowerCase()) {
@@ -78,16 +88,16 @@ public class ArtifactDataStoreConfig {
 
                     HadoopConfigBuilder config = new HadoopConfigBuilder();
                     config.fileSystemUri(hdfsServer);
-                    return new HdfsWarcArtifactDataStore(config.build(), hdfsBaseDir);
+                    return new HdfsWarcArtifactDataStore(index, config.build(), hdfsBaseDir);
 
                 case "local":
                     String baseDir = env.getProperty(LOCAL_BASEDIR_KEY);
                     log.info(String.format("Configuring local filesystem artifact data store [%s]", baseDir));
-                    return new LocalWarcArtifactDataStore(new File(baseDir));
+                    return new LocalWarcArtifactDataStore(index, new File(baseDir));
 
                 case "volatile":
                     log.info("Configuring volatile artifact data store");
-                    return new VolatileWarcArtifactDataStore();
+                    return new VolatileWarcArtifactDataStore(index);
 
                 default:
                     String errMsg = String.format("Unknown data store specification '%s'", datastoreSpec);
