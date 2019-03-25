@@ -35,6 +35,15 @@ JVM_OPTS_DOCKER='-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHe
 JVM_OPTS_LOGGING='-Dorg.lockss.defaultLogLevel=debug -Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager -Dorg.springframework.boot.logging.LoggingSystem=none'
 JVM_OPTS_TMP="-Djava.io.tmpdir=${LOCKSS_TMP}"
 LOCKSS_JAR="${LOCKSS_HOME}/lib/lockss.jar"
+STARTUP_FILE="${LOCKSS_PIDS}/lockss.startup"
+PID_FILE="${LOCKSS_PIDS}/lockss.pid"
+
+# $1=exitcode
+Exit()
+{
+  rm -f "${STARTUP_FILE}"
+  exit "${1}"
+}
 
 # $1=srcdir
 Apply_Config()
@@ -62,7 +71,7 @@ Check_Dir()
 {
   if [ ! -d "${1}" ]; then
     echo "${_0}: directory not found: ${1}"
-    exit 1
+    Exit 1
   fi
 }
 
@@ -71,7 +80,7 @@ Check_Executable()
 {
   if ! which "${1}" > /dev/null 2>&1 ; then
     echo "${_0}: PATH executable not found: ${1}"
-    exit 1
+    Exit 1
   fi
 }
 
@@ -80,7 +89,7 @@ Check_File()
 {
   if [ ! -f "${1}" ]; then
     echo "${_0}: file not found: ${1}"
-    exit 1
+    Exit 1
   fi
 }
 
@@ -89,7 +98,7 @@ Check_Set()
 {
   if [ -z "${1}" ]; then
     echo "${_0}: environment variable not set: ${2}"
-    exit 1
+    Exit 1
   fi
 }
 
@@ -105,6 +114,12 @@ Wait_For_Port()
     done
   done
 }
+
+# Beginning
+
+echo "$$" > "${STARTUP_FILE}"
+rm -f "${PID_FILE}"
+echo " * Beginning execution with ${LOCKSS_MAVEN_GROUP}:${LOCKSS_MAVEN_ARTIFACT}:${LOCKSS_MAVEN_VERSION}"
 
 # Sanity checks
 
@@ -162,7 +177,8 @@ export LOG4J_LOCKSS_CONFIG="${LOCKSS_HOME}/etc/log4j2-lockss-container.xml"
 # Invoke JVM
 
 echo " * Launching service..."
-echo "$$" > "${LOCKSS_PIDS}/lockss.pid"
+echo "$$" > "${PID_FILE}"
+rm -f "${STARTUP_FILE}"
 exec java ${JVM_OPTS_DOCKER} \
           ${JVM_OPTS_LOGGING} \
           ${JVM_OPTS_TMP} \

@@ -67,7 +67,18 @@ Check_Executable 'curl'
 Check_Executable 'nc'
 Check_Set "${LOCKSS_REST_PORT}" LOCKSS_REST_PORT
 Check_Dir "${LOCKSS_PIDS}"
-Check_File "${LOCKSS_PIDS}/lockss.pid"
-ps -p "$(cat "${LOCKSS_PIDS}/lockss.pid")" > /dev/null || exit 1
+
+# Not okay if neither still starting up nor running
+if [ ! -f "${STARTUP_FILE}" ] && [ ! -f "${PID_FILE}" ]; then
+  exit 1
+fi
+
+# Okay if still starting up
+if [ -f "${STARTUP_FILE}" ] && ps -p "$(cat "${STARTUP_FILE}")" > /dev/null ; then
+  exit 0
+fi
+
+# If running, check health
+ps -p "$(cat "${PID_FILE}")" > /dev/null || exit 1
 nc -z -w 10 localhost "${LOCKSS_REST_PORT}" || exit 1
 curl --silent --max-time 10 --location "http://localhost:${LOCKSS_REST_PORT}/status" || exit 1
