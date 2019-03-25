@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright (c) 2000-2019, Board of Trustees of Leland Stanford Jr. University
 # All rights reserved.
 #
@@ -27,50 +29,45 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-FROM lockss/lockss-alpine:3.9-2
+_0="$(basename "${0}")"
 
-MAINTAINER "LOCKSS Buildmaster" <buildmaster@lockss.org>
+Check_Dir()
+{
+  if [ ! -d "${1}" ]; then
+    echo "${_0}: directory not found: ${1}"
+    exit 1
+  fi
+}
 
-# Mandatory build arguments
-ARG LOCKSS_MAVEN_GROUP
-ARG LOCKSS_MAVEN_ARTIFACT
-ARG LOCKSS_MAVEN_VERSION
-ARG LOCKSS_REST_PORT
-RUN test -n "${LOCKSS_MAVEN_GROUP}"    || exit 1 \
- && test -n "${LOCKSS_MAVEN_ARTIFACT}" || exit 2 \
- && test -n "${LOCKSS_MAVEN_VERSION}"  || exit 3 \
- && test -n "${LOCKSS_REST_PORT}"      || exit 4
+Check_Executable()
+{
+  if ! which "${1}" > /dev/null 2>&1 ; then
+    echo "${_0}: ${1} not on the PATH"
+    exit 1
+  fi
+}
 
-# Optional build arguments
-ARG LOCKSS_UI_PORT
+Check_File()
+{
+  if [ ! -f "${1}" ]; then
+    echo "${_0}: file not found: ${1}"
+    exit 1
+  fi
+}
 
-# Environment variables
-ENV LOCKSS_MAVEN_GROUP="${LOCKSS_MAVEN_GROUP}" \
-    LOCKSS_MAVEN_ARTIFACT="${LOCKSS_MAVEN_ARTIFACT}" \
-    LOCKSS_MAVEN_VERSION="${LOCKSS_MAVEN_VERSION}" \
-    LOCKSS_REST_PORT="${LOCKSS_REST_PORT}" \
-    LOCKSS_UI_PORT="${LOCKSS_UI_PORT}" \
-    LOCKSS_WAIT_FOR_PORT_TIMEOUT=2 \
-    LOCKSS_WAIT_FOR_PORT_SLEEP=2 \
-    CONFIGS=/run/configs \
-    SECRETS=/run/secrets \
-    LOCKSS_HOME=/usr/local/share/lockss \
-    LOCKSS_PIDS=/var/run \
-    LOCKSS_DATA=/data \
-    LOCKSS_TMP=/data/temp \
-    LOCKSS_LOGS=/var/log/lockss
+Check_Set()
+{
+  if [ -z "${1}" ]; then
+    echo "${_0}: environment variable is not set: ${2}"
+    exit 1
+  fi
+}
 
-EXPOSE ${LOCKSS_REST_PORT} ${LOCKSS_UI_PORT}
-
-RUN ipm-update \
- && ipm-install gettext \
-                netcat \
-                openjdk8-jre \
- && ipm-clean
-
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint"]
-
-HEALTHCHECK --retries=1 --start-period=60s CMD ["/usr/local/bin/docker-healthcheck"]
-
-COPY /docker/bin/* /usr/local/bin/
-COPY /target/current-with-deps.jar "${LOCKSS_HOME}/lib/lockss.jar"
+Check_Executable 'curl'
+Check_Executable 'nc'
+Check_Set "${LOCKSS_REST_PORT}" LOCKSS_REST_PORT
+Check_Dir "${LOCKSS_PIDS}"
+Check_File "${LOCKSS_PIDS}/lockss.pid"
+ps -p "$(cat "${LOCKSS_PIDS}/lockss.pid")" > /dev/null || exit 1
+nc -z -w 10 localhost "${LOCKSS_REST_PORT}" || exit 1
+curl --silent --max-time 10 --location "http://localhost:${LOCKSS_REST_PORT}/status" || exit 1
