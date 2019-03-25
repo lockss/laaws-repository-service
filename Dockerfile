@@ -27,7 +27,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-FROM lockss/lockss-alpine:3.9-2
+FROM lockss/lockss-alpine:3.9.2-1
 
 MAINTAINER "LOCKSS Buildmaster" <buildmaster@lockss.org>
 
