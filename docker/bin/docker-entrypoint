@@ -105,14 +105,17 @@ Check_Set()
 # $1=space separated string of host:port pairs
 Wait_For_Port()
 {
+  echo " * Waiting for: $@"
   for hostport in $@ ; do
-    echo " * Waiting for ${hostport}..."
+    echo " * Waiting for ${hostport} since $(date)"
     host="${hostport%%:*}"
     port="${hostport#*:}"
     until nc -z -w "${LOCKSS_WAIT_FOR_PORT_TIMEOUT}" "${host}" "${port}" ; do
       sleep "${LOCKSS_WAIT_FOR_PORT_SLEEP}"
     done
+    echo " * ...done at $(date)"
   done
+  echo " * ...done"  
 }
 
 # Beginning
