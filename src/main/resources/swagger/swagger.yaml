@@ -1,4 +1,4 @@
-# Copyright (c) 2000-2018, Board of Trustees of Leland Stanford Jr. University
+# Copyright (c) 2000-2019, Board of Trustees of Leland Stanford Jr. University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -57,6 +57,7 @@ paths:
         - collections
       summary: "Get collection identifiers of the committed artifacts in the\
         \ repository"
+      operationId: getCollections
       parameters: []
       responses:
         200:
@@ -70,6 +71,7 @@ paths:
       tags:
         - collections
       summary: "Create an artifact"
+      operationId: createArtifact
       consumes:
       - "multipart/form-data"
       parameters:
@@ -123,6 +125,7 @@ paths:
       tags:
         - collections
       summary: "Get artifact content and metadata"
+      operationId: getArtifact
       parameters:
       - name: "Accept"
         in: "header"
@@ -151,6 +154,7 @@ paths:
       tags:
         - collections
       summary: "Update the committed property of an artifact"
+      operationId: updateArtifact
       consumes:
       - "multipart/form-data"
       parameters:
@@ -176,6 +180,7 @@ paths:
       tags:
         - collections
       summary: "Remove an artifact from the repository"
+      operationId: deleteArtifact
       consumes:
       - "application/json"
       parameters: []
@@ -206,6 +211,7 @@ paths:
       tags:
         - collections
       summary: "Get Archival Unit IDs (AUIDs) in a collection"
+      operationId: getAus
       responses:
         200:
           description: "OK"
@@ -232,6 +238,7 @@ paths:
       tags:
         - collections
       summary: "Get committed artifacts in a collection and Archival Unit"
+      operationId: getCommittedArtifacts
       responses:
         200:
           description: "The requested artifacts"
@@ -278,6 +285,7 @@ paths:
       tags:
         - collections
       summary: "Get the size of Archival Unit artifacts in a collection"
+      operationId: getArtifactsSize
       responses:
         200:
           description: "The size of the artifacts"
@@ -318,6 +326,24 @@ paths:
       required: false
       type: "string"
       description: "The version of the URL contained by the artifacts"
+  /status:
+    get:
+      tags:
+      - "status"
+      summary: "Get the status of the service"
+      description: "Get the status of the service"
+      operationId: "getStatus"
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "The status of the service"
+          schema:
+            $ref: "#/definitions/apiStatus"
+        401:
+          description: "Unauthorized"
+        500:
+          description: "Internal Server Error"
 definitions:
   artifact:
     type: "object"
@@ -338,4 +364,17 @@ definitions:
         type: "string"
   streamingResponseBody:
     type: "object"
-        
+  apiStatus:
+    type: "object"
+    required:
+    - "version"
+    - "ready"
+    properties:
+      version:
+        type: "string"
+        description: "The version of the service"
+      ready:
+        type: "boolean"
+        description: "The indication of whether the service is available"
+    description: "The status information of the service"
+    
