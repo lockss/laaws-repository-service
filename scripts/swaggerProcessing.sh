@@ -31,6 +31,42 @@
 COLLECTIONS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/CollectionsApiDelegate.java
 sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody/" $COLLECTIONS_API_DELEGATE && rm $COLLECTIONS_API_DELEGATE.backup
 
+TEMPFILE="$(mktemp)"
+sed -e "s/^}$//" $COLLECTIONS_API_DELEGATE > "$TEMPFILE" && cat <<EOF_COLLECTIONS_API_DELEGATE_EDIT >> "$TEMPFILE" && mv "$TEMPFILE" $COLLECTIONS_API_DELEGATE
+    /**
+     * @see CollectionsApi#getStatus
+     */
+    default ResponseEntity<org.lockss.laaws.status.model.ApiStatus> getStatus() {
+      if (getObjectMapper().isPresent() && getAcceptHeader().isPresent()) {
+        if (getAcceptHeader().get().contains("application/json")) {
+          try {
+            return new ResponseEntity<>(getObjectMapper().get()
+                .readValue("{  \"ready\" : true,  \"version\" : \"version\"}", org.lockss.laaws.status.model.ApiStatus.class),
+                HttpStatus.NOT_IMPLEMENTED);
+          } catch (IOException e) {
+            log.error("Couldn't serialize response for content type application/json", e);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+          }
+        }
+      } else {
+        log.warn(
+            "ObjectMapper or HttpServletRequest not configured in default StatusApi interface so no example is generated");
+      }
+      return new ResponseEntity<>(HttpStatus.NOT_IMPLEMENTED);
+    }
+}
+EOF_COLLECTIONS_API_DELEGATE_EDIT
+
 # Edit CollectionsApi.java.
 COLLECTIONS_API=src/generated/java/org/lockss/laaws/rs/api/CollectionsApi.java
 sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody/" $COLLECTIONS_API && rm $COLLECTIONS_API.backup
+sed -i.backup "s/public interface CollectionsApi/public interface CollectionsApi extends org.lockss.spring.status.SpringLockssBaseApi/" $COLLECTIONS_API && rm $COLLECTIONS_API.backup
+
+TEMPFILE="$(mktemp)"
+sed -e "s/^}$//" $COLLECTIONS_API > "$TEMPFILE" && cat <<EOF_COLLECTIONS_API_EDIT >> "$TEMPFILE" && mv "$TEMPFILE" $COLLECTIONS_API
+    @Override
+    default ResponseEntity<org.lockss.laaws.status.model.ApiStatus> getStatus() {
+      return getDelegate().getStatus();
+    }
+}
+EOF_COLLECTIONS_API_EDIT
