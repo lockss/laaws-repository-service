@@ -443,7 +443,7 @@ paths:
         - name: closest
           in: query
           description: Timestamp for sort=closest mode
-          type: integer
+          type: string
           example: 20030402172120
         - name: output
           in: query
