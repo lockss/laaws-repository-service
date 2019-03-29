@@ -98,7 +98,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *          A String with the identifier of the collection.
    * @param q
    *          A String with the query string. Supported fields are url, type
-   *          (urlquery/prefixquery), offset and limit.
+   *          (urlquery/prefixquery), offset, limit, request.anchordate,
+   *          startdate and enddate.
    * @param count
    *          An Integer with the count of results per page to be returned.
    * @param startPage
@@ -165,8 +166,13 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       // Initialize the results.
       CdxRecords records = new CdxRecords(openWayBackQuery, charsetName);
 
+      boolean isPrefix = openWayBackQuery.containsKey("type")
+	  && openWayBackQuery.get("type").toLowerCase().equals("prefixquery");
+      log.trace("isPrefix = {}", isPrefix);
+
       // Get the results.
-      getCdxRecords(collectionid, url, repo, count, startPage, records);
+      getCdxRecords(collectionid, url, repo, isPrefix, count, startPage,
+	  records);
 
       // Convert the results to XML.
       String result = records.toXmlText();
@@ -201,7 +207,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    * @param sort
    *          A String with the type of sort requested.
    * @param closest
-   *          An Integer with the timestamp for the sort=closest mode.
+   *          A String with the timestamp for the sort=closest mode.
    * @param output
    *          A String with the output format requested.
    * @param fl
@@ -216,7 +222,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    */
   @Override
   public ResponseEntity<String> getCdxPwb(String collectionid, String url,
-      Integer limit, String matchType, String sort, Integer closest,
+      Integer limit, String matchType, String sort, String closest,
       String output, String fl, String accept, String acceptEncoding) {
     log.debug2("collectionid = {}", collectionid);
     log.debug2("url = {}", url);
@@ -259,11 +265,35 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       // Initialize the results.
       CdxRecords records = new CdxRecords();
 
-      // Get the results.
-      getCdxRecords(collectionid, url, repo, null, null, records);
+      boolean isPrefix =
+	  matchType != null && matchType.toLowerCase().equals("prefix");
+      log.trace("isPrefix = {}", isPrefix);
 
-      // Convert the results to XML.
-      String result = records.toIaText();
+      Integer startPage = null;
+
+      // Check whether there is pagination involved.
+      if (limit != null) {
+	// Yes: Return the first page of results.
+	startPage = 1;
+
+	// Validate the pagination.
+	validatePagination(limit, startPage, parsedRequest);
+      }
+      
+      // Get the results.
+      getCdxRecords(collectionid, url, repo, isPrefix, limit, startPage,
+	  records);
+
+      // Convert the results to the right format.
+      String result = null;
+
+      if (output != null && output.toLowerCase().equals("json")) {
+	result = records.toJson();
+      } else {
+	result = records.toIaText();
+      }
+
+      log.trace("records.toJson() = {}", records.toJson());
       log.debug2("result = {}", result);
 
       return new ResponseEntity<String>(result, HttpStatus.OK);
@@ -411,6 +441,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *          are requested.
    * @param repo
    *          A LockssRepository with the repository.
+   * @param isPrefix
+   *          A boolean indicating whether the passed URL is to be used as a
+   *          search prefix.
    * @param count
    *          An Integer with the count of results per page to be returned, or
    *          <code>null</code> if no limit is requested.
@@ -422,16 +455,25 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *           if there are I/O problems.
    */
   private void getCdxRecords(String collectionid, String url,
-      LockssRepository repo, Integer count, Integer startPage,
+      LockssRepository repo, boolean isPrefix, Integer count, Integer startPage,
       CdxRecords records) throws IOException {
     log.debug2("collectionid = {}", collectionid);
     log.debug2("url = {}", url);
+    log.debug2("isPrefix = {}", isPrefix);
     log.debug2("count = {}", count);
     log.debug2("startPage = {}", startPage);
 
-    // Get from the repository the artifacts for the passed URL.
-    Iterable<Artifact> iterable =
-	repo.getArtifactAllVersions(collectionid, null, url);
+    Iterable<Artifact> iterable = null;
+
+    if (isPrefix) {
+      // Yes: Get from the repository the artifacts for URLs with the passed
+      // prefix.
+      iterable =
+	  repo.getAllArtifactsWithPrefixAllVersions(collectionid, null, url);
+    } else {
+      // No: Get from the repository the artifacts for the passed URL.
+      iterable = repo.getArtifactAllVersions(collectionid, null, url);
+    }
 
     // Initialize the collection of artifacts for the results to be returned.
     List<Artifact> artifacts = new ArrayList<>();
@@ -482,7 +524,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       log.trace("artifactId = {}", artifactId);
 
       // Create the result for this artifact.
-      CdxRecord record = getCdxRecord(collectionid, url, artifactId);
+      CdxRecord record = getCdxRecord(collectionid, artifactId);
       log.trace("record = {}", record);
 
       // Add this artifact to the results.
@@ -504,10 +546,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    * @return a CdxRecord with the CDX record of the artifact.
    * @throws IOException if there are I/O problems.
    */
-  private CdxRecord getCdxRecord(String collectionid, String url,
-      String artifactId) throws IOException {
+  private CdxRecord getCdxRecord(String collectionid, String artifactId)
+      throws IOException {
     log.debug2("collectionid = {}", collectionid);
-    log.debug2("url = {}", url);
     log.debug2("artifactId = {}", artifactId);
 
     // Get the artifact data.
@@ -517,8 +558,11 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Initialize the result for this artifact.
     CdxRecord record = new CdxRecord();
 
+    String artifactUrl = artifactData.getIdentifier().getUri();
+    log.trace("artifactUrl = {}", artifactUrl);
+
     // Set the sort key.
-    String urlSortKey = SURTTokenizer.exactKey(url);
+    String urlSortKey = SURTTokenizer.exactKey(artifactUrl);
     log.trace("urlSortKey = {}", urlSortKey);
     record.setUrlSortKey(urlSortKey);
 
@@ -534,7 +578,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     record.setTimestamp(Long.parseLong(timestamp));
 
     // Set the artifact URL.
-    record.setUrl(url);
+    record.setUrl(artifactUrl);
 
     // Set the artifact MIME type.
     record.setMimeType(headers.getContentType().toString());
