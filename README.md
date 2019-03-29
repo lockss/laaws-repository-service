@@ -74,7 +74,7 @@ this project. To use it follow these steps:
   * Edit the file `config.yaml`:
     1. After the definition of the `pywb` collection, add a new collection definition:
 
-              FGL-OB:
+              collectionid:
                  archive_paths: http://reposervicehost:reposerviceport/warcs/
                  index:
                      type: cdx
