@@ -37,6 +37,8 @@ this project. To use it follow these steps:
     repository and AUID settings.
 
 # Configuring OpenWayback to use this service for indexing and replay
+  Assuming that the LAAWS Repository service is running on host `reposervicehost` at port `reposerviceport` and it has a collection `collectionid`:
+  
   * Edit the file `wayback-webapp/src/main/webapp/WEB-INF/wayback.xml`:
     1. Comment out the `resourcefilelocationdb` bean:
 
@@ -65,4 +67,17 @@ this project. To use it follow these steps:
               <property name="prefix" value="http://reposervicehost:reposerviceport/warcs/" />
     2. Change the value of the `searchUrlBase` property from `http://wayback.archive-it.org/1055/xmlquery` to `http://reposervicehost:reposerviceport/cdx/owb/collectionid`:
               <property name="searchUrlBase" value="http://reposervicehost:reposerviceport/cdx/owb/collectionid" />
+
+# Configuring PyWayback to use this service for indexing and replay
+  Assuming that the LAAWS Repository service is running on host `reposervicehost` at port `reposerviceport` and it has a collection `collectionid`:
+  
+  * Edit the file `config.yaml`:
+    1. After the definition of the `pywb` collection, add a new collection definition:
+
+              FGL-OB:
+                 archive_paths: http://reposervicehost:reposerviceport/warcs/
+                 index:
+                     type: cdx
+                     api_url: http://reposervicehost:reposerviceport/cdx/pwb/collectionid?url={url}
+                     replay_url: ""
   
