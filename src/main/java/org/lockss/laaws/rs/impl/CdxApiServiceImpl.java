@@ -41,6 +41,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
@@ -99,9 +100,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *          A String with the query string. Supported fields are url, type
    *          (urlquery/prefixquery), offset and limit.
    * @param count
-   *          An Integer with the count.
+   *          An Integer with the count of results per page to be returned.
    * @param startPage
-   *          An Integer with the start page.
+   *          An Integer with the page number of results, 1 based.
    * @param accept
    *          A String with the Accept request header.
    * @param acceptEncoding
@@ -146,6 +147,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 	  e);
     }
 
+    // Validate the pagination.
+    validatePagination(count, startPage, parsedRequest);
+
     try {
       // Parse the OpenWayback query.
       Map<String, String> openWayBackQuery = parseOpenWayBackQueryString(q);
@@ -162,7 +166,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       CdxRecords records = new CdxRecords(openWayBackQuery, charsetName);
 
       // Get the results.
-      getAllCdxRecords(collectionid, url, repo, records);
+      getCdxRecords(collectionid, url, repo, count, startPage, records);
 
       // Convert the results to XML.
       String result = records.toXmlText();
@@ -256,7 +260,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       CdxRecords records = new CdxRecords();
 
       // Get the results.
-      getAllCdxRecords(collectionid, url, repo, records);
+      getCdxRecords(collectionid, url, repo, null, null, records);
 
       // Convert the results to XML.
       String result = records.toIaText();
@@ -324,6 +328,39 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
   }
 
   /**
+   * Validates the pagination request parameters.
+   * 
+   * @param count
+   *          An Integer with the count of results per page to be returned.
+   * @param startPage
+   *          An Integer with the page number of results, 1 based.
+   * @param parsedRequest
+   *          A String with the parsed request for diagnostic purposes.
+   */
+  private void validatePagination(Integer count, Integer startPage,
+      String parsedRequest) {
+    log.debug2("count = {}", count);
+    log.debug2("startPage = {}", startPage);
+    log.debug2("parsedRequest = {}", parsedRequest);
+
+    if (count == null && startPage == null) {
+      log.debug2("Pagination request parameters are valid");
+      return;
+    }
+
+    if (count != null && startPage != null && count > 0 && startPage > 0) {
+      log.debug2("Pagination request parameters are valid");
+      return;
+    }
+
+    String errorMessage = "Invalid pagination request: count = " + count
+	  + ", startPage = " + startPage;
+    log.error(errorMessage);
+    throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, errorMessage, 
+	  parsedRequest);
+  }
+
+  /**
    * Parses an OpenWayBack query into its components.
    * 
    * @param q
@@ -365,7 +402,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
   }
 
   /**
-   * 
+   * Provides the requested CDX records.
+   *
    * @param collectionid
    *          A String with the identifier of the collection.
    * @param url
@@ -373,24 +411,71 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *          are requested.
    * @param repo
    *          A LockssRepository with the repository.
+   * @param count
+   *          An Integer with the count of results per page to be returned, or
+   *          <code>null</code> if no limit is requested.
+   * @param startPage
+   *          An Integer with the page number of results, 1 based.
    * @param records
    *          A CdxRecords where the resulting CDX records are stored.
    * @throws IOException
    *           if there are I/O problems.
    */
-  private void getAllCdxRecords(String collectionid, String url,
-      LockssRepository repo, CdxRecords records) throws IOException {
+  private void getCdxRecords(String collectionid, String url,
+      LockssRepository repo, Integer count, Integer startPage,
+      CdxRecords records) throws IOException {
     log.debug2("collectionid = {}", collectionid);
     log.debug2("url = {}", url);
+    log.debug2("count = {}", count);
+    log.debug2("startPage = {}", startPage);
 
     // Get from the repository the artifacts for the passed URL.
+    Iterable<Artifact> iterable =
+	repo.getArtifactAllVersions(collectionid, null, url);
+
+    // Initialize the collection of artifacts for the results to be returned.
     List<Artifact> artifacts = new ArrayList<>();
 
-    repo.getArtifactAllVersions(collectionid, null, url)
-	.forEach(artifacts::add);
+    // Check whether there is no limit to the results to be returned.
+    if (count == null) {
+      // Yes: Return all the artifacts found.
+      iterable.forEach(artifacts::add);
+    } else {
+      // No: Determine the boundaries of the results to be returned.
+      int lastSkipped = count * (startPage -1) - 1;
+      log.trace("lastSkipped = {}", lastSkipped);
+
+      int lastIncluded = lastSkipped + count;
+      log.trace("lastIncluded = {}", lastIncluded);
+
+      // Loop through all the artifacts that are potential results.
+      int iteratorCounter = 0;
+
+      Iterator<Artifact> iterator = iterable.iterator();
+
+      while (iterator.hasNext()) {
+	// Get the next artifact.
+	Artifact artifact = iterator.next();
+
+	// Check whether this artifact needs to be included in the results.
+	if (iteratorCounter > lastSkipped) {
+	  // Yes: Include it in the results.
+	  artifacts.add(artifact);
+	}
+
+	iteratorCounter++;
+
+	// Check whether all the results to be returned have been processed.
+	if (iteratorCounter > lastIncluded) {
+	  // Yes: Stop the loop.
+	  break;
+	}
+      }
+    }
+
     log.trace("artifacts.size() = {}", artifacts.size());
 
-    // Loop through all the artifacts found in the repository.
+    // Loop through all the artifacts involved in the results.
     for (Artifact artifact : artifacts) {
       // Get the artifact identifier.
       String artifactId = artifact.getId();
