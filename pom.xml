@@ -67,6 +67,7 @@ POSSIBILITY OF SUCH DAMAGE.
     <!-- Is a Docker project -->
     <build.docker.skip>false</build.docker.skip>
     <build.docker.dockerBuild.servicePort>24610</build.docker.dockerBuild.servicePort>
+    <build.docker.dockerBuild.restPort>24610</build.docker.dockerBuild.restPort>
   </properties>
 
   <dependencies>
