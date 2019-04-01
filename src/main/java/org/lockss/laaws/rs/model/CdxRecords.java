@@ -31,8 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.model;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -205,15 +203,16 @@ public class CdxRecords {
    * Provides the representation of this object in JSON format.
    * 
    * @return a String with the representation of this object in JSON format.
-   * @throws JsonProcessingException
-   *           if there are problems writing the JSON text.
    */
-  public String toJson() throws JsonProcessingException {
+  public String toJson() {
     log.debug2("Invoked.");
-    String result = toIaText();
-    // TODO: Fix the next line once we know what PyWayback expects as a "proper
-    // JSON dictionary" for each record.
-    // String result = new ObjectMapper().writeValueAsString(cdxRecords);
+    StringBuilder out = new StringBuilder();
+
+    for (CdxRecord cdxRecord : cdxRecords) {
+      out.append(cdxRecord.toJson()).append("\n");
+    }
+
+    String result = out.toString();
     log.debug2("result = {}", result);
     return result;
   }

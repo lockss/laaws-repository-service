@@ -322,6 +322,33 @@ public class CdxRecord {
     log.debug2("Done.");
   }
 
+  /**
+   * Provides the representation of this object in JSON format.
+   * 
+   * @return a String with the representation of this object in JSON format.
+   */
+  public String toJson() {
+    log.debug2("Invoked.");
+
+    StringBuilder out = new StringBuilder();
+
+    out.append(urlSortKey).append(' ');
+    out.append(timestamp).append(' ');
+    out.append("{");
+    out.append("\"url\": \"").append(url).append("\", ");
+    out.append("\"mime\": \"").append(mimeType).append("\", ");
+    out.append("\"status\": \"").append(httpStatus).append("\", ");
+    out.append("\"digest\": \"").append(digest).append("\", ");
+    out.append("\"length\": \"").append(length).append("\", ");
+    out.append("\"offset\": \"").append(offset).append("\", ");
+    out.append("\"filename\": \"").append(archiveName).append("\"");
+    out.append("}\n");
+
+    String result = out.toString();
+    log.debug2("result = {}", result);
+    return result;
+  }
+
   @Override
   public String toString() {
     return "[CdxRecord urlSortKey=" + urlSortKey + ", timestamp=" + timestamp
