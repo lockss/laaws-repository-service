@@ -37,12 +37,9 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Enumeration;
-import java.util.Iterator;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.DeferredFileOutputStream;
-import org.json.JSONObject;
-import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.WarcsApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.io.storage.warc.WarcArtifactDataStore;
@@ -113,33 +110,26 @@ public class WarcsApiServiceImpl implements WarcsApiDelegate {
 
     // The parsed request for diagnostic purposes.
     String parsedRequest = String.format("fileName: %s, requestUrl: %s",
-	fileName, getFullRequestUrl());
+	fileName, ServiceImplUtil.getFullRequestUrl(request));
     log.trace("Parsed request: " + parsedRequest);
 
     // Validate the repository.
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
+      String collectionId = ServiceImplUtil.getArchiveFilenameCollectionId(
+	  fileName, parsedRequest);
+      log.trace("collectionId = {}", collectionId);
+
       // Get the artifact identifier.
-      String artifactId =
-	  fileName.substring(0, fileName.length() - ".warc".length());
+      String artifactId = ServiceImplUtil.getArchiveFilenameArtifactId(
+	  fileName, parsedRequest);
       log.trace("artifactId = {}", artifactId);
 
-      String collectionId = null;
-      ArtifactData artifactData = null;
-
-      // Loop through all the collection identifiers.
-      Iterator<String> collectionIterator = repo.getCollectionIds().iterator();
-
-      while (artifactData == null && collectionIterator.hasNext()) {
-	// Get this collection identifier.
-	collectionId = repo.getCollectionIds().iterator().next();
-	log.trace("collectionId = {}", collectionId);
-
-	// Get the data for the artifact in this collection, if it exists.
-	artifactData = repo.getArtifactData(collectionId, artifactId);
-	log.trace("artifactData = {}", artifactData);
-      }
+      // Get the data for the artifact in this collection, if it exists.
+      ArtifactData artifactData =
+	  repo.getArtifactData(collectionId, artifactId);
+      log.trace("artifactData = {}", artifactData);
 
       // Handle a missing artifact.
       if (artifactData == null) {
@@ -200,30 +190,6 @@ public class WarcsApiServiceImpl implements WarcsApiDelegate {
   }
 
   /**
-   * Provides the full URL of the request.
-   * 
-   * @return a String with the full URL of the request.
-   */
-  private String getFullRequestUrl() {
-    return "'" + request.getMethod() + " " + request.getRequestURL() + "?"
-	+ request.getQueryString() + "'";
-  }
-
-  /**
-   * Verifies that the repository is ready.
-   * 
-   * @param parsedRequest
-   *          A String with the parsed request for diagnostic purposes.
-   */
-  private void checkRepositoryReady(String parsedRequest) {
-    if (!repo.isReady()) {
-      String errorMessage = "LOCKSS repository is not ready";
-      throw new LockssRestServiceException(HttpStatus.SERVICE_UNAVAILABLE,
-	  errorMessage, parsedRequest);
-    }
-  }
-
-  /**
    * Provides the response entity when there is an error.
    * 
    * @param status
@@ -247,33 +213,9 @@ public class WarcsApiServiceImpl implements WarcsApiDelegate {
       }
     }
 
-    String result = toJsonError(status.value(), errorMessage);
+    String result = ServiceImplUtil.toJsonError(status.value(), errorMessage);
     InputStream is =
 	new ByteArrayInputStream(result.getBytes(Charset.forName("UTF-8")));
     return new ResponseEntity<Resource>(new InputStreamResource(is), status);
-  }
-
-  /**
-   * Provides an error message formatted in JSON.
-   * 
-   * @param code
-   *          An int with the code of the error to be formatted.
-   * @param message
-   *          A String with the message of the error to be formatted.
-   * @return a String with the error message formatted in JSON.
-   */
-  private static String toJsonError(int code, String message) {
-    JSONObject errorElement = new JSONObject();
-    errorElement.put("code", code);
-
-    if (message == null) {
-      message = "";
-    }
-
-    errorElement.put("message", message);
-
-    JSONObject responseBody = new JSONObject();
-    responseBody.put("error", errorElement);
-    return responseBody.toString();
   }
 }

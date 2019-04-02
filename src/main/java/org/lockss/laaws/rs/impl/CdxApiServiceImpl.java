@@ -44,13 +44,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
-import org.json.JSONObject;
 import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CdxApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.archive.wayback.util.url.AggressiveUrlCanonicalizer;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.CdxRecord;
@@ -130,16 +127,15 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     log.trace("parameterMap = {}", request.getParameterMap());
 
     // The parsed request for diagnostic purposes.
-    String parsedRequest = String.format("collectionid: %s, requestUrl: %s",
-	collectionid, getFullRequestUrl());
+    String parsedRequest = getParsedRequest(request, collectionid);
     log.trace("Parsed request: " + parsedRequest);
 
     // Validate the repository.
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     // Check that the collection exists.
     try {
-      validateCollectionId(collectionid, parsedRequest);
+      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
     } catch (IOException e) {
       String message =
 	  "Cannot validate the collectionid = '" + collectionid + "'";
@@ -149,7 +145,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     }
 
     // Validate the pagination.
-    validatePagination(count, startPage, parsedRequest);
+    ServiceImplUtil.validatePagination(count, startPage, parsedRequest);
 
     try {
       // Parse the OpenWayback query.
@@ -160,8 +156,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       log.trace("url = {}", url);
 
       // Add a canonical version of the query URL.
-      openWayBackQuery.put("canonicalUrl",
-	  new AggressiveUrlCanonicalizer().canonicalize(url));
+      openWayBackQuery.put("canonicalUrl", url);
 
       // Initialize the results.
       CdxRecords records = new CdxRecords(openWayBackQuery, charsetName);
@@ -169,6 +164,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       boolean isPrefix = openWayBackQuery.containsKey("type")
 	  && openWayBackQuery.get("type").toLowerCase().equals("prefixquery");
       log.trace("isPrefix = {}", isPrefix);
+
+      // TODO: Handle offset, limit, request.anchordate, startdate and enddate
+      // in the OpenWayback query.
 
       // Get the results.
       getCdxRecords(collectionid, url, repo, isPrefix, count, startPage,
@@ -221,7 +219,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *         records.
    */
   @Override
-  public ResponseEntity<String> getCdxPwb(String collectionid, String url,
+  public ResponseEntity<String> getCdxPywb(String collectionid, String url,
       Integer limit, String matchType, String sort, String closest,
       String output, String fl, String accept, String acceptEncoding) {
     log.debug2("collectionid = {}", collectionid);
@@ -244,15 +242,15 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     log.trace("parameterMap = {}", request.getParameterMap());
 
     // The parsed request for diagnostic purposes.
-    String parsedRequest = String.format("collectionid: %s, requestUrl: %s",
-	collectionid, getFullRequestUrl());
+    String parsedRequest = getParsedRequest(request, collectionid);
     log.trace("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    // Validate the repository.
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     // Check that the collection exists.
     try {
-      validateCollectionId(collectionid, parsedRequest);
+      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
     } catch (IOException e) {
       String message =
 	  "Cannot validate the collectionid = '" + collectionid + "'";
@@ -264,6 +262,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     try {
       // Initialize the results.
       CdxRecords records = new CdxRecords();
+
+      // TODO: Handle the matchType query parameter values host, domain, range.
 
       boolean isPrefix =
 	  matchType != null && matchType.toLowerCase().equals("prefix");
@@ -277,9 +277,11 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 	startPage = 1;
 
 	// Validate the pagination.
-	validatePagination(limit, startPage, parsedRequest);
+	ServiceImplUtil.validatePagination(limit, startPage, parsedRequest);
       }
-      
+
+      // TODO: Handle the query parameters sort, closest and fl.
+
       // Get the results.
       getCdxRecords(collectionid, url, repo, isPrefix, limit, startPage,
 	  records);
@@ -287,10 +289,16 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       // Convert the results to the right format.
       String result = null;
 
-      if (output != null && output.toLowerCase().equals("json")) {
+      if (output == null || output.trim().isEmpty()
+	  || output.trim().toLowerCase().equals("cdx")) {
+	result = records.toIaText();
+      } else if (output.trim().toLowerCase().equals("json")) {
 	result = records.toJson();
       } else {
-	result = records.toIaText();
+	String errorMessage = "Invalid output request parameter: " + output;
+	log.error(errorMessage);
+	throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+	    errorMessage, parsedRequest);
       }
 
       log.trace("records.toJson() = {}", records.toJson());
@@ -312,82 +320,19 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
   }
 
   /**
-   * Provides the full URL of the request.
+   * Provides the parsed request for diagnostic purposes.
    * 
-   * @return a String with the full URL of the request.
+   * @param request
+   *          An HttpServletRequest with the HTTP request.
+   * @param collectionid
+   *          A String with the identifier of the collection.
+   * @return a String with the parsed request.
    */
-  private String getFullRequestUrl() {
-    return "'" + request.getMethod() + " " + request.getRequestURL() + "?"
-	+ request.getQueryString() + "'";
-  }
-
-  /**
-   * Verifies that the repository is ready.
-   * 
-   * @param parsedRequest
-   *          A String with the parsed request for diagnostic purposes.
-   */
-  private void checkRepositoryReady(String parsedRequest) {
-    if (!repo.isReady()) {
-      String errorMessage = "LOCKSS repository is not ready";
-      throw new LockssRestServiceException(HttpStatus.SERVICE_UNAVAILABLE,
-	  errorMessage, parsedRequest);
-    }
-  }
-
-  /**
-   * Verifies that the collection exists.
-   * 
-   * @param parsedRequest
-   *          A String with the parsed request for diagnostic purposes.
-   */
-
-  private void validateCollectionId(String collectionid, String parsedRequest)
-      throws IOException {
-    if (!StreamSupport.stream(repo.getCollectionIds().spliterator(), false)
-	.anyMatch(name -> collectionid.equals(name))) {
-      String errorMessage = "The collection does not exist";
-      log.warn(errorMessage);
-      log.warn("Parsed request: " + parsedRequest);
-
-      throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage, 
-	  parsedRequest);
-    }
-
-    log.debug("collectionid '" + collectionid + "' is valid.");
-  }
-
-  /**
-   * Validates the pagination request parameters.
-   * 
-   * @param count
-   *          An Integer with the count of results per page to be returned.
-   * @param startPage
-   *          An Integer with the page number of results, 1 based.
-   * @param parsedRequest
-   *          A String with the parsed request for diagnostic purposes.
-   */
-  private void validatePagination(Integer count, Integer startPage,
-      String parsedRequest) {
-    log.debug2("count = {}", count);
-    log.debug2("startPage = {}", startPage);
-    log.debug2("parsedRequest = {}", parsedRequest);
-
-    if (count == null && startPage == null) {
-      log.debug2("Pagination request parameters are valid");
-      return;
-    }
-
-    if (count != null && startPage != null && count > 0 && startPage > 0) {
-      log.debug2("Pagination request parameters are valid");
-      return;
-    }
-
-    String errorMessage = "Invalid pagination request: count = " + count
-	  + ", startPage = " + startPage;
-    log.error(errorMessage);
-    throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, errorMessage, 
-	  parsedRequest);
+  // The parsed request for diagnostic purposes.
+  private String getParsedRequest(HttpServletRequest request,
+      String collectionid) {
+    return String.format("collectionid: %s, requestUrl: %s", collectionid,
+	ServiceImplUtil.getFullRequestUrl(request));
   }
 
   /**
@@ -469,10 +414,10 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       // Yes: Get from the repository the artifacts for URLs with the passed
       // prefix.
       iterable =
-	  repo.getAllArtifactsWithPrefixAllVersions(collectionid, null, url);
+	  repo.getAllArtifactsWithPrefixAllVersionsAllAus(collectionid, url);
     } else {
       // No: Get from the repository the artifacts for the passed URL.
-      iterable = repo.getArtifactAllVersions(collectionid, null, url);
+      iterable = repo.getAllArtifactsAllVersionsAllAus(collectionid, url);
     }
 
     // Initialize the collection of artifacts for the results to be returned.
@@ -595,9 +540,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Set the artifact offset. Each artifact has its own archive.
     record.setOffset(0);
 
-    // Set the artifact archive name. If no extension is provided, one is added
-    // at the other end.
-    record.setArchiveName(artifactId + ".warc");
+    // Set the artifact archive name.
+    record.setArchiveName(ServiceImplUtil.getArtifactArchiveName(collectionid,
+	artifactId));
 
     log.debug2("record = {}", record);
     return record;
@@ -627,31 +572,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       }
     }
 
-    return new ResponseEntity<String>(toJsonError(status.value(), errorMessage),
-	status);
-  }
-
-  /**
-   * Provides an error message formatted in JSON.
-   * 
-   * @param code
-   *          An int with the code of the error to be formatted.
-   * @param message
-   *          A String with the message of the error to be formatted.
-   * @return a String with the error message formatted in JSON.
-   */
-  private static String toJsonError(int code, String message) {
-    JSONObject errorElement = new JSONObject();
-    errorElement.put("code", code);
-
-    if (message == null) {
-      message = "";
-    }
-
-    errorElement.put("message", message);
-
-    JSONObject responseBody = new JSONObject();
-    responseBody.put("error", errorElement);
-    return responseBody.toString();
+    return new ResponseEntity<String>(ServiceImplUtil.toJsonError(
+	status.value(), errorMessage), status);
   }
 }

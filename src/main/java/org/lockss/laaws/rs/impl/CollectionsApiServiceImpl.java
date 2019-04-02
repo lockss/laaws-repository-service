@@ -102,10 +102,11 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
    */
   @Override
   public ResponseEntity<List<String>> getCollections() {
-    String parsedRequest = String.format("requestUrl: %s", getFullRequestUrl());
+    String parsedRequest = String.format("requestUrl: %s",
+	ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       log.debug("Invoked");
@@ -143,10 +144,10 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       String artifactid) {
     String parsedRequest = String.format(
 	"collectionid: %s, artifactid: %s, requestUrl: %s",
-	collectionid, artifactid, getFullRequestUrl());
+	collectionid, artifactid, ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       // Check that the collection exists.
@@ -190,10 +191,11 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       String artifactid, String accept) {
     String parsedRequest = String.format(
 	"collectionid: %s, artifactid: %s, accept: %s, requestUrl: %s",
-	collectionid, artifactid, accept, getFullRequestUrl());
+	collectionid, artifactid, accept,
+	ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       log.info(String.format("Retrieving artifact: %s from collection %s",
@@ -284,10 +286,11 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       String artifactid, Boolean committed) {
     String parsedRequest = String.format(
 	"collectionid: %s, artifactid: %s, committed: %s, requestUrl: %s",
-	collectionid, artifactid, committed, getFullRequestUrl());
+	collectionid, artifactid, committed,
+	ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       // Return bad request if new commit status has not been passed
@@ -355,10 +358,10 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
   {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, uri: %s, requestUrl: %s",
-	collectionid, auid, uri, getFullRequestUrl());
+	collectionid, auid, uri, ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       log.info(String.format("Adding artifact %s, %s, %s",
@@ -464,10 +467,11 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       String version) {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
-	collectionid, auid, url, urlPrefix, version, getFullRequestUrl());
+	collectionid, auid, url, urlPrefix, version,
+	ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       boolean isLatestVersion =
@@ -530,7 +534,7 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       }
 
       // Check that the collection exists.
-      validateCollectionId(collectionid, parsedRequest);
+      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
       // Check that the Archival Unit exists.
       validateAuId(collectionid, auid, parsedRequest);
@@ -633,10 +637,11 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       String url, String urlPrefix, String version) {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
-	collectionid, auid, url, urlPrefix, version, getFullRequestUrl());
+	collectionid, auid, url, urlPrefix, version,
+	ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       boolean isLatestVersion =
@@ -699,7 +704,7 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       }
 
       // Check that the collection exists.
-      validateCollectionId(collectionid, parsedRequest);
+      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
       // Check that the Archival Unit exists.
       validateAuId(collectionid, auid, parsedRequest);
@@ -734,14 +739,14 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
   @Override
   public ResponseEntity<List<String>> getAus(String collectionid) {
     String parsedRequest = String.format("collectionid: %s, requestUrl: %s",
-	collectionid, getFullRequestUrl());
+	collectionid, ServiceImplUtil.getFullRequestUrl(request));
     log.debug("Parsed request: " + parsedRequest);
 
-    checkRepositoryReady(parsedRequest);
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
       // Check that the collection exists.
-      validateCollectionId(collectionid, parsedRequest);
+      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
       List<String> result = new ArrayList<>();
       repo.getAuIds(collectionid).forEach(result::add);
@@ -763,29 +768,9 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
     }
   }
 
-  private String getFullRequestUrl() {
-    return "'" + request.getMethod() + " " + request.getRequestURL() + "?"
-	+ request.getQueryString() + "'";
-  }
-
   private static Boolean isHttpResponseType(MediaType type) {
     return (APPLICATION_HTTP_RESPONSE.isCompatibleWith(type) && (type
 	.getParameters().equals(APPLICATION_HTTP_RESPONSE.getParameters())));
-  }
-
-  private void validateCollectionId(String collectionid, String parsedRequest)
-      throws IOException {
-    if (!StreamSupport.stream(repo.getCollectionIds().spliterator(), false)
-	.anyMatch(name -> collectionid.equals(name))) {
-      String errorMessage = "The collection does not exist";
-      log.warn(errorMessage);
-      log.warn("Parsed request: " + parsedRequest);
-
-      throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage, 
-	  parsedRequest);
-    }
-
-    log.debug("collectionid '" + collectionid + "' is valid.");
   }
 
   private void validateAuId(String collectionid, String auid,
@@ -827,13 +812,6 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
     }
 
     log.debug("artifactid '" + artifactid + "' exists.");
-  }
-
-  private void checkRepositoryReady(String parsedRequest) {
-    if (!repo.isReady()) {
-      String errorMessage = "LOCKSS repository is not ready";
-      throw new LockssRestServiceException(HttpStatus.SERVICE_UNAVAILABLE, errorMessage, parsedRequest);
-    }
   }
 
   @Override

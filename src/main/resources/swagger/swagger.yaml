@@ -396,13 +396,13 @@ paths:
           description: The Accept-Encoding header
           required: false
           type: string
-  /cdx/pwb/{collectionid}:
+  /cdx/pywb/{collectionid}:
     get:
       tags:
         - wayback
       summary: Get PyWayback CDX records
       description: Get the PyWayback CDX records of a URL in a collection
-      operationId: getCdxPwb
+      operationId: getCdxPywb
       produces:
         - "text/plain"
       responses:
@@ -471,7 +471,7 @@ paths:
       tags:
         - wayback
       summary: Get a WARC archive
-      description: Get the contents of a WARC archive
+      description: Get the contents of a single WARC record as a WARC archive
       operationId: getWarcArchive
       produces:
         - "application/octet-stream"
