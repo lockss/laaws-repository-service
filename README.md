@@ -78,6 +78,6 @@ this project. To use it follow these steps:
                  archive_paths: http://reposervicehost:reposerviceport/warcs/
                  index:
                      type: cdx
-                     api_url: http://reposervicehost:reposerviceport/cdx/pywb/collectionid?url={url}&limit={limit}&matchType={matchType}&sort={sort}&closest={closest}&output={output}&fl={fl}
+                     api_url: http://reposervicehost:reposerviceport/cdx/pywb/collectionid?url={url}&matchType={matchType}&sort={sort}&closest={closest}&output={output}&fl={fl}
                      replay_url: ""
   
