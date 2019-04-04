@@ -549,8 +549,8 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       } else if (urlPrefix != null && isAllVersions) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
 	    + "All versions of all URLs matching a prefix");
-	repo.getArtifactsWithPrefixAllVersions(collectionid, auid,
-	    urlPrefix).forEach(result::add);
+	repo.getArtifactsWithPrefixAllVersions(collectionid, auid, urlPrefix)
+	.forEach(result::add);
       } else if (url != null && isAllVersions) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
 	    + "All versions of a URL");

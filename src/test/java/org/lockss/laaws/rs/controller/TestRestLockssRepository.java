@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -589,7 +589,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     Pair<String,String> collau = collAuMismatch();
     if (collau != null) {
       assertEmpty(repository.getArtifacts(collau.getLeft(),
-					     collau.getRight()));
+					  collau.getRight()));
     }
     // non-existent coll, au
     if (anyColl != null && anyAuid != null) {
