@@ -540,26 +540,26 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
       if (isAllUrls && isAllVersions) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
 	    + "All versions of all URLs");
-	repo.getAllArtifactsAllVersions(collectionid, auid)
+	repo.getArtifactsAllVersions(collectionid, auid)
 	.forEach(result::add);
       } else if (urlPrefix != null && isAllVersions) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
 	    + "All versions of all URLs matching a prefix");
-	repo.getAllArtifactsWithPrefixAllVersions(collectionid, auid,
-	    urlPrefix).forEach(result::add);
+	repo.getArtifactsWithPrefixAllVersions(collectionid, auid, urlPrefix)
+	.forEach(result::add);
       } else if (url != null && isAllVersions) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
 	    + "All versions of a URL");
-	repo.getArtifactAllVersions(collectionid, auid, url)
+	repo.getArtifactsAllVersions(collectionid, auid, url)
 	.forEach(result::add);
       } else if (isAllUrls && isLatestVersion) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
 	    + "Latest versions of all URLs");
-	repo.getAllArtifacts(collectionid, auid).forEach(result::add);
+	repo.getArtifacts(collectionid, auid).forEach(result::add);
       } else if (urlPrefix != null && isLatestVersion) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
 	    + "Latest versions of all URLs matching a prefix");
-	repo.getAllArtifactsWithPrefix(collectionid, auid, urlPrefix)
+	repo.getArtifactsWithPrefix(collectionid, auid, urlPrefix)
 	.forEach(result::add);
       } else if (url != null && isLatestVersion) {
 	log.debug("collectionsCollectionidAusAuidGet(): "
