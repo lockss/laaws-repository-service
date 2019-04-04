@@ -414,10 +414,10 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       // Yes: Get from the repository the artifacts for URLs with the passed
       // prefix.
       iterable =
-	  repo.getAllArtifactsWithPrefixAllVersionsAllAus(collectionid, url);
+	  repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, url);
     } else {
       // No: Get from the repository the artifacts for the passed URL.
-      iterable = repo.getAllArtifactsAllVersionsAllAus(collectionid, url);
+      iterable = repo.getArtifactsAllVersionsAllAus(collectionid, url);
     }
 
     // Initialize the collection of artifacts for the results to be returned.
