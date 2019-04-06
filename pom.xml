@@ -49,7 +49,7 @@ POSSIBILITY OF SUCH DAMAGE.
   <packaging>jar</packaging>
   
   <name>laaws-repository-service</name>
-  <description>LOCKSS repository service</description>
+  <description>LOCKSS Repository Service</description>
 
   <!-- Must be in every lockss-parent-pom descendant -->
   <scm>
