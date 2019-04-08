@@ -824,8 +824,6 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
     return Optional.ofNullable(request);
   }
 
-  private static final String API_VERSION = "1.0.0";
-
   /**
    * Provides the status object.
    * 
@@ -833,8 +831,7 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
    */
   @Override
   public ApiStatus getApiStatus() {
-    return new ApiStatus()
-      .setVersion(API_VERSION)
+    return new ApiStatus("swagger/swagger.yaml")
       .setReady(repo.isReady());
   }
 }
