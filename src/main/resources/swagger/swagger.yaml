@@ -30,15 +30,15 @@
 swagger: "2.0"
 info:
   title: "LOCKSS Repository Service REST API"
-  version: "1.0.0"
-  description: "API of the LOCKSS Repository REST Service"
+  version: "2.0.0"
+  description: "REST API of the LOCKSS Repository Service"
   contact:
     name: "LOCKSS Support"
     url: "https://www.lockss.org/"
     email: "lockss-support@lockss.org"
   license:
     name: "BSD-3-Clause"
-    url: "https://www.lockss.org/support/open-source-license/"
+    url: "https://opensource.org/licenses/BSD-3-Clause"
 host: "laaws.lockss.org:443"
 basePath: "/"
 tags:
