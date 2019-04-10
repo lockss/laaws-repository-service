@@ -51,12 +51,12 @@ import org.lockss.laaws.rs.api.CdxApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
+import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
 import org.archive.wayback.surt.SURTTokenizer;
 import org.lockss.log.L4JLogger;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -77,9 +77,6 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
   // The HTTP request.
   private final HttpServletRequest request;
-
-  // The formatter for the CDX timestamps.
-  DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
   /**
    * Constructor for autowiring.
@@ -435,19 +432,6 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     log.debug2("startPage = {}", startPage);
     log.debug2("closest = {}", closest);
 
-    int lastArticleSkipped = -1;
-    int lastArticleIncluded = Integer.MAX_VALUE;
-
-    // Check whether the results are bounded in quantity.
-    if (count != null) {
-      // Yes: Determine the boundaries of the results to be returned.
-      lastArticleSkipped = count * (startPage -1) - 1;
-      log.trace("lastArticleSkipped = {}", lastArticleSkipped);
-
-      lastArticleIncluded = lastArticleSkipped + count;
-      log.trace("lastArticleIncluded = {}", lastArticleIncluded);
-    }
-
     Iterable<Artifact> iterable = null;
 
     if (isPrefix) {
@@ -470,12 +454,51 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 	  getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
     }
 
+    getArtifactsCdxRecords(artIterator, repo, count, startPage, records);
+  }
+
+  /**
+   * Provides the requested CDX records for a collection of artifacts.
+   *
+   * @param artIterator
+   *          An Iterator<Artifact> to the artifacts for which the CDX records
+   *          are requested.
+   * @param count
+   *          An Integer with the count of results per page to be returned, or
+   *          <code>null</code> if no limit is requested.
+   * @param startPage
+   *          An Integer with the page number of results, 1 based.
+   * @param records
+   *          A CdxRecords where the resulting CDX records are stored.
+   * @throws IOException
+   *           if there are I/O problems.
+   */
+  private void getArtifactsCdxRecords(Iterator<Artifact> artIterator,
+      LockssRepository repo, Integer count, Integer startPage,
+      CdxRecords records) throws IOException {
+    log.debug2("count = {}", count);
+    log.debug2("startPage = {}", startPage);
+
+    int lastArticleSkipped = -1;
+    int lastArticleIncluded = Integer.MAX_VALUE;
+
+    // Check whether the results are bounded in quantity.
+    if (count != null) {
+      // Yes: Determine the boundaries of the results to be returned.
+      lastArticleSkipped = count * (startPage -1) - 1;
+      log.trace("lastArticleSkipped = {}", lastArticleSkipped);
+
+      lastArticleIncluded = lastArticleSkipped + count;
+      log.trace("lastArticleIncluded = {}", lastArticleIncluded);
+    }
+
     // Loop through all the artifacts that are potential results.
     int iteratorCounter = 0;
 
     while (artIterator.hasNext()) {
       // Get the next artifact.
       Artifact artifact = artIterator.next();
+      log.trace("artifact = {}", artifact);
 
       // Check whether this artifact needs to be included in the results.
       if (iteratorCounter > lastArticleSkipped) {
@@ -484,7 +507,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 	log.trace("artifactId = {}", artifactId);
 
 	// Create the result for this artifact.
-	CdxRecord record = getCdxRecord(collectionid, artifactId);
+	CdxRecord record = getCdxRecord(
+	    repo.getArtifactData(artifact.getCollection(), artifactId));
 	log.trace("record = {}", record);
 
 	// Add this artifact to the results.
@@ -520,23 +544,27 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     log.debug2("closest = {}", closest);
 
     // Convert the passed timestamp to the one stored in the repository.
-    long targetTimestamp = LocalDateTime.parse(closest, dtFormatter)
-	.toInstant(ZoneOffset.UTC).toEpochMilli();
+    long targetTimestamp = LocalDateTime.parse(closest,
+	DateTimeFormatter.ofPattern("yyyyMMddHHmmss")).toInstant(ZoneOffset.UTC)
+	.toEpochMilli();
     log.trace("targetTimestamp = {}", targetTimestamp);
 
-    // Get a copy of a collection of objects that are suitable for sorting.
+    // Get a copy of a collection of objects that are suitable for sorting by
+    // their temporal gap with respect to the target timestamp.
     List<ClosestArtifact> cas = new ArrayList<>();
 
     while (artIterator.hasNext()) {
-      cas.add(new ClosestArtifact(artIterator.next(), repo, targetTimestamp));
+      cas.add(new ClosestArtifact(artIterator.next(), targetTimestamp));
     }
 
     log.trace("cas.size() = {}", cas.size());
 
-    // Sort the collection of objects.
+    // Sort the collection of objects by their temporal gap with respect to the
+    // target timestamp.
     cas.sort(Comparator.comparing(ClosestArtifact::getGap));
 
-    // Get the sorted list of artifacts.
+    // Get the list of artifacts soted by their temporal proximity to the target
+    // timestamp.
     List<Artifact> sortedArtifacts = new ArrayList<>();
     Iterator<ClosestArtifact> caIterator = cas.iterator();
 
@@ -544,7 +572,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       sortedArtifacts.add(caIterator.next().getArtifact());
     }
 
-    // Return all the artifacts found sorted by temporal proximity to the
+    // Return all the artifacts found sorted by their temporal proximity to the
     // target timestamp.
     return sortedArtifacts;
   }
@@ -552,24 +580,13 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
   /**
    * Provides the CDX record of an artifact.
    * 
-   * @param collectionid
-   *          A String with the identifier of the collection.
-   * @param url
-   *          A String with the URL of the artifact for which the CDX record is
-   *          requested.
-   * @param artifactId
-   *          A String with the identifier of the artifact.
+   * @param artifactData
+   *          An ArtifactData with the artifact data.
    * @return a CdxRecord with the CDX record of the artifact.
    * @throws IOException if there are I/O problems.
    */
-  private CdxRecord getCdxRecord(String collectionid, String artifactId)
-      throws IOException {
-    log.debug2("collectionid = {}", collectionid);
-    log.debug2("artifactId = {}", artifactId);
-
-    // Get the artifact data.
-    ArtifactData artifactData = repo.getArtifactData(collectionid, artifactId);
-    log.trace("artifactData = {}", artifactData);
+  private CdxRecord getCdxRecord(ArtifactData artifactData) throws IOException {
+    log.debug2("artifactData = {}", artifactData);
 
     // Initialize the result for this artifact.
     CdxRecord record = new CdxRecord();
@@ -582,13 +599,10 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     log.trace("urlSortKey = {}", urlSortKey);
     record.setUrlSortKey(urlSortKey);
 
-    // Get the artifact metadata.
-    HttpHeaders headers = artifactData.getMetadata();
-    log.trace("headers = {}", headers);
-
     // Set the artifact timestamp.
-    String timestamp = dtFormatter.format(
-	LocalDateTime.ofEpochSecond(headers.getDate()/1000, 0, ZoneOffset.UTC));
+    String timestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(
+	LocalDateTime.ofEpochSecond(artifactData.getOriginDate()/1000, 0,
+	    ZoneOffset.UTC));
     log.trace("timestamp = {}", timestamp);
     record.setTimestamp(Long.parseLong(timestamp));
 
@@ -596,7 +610,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     record.setUrl(artifactUrl);
 
     // Set the artifact MIME type.
-    record.setMimeType(headers.getContentType().toString());
+    record.setMimeType(artifactData.getMetadata().getContentType().toString());
 
     // Set the artifact HTTP status.
     record.setHttpStatus(artifactData.getHttpStatus().getStatusCode());
@@ -610,9 +624,11 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Set the artifact offset. Each artifact has its own archive.
     record.setOffset(0);
 
+    ArtifactIdentifier artifactIdentifier = artifactData.getIdentifier();
+
     // Set the artifact archive name.
-    record.setArchiveName(ServiceImplUtil.getArtifactArchiveName(collectionid,
-	artifactId));
+    record.setArchiveName(ServiceImplUtil.getArtifactArchiveName(
+	artifactIdentifier.getCollection(), artifactIdentifier.getId()));
 
     log.debug2("record = {}", record);
     return record;
@@ -664,21 +680,15 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
      * @param artifact
      *          An Artifact with the artifact for which the temporal proximity
      *          to a target timestamp is requested.
-     * @param repo
-     *          A LockssRepository with the repository.
      * @param targetTimestamp
      *          A long with the target timestamp expressed as milliseconds since
      *          the epoch.
-     * @throws IOException
-     *           if the artifact data cannot be obtained from the repository.
      */
-    ClosestArtifact(Artifact artifact, LockssRepository repo,
-	long targetTimestamp) throws IOException {
+    ClosestArtifact(Artifact artifact, long targetTimestamp) {
       this.artifact = artifact;
 
       // Calculate the temporal gap.
-      gap = Math.abs(repo.getArtifactData(artifact.getCollection(),
-	  artifact.getId()).getMetadata().getDate() - targetTimestamp);
+      gap = Math.abs(artifact.getOriginDate() - targetTimestamp);
     }
 
     /**
