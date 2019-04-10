@@ -525,6 +525,9 @@ definitions:
         type: "boolean"
       storageUrl:
         type: "string"
+      originDate:
+        type: "integer"
+        format: "int64"
   streamingResponseBody:
     type: "object"
   apiStatus:
