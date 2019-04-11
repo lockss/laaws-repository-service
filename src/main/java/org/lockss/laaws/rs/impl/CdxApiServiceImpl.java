@@ -473,7 +473,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    * @throws IOException
    *           if there are I/O problems.
    */
-  private void getArtifactsCdxRecords(Iterator<Artifact> artIterator,
+  void getArtifactsCdxRecords(Iterator<Artifact> artIterator,
       LockssRepository repo, Integer count, Integer startPage,
       CdxRecords records) throws IOException {
     log.debug2("count = {}", count);
@@ -585,7 +585,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    * @return a CdxRecord with the CDX record of the artifact.
    * @throws IOException if there are I/O problems.
    */
-  private CdxRecord getCdxRecord(ArtifactData artifactData) throws IOException {
+  CdxRecord getCdxRecord(ArtifactData artifactData) throws IOException {
     log.debug2("artifactData = {}", artifactData);
 
     // Initialize the result for this artifact.
@@ -601,7 +601,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
     // Set the artifact timestamp.
     String timestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(
-	LocalDateTime.ofEpochSecond(artifactData.getOriginDate()/1000, 0,
+	LocalDateTime.ofEpochSecond(artifactData.getCollectionDate()/1000, 0,
 	    ZoneOffset.UTC));
     log.trace("timestamp = {}", timestamp);
     record.setTimestamp(Long.parseLong(timestamp));
@@ -688,7 +688,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       this.artifact = artifact;
 
       // Calculate the temporal gap.
-      gap = Math.abs(artifact.getOriginDate() - targetTimestamp);
+      gap = Math.abs(artifact.getCollectionDate() - targetTimestamp);
     }
 
     /**
