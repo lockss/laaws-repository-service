@@ -50,6 +50,7 @@ import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.core.AbstractLockssRepositoryTest.ArtSpec;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.util.test.LockssTestCase5;
+import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.*;
@@ -149,6 +150,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     @Before
     public void setUpArtifactDataStore() throws Exception {
+      TimeBase.setSimulated();
       this.repository = makeLockssRepository();
     }
 
