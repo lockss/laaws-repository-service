@@ -35,9 +35,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
@@ -349,7 +346,6 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *          A String with the identifier of the collection.
    * @return a String with the parsed request.
    */
-  // The parsed request for diagnostic purposes.
   private String getParsedRequest(HttpServletRequest request,
       String collectionid) {
     return String.format("collectionid: %s, requestUrl: %s", collectionid,
@@ -422,9 +418,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    * @throws IOException
    *           if there are I/O problems.
    */
-  private void getCdxRecords(String collectionid, String url,
-      LockssRepository repo, boolean isPrefix, Integer count, Integer startPage,
-      String closest, CdxRecords records) throws IOException {
+  void getCdxRecords(String collectionid, String url, LockssRepository repo,
+      boolean isPrefix, Integer count, Integer startPage, String closest,
+      CdxRecords records) throws IOException {
     log.debug2("collectionid = {}", collectionid);
     log.debug2("url = {}", url);
     log.debug2("isPrefix = {}", isPrefix);
@@ -454,6 +450,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 	  getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
     }
 
+    // Get the CDX records for the selected artifacts.
     getArtifactsCdxRecords(artIterator, repo, count, startPage, records);
   }
 
@@ -485,7 +482,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Check whether the results are bounded in quantity.
     if (count != null) {
       // Yes: Determine the boundaries of the results to be returned.
-      lastArticleSkipped = count * (startPage -1) - 1;
+      lastArticleSkipped = count * (startPage - 1) - 1;
       log.trace("lastArticleSkipped = {}", lastArticleSkipped);
 
       lastArticleIncluded = lastArticleSkipped + count;
@@ -543,10 +540,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
       String closest) throws IOException {
     log.debug2("closest = {}", closest);
 
-    // Convert the passed timestamp to the one stored in the repository.
-    long targetTimestamp = LocalDateTime.parse(closest,
-	DateTimeFormatter.ofPattern("yyyyMMddHHmmss")).toInstant(ZoneOffset.UTC)
-	.toEpochMilli();
+    // Convert the passed CDX record timestamp to the one stored in the
+    // repository.
+    long targetTimestamp = CdxRecord.computeCollectiondate(closest);
     log.trace("targetTimestamp = {}", targetTimestamp);
 
     // Get a copy of a collection of objects that are suitable for sorting by
@@ -600,11 +596,10 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     record.setUrlSortKey(urlSortKey);
 
     // Set the artifact timestamp.
-    String timestamp = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(
-	LocalDateTime.ofEpochSecond(artifactData.getCollectionDate()/1000, 0,
-	    ZoneOffset.UTC));
+    long timestamp =
+	CdxRecord.computeNumericTimestamp(artifactData.getCollectionDate());
     log.trace("timestamp = {}", timestamp);
-    record.setTimestamp(Long.parseLong(timestamp));
+    record.setTimestamp(timestamp);
 
     // Set the artifact URL.
     record.setUrl(artifactUrl);

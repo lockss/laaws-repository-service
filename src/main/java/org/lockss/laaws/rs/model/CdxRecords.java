@@ -216,4 +216,13 @@ public class CdxRecords {
     log.debug2("result = {}", result);
     return result;
   }
+
+  /**
+   * Provides the CDX records in this object, for testing purposes.
+   * 
+   * @return a List<CdxRecord> with the CDX records in this object.
+   */
+  public List<CdxRecord> getCdxRecords() {
+    return cdxRecords;
+  }
 }

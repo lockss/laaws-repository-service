@@ -41,7 +41,6 @@ import org.apache.http.message.BasicStatusLine;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.VolatileLockssRepository;
 import org.lockss.laaws.rs.impl.CdxApiServiceImpl.ClosestArtifact;
@@ -51,37 +50,14 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
 import org.lockss.util.test.LockssTestCase5;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.junit4.SpringRunner;
 
 /**
  * Test class for org.lockss.laaws.rs.impl.CdxApiServiceImpl.
  */
-@RunWith(SpringRunner.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class TestCdxApiServiceImpl extends LockssTestCase5 {
-  @Autowired
-  ApplicationContext appCtx;
-
-  @TestConfiguration
-  static class TestLockssRepositoryConfig {
-    @Bean
-    public LockssRepository createInitializedRepository() throws IOException {
-      LockssRepository repository = new VolatileLockssRepository();
-      repository.initRepository();
-      return repository;
-    }
-  }
-
-  LockssRepository repository;
+  private LockssRepository repository;
 
   /**
    * Sets up a test repository.
@@ -91,7 +67,8 @@ public class TestCdxApiServiceImpl extends LockssTestCase5 {
    */
   @Before
   public void setUpArtifactDataStore() throws Exception {
-    this.repository = makeLockssRepository();
+    repository = new VolatileLockssRepository();
+    repository.initRepository();
   }
 
   /**
@@ -100,19 +77,6 @@ public class TestCdxApiServiceImpl extends LockssTestCase5 {
   @After
   public void tearDownArtifactDataStore() {
       this.repository = null;
-  }
-
-  /**
-   * Creates a test repository.
-   * 
-   * @return a LockssRepository with the test repository newly created.
-   * @throws Exception
-   *           if there are problems creating the repository.
-   */
-  public LockssRepository makeLockssRepository() throws Exception {
-    LockssRepository repository = new VolatileLockssRepository();
-    repository.initRepository();
-    return repository;
   }
 
   /**
@@ -131,18 +95,23 @@ public class TestCdxApiServiceImpl extends LockssTestCase5 {
    */
   @Test
   public void testClosestArtifact() throws IOException {
+    long collectiondate = 0;
+
     Artifact art1 = makeArtifact("coll1", "auid1", "url1", 1,
-	MediaType.TEXT_HTML, 0);
+	MediaType.TEXT_HTML, collectiondate);
 
-    ClosestArtifact ca = new ClosestArtifact(art1, 12345);
+    long targetTimestamp = 12345;
+
+    ClosestArtifact ca = new ClosestArtifact(art1, targetTimestamp);
     assertEquals(art1, ca.getArtifact());
-    assertEquals(12345, ca.getGap());
+    assertEquals(targetTimestamp, ca.getGap());
 
-    art1.setCollectionDate(12345);
+    collectiondate = 12345;
+    art1.setCollectionDate(collectiondate);
 
-    assertEquals(0, new ClosestArtifact(art1, 12345).getGap());
-    assertEquals(1000, new ClosestArtifact(art1, 11345).getGap());
-    assertEquals(1000, new ClosestArtifact(art1, 13345).getGap());
+    assertEquals(0, new ClosestArtifact(art1, collectiondate).getGap());
+    assertEquals(100, new ClosestArtifact(art1, collectiondate - 100).getGap());
+    assertEquals(100, new ClosestArtifact(art1, collectiondate + 100).getGap());
   }
 
   /**
@@ -153,23 +122,12 @@ public class TestCdxApiServiceImpl extends LockssTestCase5 {
    */
   @Test
   public void testGetCdxRecord() throws Exception {
-    ArtifactIdentifier ai1 =
-	new ArtifactIdentifier("id1", "coll1", "auid1", "url1.example.com", 1);
+    ArtifactData ad = makeArtifactData("id1", "coll1", "auid1",
+	"url1.example.com", 1, MediaType.TEXT_HTML, 24 * 60 * 60 * 1000);
+    ad.setContentDigest("cd1");
+    ad.setContentLength(9876);
 
-    HttpHeaders am1 = new HttpHeaders();
-    am1.setContentType(MediaType.TEXT_HTML);
-
-    InputStream is1 = new ByteArrayInputStream("test".getBytes());
-
-    StatusLine sl1 =
-	new BasicStatusLine(new ProtocolVersion("http", 1, 1), 200, null);
-
-    ArtifactData ad1 = new ArtifactData(ai1, am1, is1, sl1);
-    ad1.setCollectionDate(24 * 60 * 60 * 1000);
-    ad1.setContentDigest("cd1");
-    ad1.setContentLength(9876);
-
-    CdxRecord cdxRecord = new CdxApiServiceImpl(null).getCdxRecord(ad1);
+    CdxRecord cdxRecord = new CdxApiServiceImpl(null).getCdxRecord(ad);
 
     String expected = "(com,example,url1,)/ 19700102000000 url1.example.com"
 	+ " text/html 200 cd1 - - 9876 0 coll1:id1.warc\n";
@@ -280,37 +238,488 @@ public class TestCdxApiServiceImpl extends LockssTestCase5 {
    */
   @Test
   public void testGetArtifactsCdxRecords() throws Exception {
+    // Populate the repository.
     List<Artifact> artifacts = new ArrayList<>();
+
     artifacts.add(makeArtifact("coll1", "auid1", "url1.example.com", 1,
 	MediaType.TEXT_HTML, 12345));
-    artifacts.add(makeArtifact("coll1", "auid1", "url1.example.com", 2,
-	MediaType.TEXT_HTML, 23456));
-    artifacts.add(makeArtifact("coll1", "auid1", "url1.example.com", 3,
-	MediaType.TEXT_HTML, 34567));
-    artifacts.add(makeArtifact("coll1", "auid1", "url2.example.com", 1,
-	MediaType.TEXT_HTML, 112345));
     artifacts.add(makeArtifact("coll1", "auid1", "url2.example.com", 2,
-	MediaType.TEXT_HTML, 123456));
-    artifacts.add(makeArtifact("coll1", "auid1", "url2.example.com", 3,
-	MediaType.TEXT_HTML, 134567));
-    artifacts.add(makeArtifact("coll1", "auid1", "url3.example.com", 1,
-	MediaType.TEXT_HTML, 212345));
-    artifacts.add(makeArtifact("coll1", "auid1", "url3.example.com", 2,
-	MediaType.TEXT_HTML, 223456));
+	MediaType.TEXT_HTML, 23456));
     artifacts.add(makeArtifact("coll1", "auid1", "url3.example.com", 3,
+	MediaType.TEXT_HTML, 34567));
+    artifacts.add(makeArtifact("coll1", "auid1", "url4.example.com", 1,
+	MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll1", "auid1", "url5.example.com", 2,
+	MediaType.TEXT_HTML, 123456));
+    artifacts.add(makeArtifact("coll1", "auid1", "url6.example.com", 3,
+	MediaType.TEXT_HTML, 134567));
+    artifacts.add(makeArtifact("coll1", "auid1", "url7.example.com", 1,
+	MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll1", "auid1", "url8.example.com", 2,
+	MediaType.TEXT_HTML, 223456));
+    artifacts.add(makeArtifact("coll1", "auid1", "url9.example.com", 3,
 	MediaType.TEXT_HTML, 234567));
 
+    // Get all CDX records.
     CdxRecords records = new CdxRecords();
-
     new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, null, null, records);
 
-    assertEquals(9, records.getCdxRecordCount());
+    assertEquals(artifacts.size(), records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    List<CdxRecord> allCdxRecords = records.getCdxRecords();
+
+    // Get sets of CDX records that include all of them.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, null, 1, records);
+    assertIterableEquals(allCdxRecords, records.getCdxRecords());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, null, 2, records);
+    assertIterableEquals(allCdxRecords, records.getCdxRecords());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 10000, 1, records);
+    assertIterableEquals(allCdxRecords, records.getCdxRecords());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, artifacts.size(), 1, records);
+    assertIterableEquals(allCdxRecords, records.getCdxRecords());
+
+    // Get sets of CDX records with a page size of 8.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 8, 1, records);
+
+    assertEquals(8, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 8, 2, records);
+
+    assertEquals(1, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i + 8).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    // Get sets of CDX records with a page size of 4.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 4, 1, records);
+
+    assertEquals(4, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 4, 2, records);
+
+    assertEquals(4, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i + 4).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 4, 3, records);
+
+    assertEquals(1, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i + 8).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    // Get sets of CDX records with a page size of 3.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 3, 1, records);
+
+    assertEquals(3, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 3, 2, records);
+
+    assertEquals(3, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i + 3).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 3, 3, records);
+
+    assertEquals(3, records.getCdxRecordCount());
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      assertEquals(artifacts.get(i + 6).getUri(),
+	  records.getCdxRecords().get(i).getUrl());
+    }
+
+    // Get sets of CDX records with a page size of 1.
+    for (int pageIdx = 0; pageIdx < 9; pageIdx++) {
+      records = new CdxRecords();
+      new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	  repository, 1, pageIdx + 1, records);
+
+      assertEquals(1, records.getCdxRecordCount());
+      assertEquals(artifacts.get(pageIdx).getUri(),
+	  records.getCdxRecords().get(0).getUrl());
+    }
+
+    // Get empty results beyond the last CDX record.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 10000, 2, records);
+    assertEquals(0, records.getCdxRecordCount());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, artifacts.size(), 2, records);
+    assertEquals(0, records.getCdxRecordCount());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 8, 3, records);
+    assertEquals(0, records.getCdxRecordCount());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 4, 4, records);
+    assertEquals(0, records.getCdxRecordCount());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 3, 4, records);
+    assertEquals(0, records.getCdxRecordCount());
+
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+	repository, 1, 10, records);
+    assertEquals(0, records.getCdxRecordCount());
   }
 
   /**
-   * Creates an artifact.
+   * Tests the creation of CDX records for URLs.
+   *
+   * @exception Exception
+   *              if there are problems creating the CDX records.
+   */
+  @Test
+  public void testGetCdxRecords() throws Exception {
+    // Populate the repository.
+    List<Artifact> artifacts = new ArrayList<>();
+
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url4.example.com", 1,
+	MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url3.example.com", 1,
+	MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 3,
+	MediaType.TEXT_HTML, 134567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 2,
+	MediaType.TEXT_HTML, 123456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 1,
+	MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 4,
+	MediaType.TEXT_HTML, 45678));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 3,
+	MediaType.TEXT_HTML, 34567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 2,
+	MediaType.TEXT_HTML, 23456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 1,
+	MediaType.TEXT_HTML, 12345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url4.example.com", 1,
+	MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url3.example.com", 1,
+	MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url2.example.com", 1,
+	MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url1.example.com", 1,
+	MediaType.TEXT_HTML, 12345));
+
+    // Get exact CDX records for www.url1.example.com in the first collection.
+    String collId = "coll1";
+    String url = "www.url1.example.com";
+    CdxRecords records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, null, records);
+
+    // Validate count.
+    assertEquals(4, records.getCdxRecordCount());
+
+    // Validate each result.
+    long previousTimestamp = -1;
+    long previousCollectiondate = -1;
+
+    // Loop through all the results.
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      // Result.
+      CdxRecord cdxRecord = records.getCdxRecords().get(i);
+
+      // Expected matching artifact.
+      Artifact artifact = artifacts.get(8 - i);
+
+      // Validate collection.
+      assertEquals(collId, artifact.getCollection());
+
+      // Validate version.
+      assertEquals(4 - i, artifact.getVersion().intValue());
+
+      // Validate URL.
+      assertEquals(url, artifact.getUri());
+      assertEquals(url, cdxRecord.getUrl());
+
+      // Validate archive name.
+      assertEquals(ServiceImplUtil.getArtifactArchiveName(collId,
+	  artifact.getId()), cdxRecord.getArchiveName());
+
+      // Validate timestamp sorting in ascending order.
+      assertTrue(previousCollectiondate < artifact.getCollectionDate());
+      assertTrue(previousTimestamp < cdxRecord.getTimestamp());
+      previousCollectiondate = artifact.getCollectionDate();
+      previousTimestamp = cdxRecord.getTimestamp();
+    }
+
+    // Get exact CDX records for www.url2.example.com in the first collection.
+    collId = "coll1";
+    url = "www.url2.example.com";
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, null, records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Validate each result.
+    previousTimestamp = -1;
+    previousCollectiondate = -1;
+
+    // Loop through all the results.
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      // Result.
+      CdxRecord cdxRecord = records.getCdxRecords().get(i);
+
+      // Expected matching artifact.
+      Artifact artifact = artifacts.get(4 - i);
+
+      // Validate collection.
+      assertEquals(collId, artifact.getCollection());
+
+      // Validate version.
+      assertEquals(3 - i, artifact.getVersion().intValue());
+
+      // Validate URL.
+      assertEquals(url, artifact.getUri());
+      assertEquals(url, cdxRecord.getUrl());
+
+      // Validate archive name.
+      assertEquals(ServiceImplUtil.getArtifactArchiveName(collId,
+	  artifact.getId()), cdxRecord.getArchiveName());
+
+      // Validate timestamp sorting in ascending order.
+      assertTrue(previousCollectiondate < artifact.getCollectionDate());
+      assertTrue(previousTimestamp < cdxRecord.getTimestamp());
+      previousCollectiondate = artifact.getCollectionDate();
+      previousTimestamp = cdxRecord.getTimestamp();
+    }
+
+    // Get exact CDX records for www.url3.example.com in the first collection.
+    collId = "coll1";
+    url = "www.url3.example.com";
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, null, records);
+
+    // Validate count.
+    assertEquals(1, records.getCdxRecordCount());
+
+    // Result.
+    CdxRecord cdxRecord = records.getCdxRecords().get(0);
+
+    // Expected matching artifact.
+    Artifact artifact = artifacts.get(1);
+
+    // Validate collection.
+    assertEquals(collId, artifact.getCollection());
+
+    // Validate URL.
+    assertEquals(url, artifact.getUri());
+    assertEquals(url, cdxRecord.getUrl());
+
+    // Validate archive name.
+    assertEquals(ServiceImplUtil.getArtifactArchiveName(collId,
+	artifact.getId()), cdxRecord.getArchiveName());
+
+    // Get prefix CDX records for www. in the first collection.
+    collId = "coll1";
+    url = "www.";
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, true,
+	null, null, null, records);
+
+    // Validate count.
+    assertEquals(9, records.getCdxRecordCount());
+
+    // Loop through all the results.
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      // Result.
+      cdxRecord = records.getCdxRecords().get(i);
+
+      // Expected matching artifact.
+      artifact = artifacts.get(8 - i);
+
+      // Validate collection.
+      assertEquals(collId, artifact.getCollection());
+
+      // Validate URL.
+      assertEquals(artifact.getUri(), cdxRecord.getUrl());
+
+      // Validate timestamp.
+      assertEquals(CdxRecord.computeNumericTimestamp(
+	  artifact.getCollectionDate()), cdxRecord.getTimestamp());
+    }
+
+    // Get "closest" CDX records for www.url2.example.com in the first
+    // collection from the epoch.
+    // Chronological order is 19700101000152, 19700101000203, 19700101000214.
+    collId = "coll1";
+    url = "www.url2.example.com";
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, "19700101000000", records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Loop through all the results.
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      // Result.
+      cdxRecord = records.getCdxRecords().get(i);
+
+      // Expected matching artifact.
+      artifact = artifacts.get(4 - i);
+
+      // Validate collection.
+      assertEquals(collId, artifact.getCollection());
+
+      // Validate URL.
+      assertEquals(artifact.getUri(), cdxRecord.getUrl());
+
+      // Validate timestamp.
+      assertEquals(CdxRecord.computeNumericTimestamp(
+	  artifact.getCollectionDate()), cdxRecord.getTimestamp());
+    }
+
+    // This the chronological order.
+    List<CdxRecord> cdxRecordsByTimestamp = records.getCdxRecords();
+
+    // Get "closest" CDX records for www.url2.example.com in the first
+    // collection from right before the first chronological record.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, "19700101000150", records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Verify that the records are in the chronological order.
+    assertIterableEquals(cdxRecordsByTimestamp, records.getCdxRecords());
+
+    // Get "closest" CDX records for www.url2.example.com in the first
+    // collection from right after the first chronological record.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, "19700101000154", records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Verify that the records are in the chronological order.
+    assertIterableEquals(cdxRecordsByTimestamp, records.getCdxRecords());
+
+    // Get "closest" CDX records for www.url2.example.com in the first
+    // collection from right before the second chronological record.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, "19700101000201", records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Verify the order of the records: 2, 1, 3.
+    assertEquals(cdxRecordsByTimestamp.get(1), records.getCdxRecords().get(0));
+    assertEquals(cdxRecordsByTimestamp.get(0), records.getCdxRecords().get(1));
+    assertEquals(cdxRecordsByTimestamp.get(2), records.getCdxRecords().get(2));
+
+    // Get "closest" CDX records for www.url2.example.com in the first
+    // collection from right after the second chronological record.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, "19700101000205", records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Verify the order of the records: 2, 3, 1.
+    assertEquals(cdxRecordsByTimestamp.get(1), records.getCdxRecords().get(0));
+    assertEquals(cdxRecordsByTimestamp.get(2), records.getCdxRecords().get(1));
+    assertEquals(cdxRecordsByTimestamp.get(0), records.getCdxRecords().get(2));
+
+    // Get "closest" CDX records for www.url2.example.com in the first
+    // collection from right before the third chronological record.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, "19700101000212", records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Verify the order of the records: 3, 2, 1.
+    assertEquals(cdxRecordsByTimestamp.get(2), records.getCdxRecords().get(0));
+    assertEquals(cdxRecordsByTimestamp.get(1), records.getCdxRecords().get(1));
+    assertEquals(cdxRecordsByTimestamp.get(0), records.getCdxRecords().get(2));
+
+    // Get "closest" CDX records for www.url2.example.com in the first
+    // collection from right after the third chronological record.
+    records = new CdxRecords();
+    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+	null, null, "19700101000216", records);
+
+    // Validate count.
+    assertEquals(3, records.getCdxRecordCount());
+
+    // Verify the order of the records: 3, 2, 1.
+    assertEquals(cdxRecordsByTimestamp.get(2), records.getCdxRecords().get(0));
+    assertEquals(cdxRecordsByTimestamp.get(1), records.getCdxRecords().get(1));
+    assertEquals(cdxRecordsByTimestamp.get(0), records.getCdxRecords().get(2));
+  }
+
+  /**
+   * Creates an ArtifactData object.
    * 
+   * @param id
+   *          A String with the artifact identifier.
    * @param collection
    *          A String with the artifact collection identifier.
    * @param auid
@@ -321,20 +730,19 @@ public class TestCdxApiServiceImpl extends LockssTestCase5 {
    *          An Integer with the artifact version.
    * @param contentType
    *          A MediaType with the artifact content type.
-   * @param originDate
-   *          A long with the artifact origin date.
-   * @return an Artifact with the newly created artifact.
-   * @exception IOException
-   *              if there are problems creating the artifact.
+   * @param collectionDate
+   *          A long with the artifact collection date.
+   * @return an ArtifactData with the newly created object.
    */
-  private Artifact makeArtifact(String collection, String auid, String url,
-      Integer version, MediaType contentType, long originDate)
-	  throws IOException {
+  private ArtifactData makeArtifactData(String id, String collection,
+      String auid, String url, Integer version, MediaType contentType,
+      long collectionDate) {
     ArtifactIdentifier ai =
-	new ArtifactIdentifier(collection, auid, url, version);
+	new ArtifactIdentifier(id, collection, auid, url, version);
 
     HttpHeaders am = new HttpHeaders();
     am.setContentType(contentType);
+    am.setDate(collectionDate);
 
     InputStream is = new ByteArrayInputStream(
 	("WARC/1.0\r\n" + 
@@ -350,9 +758,35 @@ public class TestCdxApiServiceImpl extends LockssTestCase5 {
 	new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, null);
 
     ArtifactData ad = new ArtifactData(ai, am, is, sl);
-    ad.setCollectionDate(originDate);
+    ad.setCollectionDate(collectionDate);
 
-    Artifact art = repository.addArtifact(ad);
+    return ad;
+  }
+
+  /**
+   * Creates an artifact and adds it to the repository.
+   * 
+   * @param collection
+   *          A String with the artifact collection identifier.
+   * @param auid
+   *          A String with the artifact AUID.
+   * @param url
+   *          A String with the artifact URL.
+   * @param version
+   *          An Integer with the artifact version.
+   * @param contentType
+   *          A MediaType with the artifact content type.
+   * @param collectionDate
+   *          A long with the artifact collection date.
+   * @return an Artifact with the newly created artifact.
+   * @exception IOException
+   *              if there are problems creating the artifact.
+   */
+  private Artifact makeArtifact(String collection, String auid, String url,
+      Integer version, MediaType contentType, long collectionDate)
+	  throws IOException {
+    Artifact art = repository.addArtifact(makeArtifactData(null, collection,
+	auid, url, version, contentType, collectionDate));
 
     return repository.commitArtifact("coll1", art.getId());
   }
