@@ -51,13 +51,6 @@ POSSIBILITY OF SUCH DAMAGE.
   <name>laaws-repository-service</name>
   <description>LOCKSS Repository Service</description>
 
-  <!-- Must be in every lockss-parent-pom descendant -->
-  <scm>
-    <connection>${scmConnection}</connection>
-    <developerConnection>${scmDeveloperConnection}</developerConnection>
-    <url>${scmUrl}</url>
-  </scm>
-
   <properties>
     <!-- Is a Spring project -->
     <build.java.spring.skip>false</build.java.spring.skip>
