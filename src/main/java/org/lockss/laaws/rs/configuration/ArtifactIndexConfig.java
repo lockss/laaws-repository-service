@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -50,6 +50,10 @@ public class ArtifactIndexConfig {
     private final static String INDEX_SPEC_KEY = "repo.index.spec";
     private final static String SOLR_URL_KEY = "repo.index.solr.solrUrl";
 
+    // Application properties keys for authentication credentials.
+    private final static String SOLR_USER_KEY = "repo.index.solr.user";
+    private final static String SOLR_PASSWORD_KEY = "repo.index.solr.password";
+
     @Resource
     private Environment env;
 
@@ -68,7 +72,9 @@ public class ArtifactIndexConfig {
         if (indexSpec != null) {
             switch (indexSpec.trim().toLowerCase()) {
                 case "solr":
-                    return new SolrArtifactIndex(env.getProperty(SOLR_URL_KEY));
+                    return new SolrArtifactIndex(env.getProperty(SOLR_URL_KEY),
+                	env.getProperty(SOLR_USER_KEY),
+                	env.getProperty(SOLR_PASSWORD_KEY));
 
                 case "volatile":
                     return new VolatileArtifactIndex();
