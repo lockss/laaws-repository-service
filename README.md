@@ -115,6 +115,7 @@ The administration UI of the web service is at <http://127.0.0.1:24611>.
     2. Change the value of the `searchUrlBase` property from
        `http://wayback.archive-it.org/1055/xmlquery` to
        `http://reposervicehost:reposerviceport/cdx/owb/collectionid`:
+
               <property name="searchUrlBase" value="http://reposervicehost:reposerviceport/cdx/owb/collectionid" />
 
 ### Configuring PyWayback to use this service for indexing and replay
