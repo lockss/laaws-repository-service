@@ -39,7 +39,7 @@ POSSIBILITY OF SUCH DAMAGE.
   <parent>
     <groupId>org.lockss</groupId>
     <artifactId>lockss-parent-pom</artifactId>
-    <version>1.10.0-SNAPSHOT</version>
+    <version>1.10.0</version>
     <relativePath />
   </parent>
 
