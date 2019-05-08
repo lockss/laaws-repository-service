@@ -36,8 +36,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
+import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -58,28 +57,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @RunWith(SpringRunner.class)
 @WebMvcTest(CollectionsApiController.class)
 @AutoConfigureMockMvc(secure = false)
-public class TestReposApiController {
+public class TestReposApiController extends LockssTestCase5 {
     private final static Log log = LogFactory.getLog(TestReposApiController.class);
-
-    private static final byte[] JAKE = ("\"Dude, sucking at something is the first step towards being sorta good at " +
-            "something.\" - Jake The Dog").getBytes();
-
-    private static final byte[] BMO  = ("\"When bad things happen, I know you want to believe they are a joke, but " +
-            "sometimes life is scary and dark. That's why we must find the light.\" - BMO").getBytes();
-
-    private static final String SAMPLE_HTTP_RESPONSE = "HTTP/1.1 200 OK\n" +
-            "Server: nginx/1.12.0\n" +
-            "Date: Wed, 30 Aug 2017 22:36:15 GMT\n" +
-            "Content-Type: text/html\n" +
-            "Content-Length: 118\n" +
-            "Last-Modified: Fri, 07 Jul 2017 09:43:40 GMT\n" +
-            "Connection: keep-alive\n" +
-            "ETag: \"595f57cc-76\"\n" +
-            "Accept-Ranges: bytes\n" +
-            "\n" +
-            "If kittens could talk, they would whisper soft riddles into my ear, tickling me with their whiskers, making me laugh.";
-
-    private static final byte[] SAMPLE_HTTP_RESPONSE_BYTES = SAMPLE_HTTP_RESPONSE.getBytes();
 
     @Autowired
     private MockMvc controller;
@@ -115,13 +94,30 @@ public class TestReposApiController {
 
     @Test
     public void getCollections() throws Exception {
-        List<String> collections = new ArrayList<>();
-        collections.add("test");
+        // Perform tests against a repository service that is not ready (should expect 503)
+        given(this.repo.isReady()).willReturn(false);
+        assertFalse(repo.isReady());
+        this.controller.perform(get("/collections")).andExpect(status().isServiceUnavailable());
 
-        given(this.repo.getCollectionIds()).willReturn(collections);
+        // Perform tests against a ready repository service
+        given(this.repo.isReady()).willReturn(true);
 
+        // Set of collections IDs; start empty
+        List<String> collectionIds = new ArrayList<>();
+
+        // Assert that we get an empty set of collection IDs from the controller if repository returns empty set
+        given(this.repo.getCollectionIds()).willReturn(collectionIds);
         this.controller.perform(get("/collections")).andExpect(status().isOk()).andExpect(
-                content().string("[\"test\"]"));
+            content().string("[]"));
+
+        // Add collection IDs our set
+        collectionIds.add("test1");
+        collectionIds.add("test2");
+
+        // Assert that we get back the same set of collection IDs
+        given(this.repo.getCollectionIds()).willReturn(collectionIds);
+        this.controller.perform(get("/collections")).andExpect(status().isOk()).andExpect(
+            content().string("[\"test1\",\"test2\"]"));
     }
 
     @Test
@@ -154,7 +150,7 @@ public class TestReposApiController {
      */
     @Test
     public void testPostArtifactWithHTTPResponse() throws Exception {
-        MultipartFile payload = new MockMultipartFile("content", "http-response", "application/http; msgtype=response", SAMPLE_HTTP_RESPONSE_BYTES);
+//        MultipartFile payload = new MockMultipartFile("content", "http-response", "application/http; msgtype=response", SAMPLE_HTTP_RESPONSE_BYTES);
 
         /*
         ResponseEntity<RepositoryArtifact> response = controller.reposRepositoryArtifactsPost( "test", "test", "test", null, null, payload, null);

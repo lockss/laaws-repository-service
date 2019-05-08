@@ -30,15 +30,57 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
+import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
+import javax.annotation.Resource;
+
+/**
+ * Spring configuration beans for the configuration of the Repository Service's internal artifact index.
+ */
 @Configuration
 public class ArtifactIndexConfig {
+    private final static Log log = LogFactory.getLog(ArtifactIndexConfig.class);
+    private final static String INDEX_SPEC_KEY = "repo.index.spec";
+    private final static String SOLR_URL_KEY = "repo.index.solr.solrUrl";
+
+    @Resource
+    private Environment env;
+
     @Bean
-    public ArtifactIndex createArtifactIndex() {
-        return new VolatileArtifactIndex();
+    public ArtifactIndex setArtifactIndex() {
+        String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
+        String indexSpec = env.getProperty(INDEX_SPEC_KEY);
+
+        if (!repoSpec.equals("custom")) {
+            log.warn("Ignoring index specification because a predefined repository specification is being used");
+            return null;
+        }
+
+        log.info(String.format("indexSpec = %s", indexSpec));
+
+        if (indexSpec != null) {
+            switch (indexSpec.trim().toLowerCase()) {
+                case "solr":
+                    return new SolrArtifactIndex(env.getProperty(SOLR_URL_KEY));
+
+                case "volatile":
+                    return new VolatileArtifactIndex();
+
+                default:
+                    String errMsg = String.format("Unknown index specification '%s'", indexSpec);
+                    log.error(errMsg);
+                    throw new IllegalArgumentException(errMsg);
+            }
+        }
+
+        log.warn("No artifact index specification set; setting ArtifactIndex bean to null");
+        return null;
     }
 }
