@@ -194,6 +194,11 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
     spec.assertArtifact(repository, commArt);
+
+    // Try adding an artifact with no URL.
+    assertThrowsMatch(IOException.class,
+	"Could not add artifact; remote server responded with status: 500 Internal Server Error",
+	() -> {addUncommitted(new ArtifactSpec().setUrl(null));});
   }
 
   @Test
