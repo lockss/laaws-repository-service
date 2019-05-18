@@ -82,7 +82,8 @@ The administration UI of the web service is at <http://127.0.0.1:24611>.
   `reposervicehost` at port `reposerviceport` and it has a collection
   `collectionid`:
   
-  * Edit the file `wayback-webapp/src/main/webapp/WEB-INF/wayback.xml`:
+  * Edit the OpenWayback file
+    `wayback-webapp/src/main/webapp/WEB-INF/wayback.xml`:
     1. Comment out the `resourcefilelocationdb` bean:
 
               <!--  
@@ -105,7 +106,7 @@ The administration UI of the web service is at <http://127.0.0.1:24611>.
 
               <property name="collection" ref="remotecollection" />
   
-  * Edit the file
+  * Edit the OpenWayback file
     `wayback-webapp/src/main/webapp/WEB-INF/RemoteCollection.xml`:
     1. Change the value of the `prefix` property from
        `http://wayback.archive-it.org/fileproxy/` to
@@ -117,6 +118,28 @@ The administration UI of the web service is at <http://127.0.0.1:24611>.
        `http://reposervicehost:reposerviceport/cdx/owb/collectionid`:
 
               <property name="searchUrlBase" value="http://reposervicehost:reposerviceport/cdx/owb/collectionid" />
+
+### Configuring OpenWayback to use BASIC authentication
+  Assuming that the authenticated user name is `lockss-u`, the password of this
+  user is `lockss-p` and that the home directory of the Tomcat 8 web
+  application server is `/usr/share/tomcat8`:
+  
+  * Edit the Tomcat file `/usr/share/tomcat8/conf/tomcat-users.xml`:
+    1. Right before the `</tomcat-users>` at the end of the file. add:
+
+              <role rolename="wayback"/>
+              <user username="lockss-u" password="lockss-p" roles="wayback"/>
+  
+  * Edit the OpenWayback file
+    `wayback-webapp/src/main/webapp/WEB-INF/web.xml`:
+    1. Un-comment out the `<security-role>`, `<security-constraint>`,
+       `<login-config>` and `<error-page>` elements at the end of the
+       file.
+    2. Change the value of the `url-pattern` property in the
+       `web-resource-collection` property from `/usersecure/*` to
+       `/wayback/*`:
+
+              <url-pattern>/wayback/*</url-pattern>
 
 ### Configuring PyWayback to use this service for indexing and replay
   Assuming that the LAAWS Repository service is running on host
