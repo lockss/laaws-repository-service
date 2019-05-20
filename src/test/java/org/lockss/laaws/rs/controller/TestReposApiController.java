@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -36,6 +36,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.status.model.ApiStatus;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -208,4 +209,18 @@ public class TestReposApiController extends LockssTestCase5 {
 
     }
 
+    /**
+     * Runs the status-related test.
+     * 
+     * @throws Exception
+     *           if there are problems.
+     */
+    @Test
+    public void testGetStatus() throws Exception {
+        // Get the expected result.
+        ApiStatus expected = new ApiStatus("swagger/swagger.yaml");
+
+        controller.perform(get("/status")).andExpect(status().isOk())
+        .andExpect(content().string(expected.toJson()));
+    }
 }
