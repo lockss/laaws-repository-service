@@ -77,18 +77,14 @@ POSSIBILITY OF SUCH DAMAGE.
       <groupId>org.lockss</groupId>
       <artifactId>lockss-spring-bundle</artifactId>
       <version>${version.lockss.lockss-spring-bundle}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.lockss.laaws</groupId>
-          <artifactId>lockss-core</artifactId>  
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpcore</artifactId>
-      <version>${version.dependency.httpcore}</version>
+      <groupId>org.lockss</groupId>
+      <artifactId>lockss-core-tests-bundle</artifactId>
+      <version>${version.lockss.lockss-core-bundle}</version>
+      <type>pom</type>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
@@ -118,12 +114,6 @@ POSSIBILITY OF SUCH DAMAGE.
           <artifactId>servlet-api</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-simple</artifactId>
-      <version>${version.group.slf4j}</version>    
     </dependency>
 
     <dependency>

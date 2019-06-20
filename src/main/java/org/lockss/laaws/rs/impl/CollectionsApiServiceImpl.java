@@ -48,8 +48,6 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
-import org.lockss.laaws.status.model.ApiStatus;
-import org.lockss.spring.status.SpringLockssBaseApiController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -63,8 +61,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
  * Service for accessing the repository artifacts.
  */
 @Service
-public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
-    implements CollectionsApiDelegate {
+public class CollectionsApiServiceImpl implements CollectionsApiDelegate {
   private final static Log log =
       LogFactory.getLog(CollectionsApiServiceImpl.class);
   private static final String APPLICATION_HTTP_RESPONSE_VALUE =
@@ -822,16 +819,5 @@ public class CollectionsApiServiceImpl extends SpringLockssBaseApiController
   @Override
   public Optional<HttpServletRequest> getRequest() {
     return Optional.ofNullable(request);
-  }
-
-  /**
-   * Provides the status object.
-   * 
-   * @return an ApiStatus with the status.
-   */
-  @Override
-  public ApiStatus getApiStatus() {
-    return new ApiStatus("swagger/swagger.yaml")
-      .setReady(repo.isReady());
   }
 }

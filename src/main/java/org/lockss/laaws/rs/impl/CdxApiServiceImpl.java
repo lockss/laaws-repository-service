@@ -259,7 +259,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Check that the collection exists.
     try {
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-    } catch (IOException e) {
+    } catch (Exception e) {
       String message =
 	  "Cannot validate the collectionid = '" + collectionid + "'";
       log.error(message, e);
