@@ -85,8 +85,8 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   protected static String ARTID1 = "art_id_1";
 
   protected static String URL1 = "http://host1.com/path";
-  protected static String URL2 = "http://host2.com/file1";
-  protected static String URL3 = "http://host2.com/file2";
+  protected static String URL2 = "http://host2.com/fil,1";
+  protected static String URL3 = "http://host2.com/fil/2";
   protected static String PREFIX1 = "http://host2.com/";
 
   protected static String CONTENT1 = "content string 1";
@@ -112,7 +112,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   // differs only in case from previous, to check case-sensitivity
   protected static String[] COLLS = {COLL1, COLL2, "Coll2"};
   protected static String[] AUIDS = {AUID1, AUID2, "Auid2"};
-  protected static String[] URLS = {URL1, URL2, URL2.toUpperCase()};
+  protected static String[] URLS = {URL1, URL2, URL2.toUpperCase(), URL3};
 
     @LocalServerPort
     private int port;
