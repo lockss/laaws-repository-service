@@ -190,7 +190,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // up variants, and by testArtifactSizes(), but for the sake of
     // completeness ...
 
-    ArtifactSpec spec = new ArtifactSpec().setUrl("https://mr/ed/").setContent(CONTENT1);
+    ArtifactSpec spec = new ArtifactSpec().setUrl("https://mr/ed/").setContent(CONTENT1).setCollectionDate(0);
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
     spec.assertArtifact(repository, commArt);
