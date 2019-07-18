@@ -38,6 +38,7 @@ import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.solr.SolrAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
@@ -45,7 +46,7 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
  * The Spring-Boot application.
  */
 // TODO: This disables Spring authentication
-@SpringBootApplication(exclude = {SecurityAutoConfiguration.class })
+@SpringBootApplication(exclude = {SecurityAutoConfiguration.class, SolrAutoConfiguration.class})
 @EnableSwagger2
 @ComponentScan(basePackages = { "org.lockss.laaws.rs", "org.lockss.laaws.rs.api" })
 public class Swagger2SpringBoot extends BaseSpringBootApplication
