@@ -33,6 +33,11 @@ package org.lockss.laaws.rs.configuration;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
+import org.lockss.laaws.rs.util.JmsFactorySource;
+import org.lockss.app.LockssDaemon;
+import org.lockss.util.*;
+import org.lockss.util.jms.*;
+import org.lockss.jms.*;
 import org.lockss.log.L4JLogger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -67,6 +72,9 @@ public class LockssRepositoryConfig {
     public LockssRepository createInitializedRepository() throws IOException {
       LockssRepository repo = createRepository();
       repo.initRepository();
+      // XXX wrong method, below is public
+      new Thread(() -> initJmsFactory(repo)).start();
+
       return repo;
     }
 
@@ -75,75 +83,103 @@ public class LockssRepositoryConfig {
         String repositoryPersistIndexName = env.getProperty(REPO_PERSISTINDEXNAME_KEY);
 
         if (log.isDebugEnabled()) {
-          log.debug("Starting internal LOCKSS repository (repositorySpecification = {})", repositorySpecification);
-          log.debug("repositoryPersistIndexName = {})", repositoryPersistIndexName);
+	    log.debug("Starting internal LOCKSS repository (repositorySpecification = {})", repositorySpecification);
+	    log.debug("repositoryPersistIndexName = {})", repositoryPersistIndexName);
         }
 
         if (repositorySpecification != null) {
             switch (repositorySpecification.trim().toLowerCase()) {
-                case "volatile":
-                    return LockssRepositoryFactory.createVolatileRepository();
+	    case "volatile":
+		return LockssRepositoryFactory.createVolatileRepository();
 
-                case "custom":
-                    // Configure artifact index and data store individually using Spring beans (see their
-                    // configuration beans in)the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
-                    // respectively.
-                    return new BaseLockssRepository(index, store);
+	    case "custom":
+		// Configure artifact index and data store individually using Spring beans (see their
+		// configuration beans in)the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
+		// respectively.
+		return new BaseLockssRepository(index, store);
 
-                default: {
-                    if (!(repositorySpecification.indexOf(':') < 0)) {
-                        String[] specParts = repositorySpecification.split(":", 2);
+	    default: {
+		if (!(repositorySpecification.indexOf(':') < 0)) {
+		    String[] specParts = repositorySpecification.split(":", 2);
 
-                        // Get the type of implementation configured.
-                        String repositoryType = specParts[0].trim().toLowerCase();
+		    // Get the type of implementation configured.
+		    String repositoryType = specParts[0].trim().toLowerCase();
 
-                        if (log.isDebugEnabled()) {
-                          log.debug("repositoryType = {}", repositoryType);
-                        }
+		    if (log.isDebugEnabled()) {
+			log.debug("repositoryType = {}", repositoryType);
+		    }
 
-                        // Check whether a local implementation is configured.
-                        switch (repositoryType) {
-                            case "local": {
-                                // Yes: Get the configured filesystem path.
-                                String repositoryLocalPath = specParts[1];
+		    // Check whether a local implementation is configured.
+		    switch (repositoryType) {
+		    case "local": {
+			// Yes: Get the configured filesystem path.
+			String repositoryLocalPath = specParts[1];
 
-                                if (log.isDebugEnabled()) {
-                                  log.debug("repositoryLocalPath = {}", repositoryLocalPath);
-                                }
+			if (log.isDebugEnabled()) {
+			    log.debug("repositoryLocalPath = {}", repositoryLocalPath);
+			}
 
-                                return new LocalLockssRepository(new File(repositoryLocalPath), repositoryPersistIndexName);
-                            }
+			return new LocalLockssRepository(new File(repositoryLocalPath), repositoryPersistIndexName);
+		    }
 
-                            case "rest": {
-                                String repositoryRestUrl = specParts[1];
+		    case "rest": {
+			String repositoryRestUrl = specParts[1];
 
-                                if (log.isDebugEnabled()) {
-                                  log.debug("repositoryRestUrl = {}", repositoryRestUrl);
-                                }
+			if (log.isDebugEnabled()) {
+			    log.debug("repositoryRestUrl = {}", repositoryRestUrl);
+			}
 
-                                return new RestLockssRepository(new URL(repositoryRestUrl));
-                            }
+			return new RestLockssRepository(new URL(repositoryRestUrl));
+		    }
 
-                            default: {
-                                String errMsg = String.format(
-                                        "Unknown repository type '%s'; cannot continue",
-                                        repositoryType
-                                );
-                                log.error(errMsg);
-                                throw new IllegalArgumentException(errMsg);
-                            }
-                        }
-                    }
+		    default: {
+			String errMsg = String.format(
+						      "Unknown repository type '%s'; cannot continue",
+						      repositoryType
+						      );
+			log.error(errMsg);
+			throw new IllegalArgumentException(errMsg);
+		    }
+		    }
+		}
 
-                    // Unknown repository specification
-                    String errMsg = String.format("Unknown repository specification '%s'", repositorySpecification);
-                    log.error(errMsg);
-                    throw new IllegalArgumentException(errMsg);
-                }
+		// Unknown repository specification
+		String errMsg = String.format("Unknown repository specification '%s'", repositorySpecification);
+		log.error(errMsg);
+		throw new IllegalArgumentException(errMsg);
+	    }
             }
         } else {
             log.warn("No LOCKSS repository specification provided. Using volatile implementation!");
             return LockssRepositoryFactory.createVolatileRepository();
         }
+    }
+
+    /** Wait for LockssDaemon to be instantiated, then to become ready, then
+     * obtain a JmsFactory from JMSManager and store it in the
+     * recently-created LockssRepositor.  Runs in a thread started by the
+     * LockssRepository bean above */
+    void initJmsFactory(LockssRepository repo) {
+	if (repo instanceof JmsFactorySource) {
+	    JmsFactorySource jmsSource = (JmsFactorySource)repo;
+	    LockssDaemon daemon = null;
+	    while (daemon == null) {
+		try {
+		    daemon = LockssDaemon.getLockssDaemon();
+		} catch (IllegalStateException e) {
+		    log.warn("getLockssDaemon() timed out");
+		}
+	    }
+	    try {
+		while (!daemon.waitUntilAppRunning(Deadline.in(5 * 60 * 1000)));
+		JMSManager mgr = daemon.getManagerByType(JMSManager.class);
+		jmsSource.setJmsFactory(mgr.getJmsFactory());
+		log.info("Stored JmsFactory in {}", jmsSource);
+	    } catch (IllegalArgumentException e) {
+		log.warn("Couldn't get JmsManager", e);
+	    } catch (InterruptedException e) {
+		// exit
+	    }
+	}
     }
 }

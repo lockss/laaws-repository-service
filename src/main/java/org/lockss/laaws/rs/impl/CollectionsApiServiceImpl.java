@@ -48,6 +48,7 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
+import org.lockss.spring.base.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -61,7 +62,10 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
  * Service for accessing the repository artifacts.
  */
 @Service
-public class CollectionsApiServiceImpl implements CollectionsApiDelegate {
+public class CollectionsApiServiceImpl
+  extends BaseSpringApiServiceImpl
+  implements CollectionsApiDelegate {
+
   private final static Log log =
       LogFactory.getLog(CollectionsApiServiceImpl.class);
   private static final String APPLICATION_HTTP_RESPONSE_VALUE =

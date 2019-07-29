@@ -55,7 +55,7 @@ POSSIBILITY OF SUCH DAMAGE.
     <!-- Is a Spring project -->
     <build.java.spring.skip>false</build.java.spring.skip>
     <build.java.package>org.lockss.laaws.rs</build.java.package>
-    <build.java.mainClass>${build.java.package}.Swagger2SpringBoot</build.java.mainClass>
+    <build.java.mainClass>${build.java.package}.RepositoryApplication</build.java.mainClass>
 
     <!-- Is a Docker project -->
     <build.docker.skip>false</build.docker.skip>
