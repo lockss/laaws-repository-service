@@ -34,6 +34,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
@@ -42,6 +44,8 @@ import org.apache.commons.logging.LogFactory;
 import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
@@ -93,6 +97,13 @@ public class CollectionsApiServiceImpl
       HttpServletRequest request) {
     this.objectMapper = objectMapper;
     this.request = request;
+  }
+
+  @javax.annotation.PostConstruct
+  private void init() {
+    setUpJms(JMS_SEND,
+	     RestLockssRepository.REST_ARTIFACT_CACHE_ID,
+	     RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC);
   }
 
   /**
@@ -159,7 +170,9 @@ public class CollectionsApiServiceImpl
 	  "The artifact to be deleted does not exist", parsedRequest);
 
       // Remove the artifact from the artifact store and index
+      String key = artifactKey(collectionid, artifactid);
       repo.deleteArtifact(collectionid, artifactid);
+      sendCacheInvalidate(ArtifactCache.InvalidateOp.Delete, key);
       return new ResponseEntity<>(HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
@@ -175,6 +188,14 @@ public class CollectionsApiServiceImpl
       throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
 	  errorMessage, e, parsedRequest);
     }
+  }
+
+  String artifactKey(String collectionid, String artifactid)
+      throws IOException {
+    ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
+    ArtifactIdentifier id = artifactData.getIdentifier();
+    return Artifact.makeKey(collectionid, id.getAuid(), id.getUri(),
+			    id.getVersion());
   }
 
   /**
@@ -320,6 +341,8 @@ public class CollectionsApiServiceImpl
 
       // Record the commit status in storage and return the new representation in the response entity body
       Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
+      sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit,
+			  artifactKey(collectionid, artifactid));
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
@@ -824,4 +847,22 @@ public class CollectionsApiServiceImpl
   public Optional<HttpServletRequest> getRequest() {
     return Optional.ofNullable(request);
   }
+
+  protected void sendCacheInvalidate(ArtifactCache.InvalidateOp op,
+				     String key) {
+    if (jmsProducer != null) {
+      Map<String,Object> map = new HashMap<>();
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION,
+	      RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE);
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_OP, op.toString());
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_KEY, key);
+      try {
+	jmsProducer.sendMap(map);
+      } catch (javax.jms.JMSException e) {
+	log.error("Couldn't send cache invalidate notification", e);
+      }
+    }
+  }
+
+
 }
