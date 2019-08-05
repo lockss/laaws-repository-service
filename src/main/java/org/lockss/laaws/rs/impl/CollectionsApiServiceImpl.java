@@ -190,14 +190,6 @@ public class CollectionsApiServiceImpl
     }
   }
 
-  String artifactKey(String collectionid, String artifactid)
-      throws IOException {
-    ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
-    ArtifactIdentifier id = artifactData.getIdentifier();
-    return Artifact.makeKey(collectionid, id.getAuid(), id.getUri(),
-			    id.getVersion());
-  }
-
   /**
    * GET /collections/{collectionid}/artifacts/{artifactid}:
    * Retrieves an artifact from the repository.
@@ -848,9 +840,21 @@ public class CollectionsApiServiceImpl
     return Optional.ofNullable(request);
   }
 
+  String artifactKey(String collectionid, String artifactid)
+      throws IOException {
+    Artifact art = repo.getArtifactFromId(artifactid);
+    if (art != null) {
+      return art.makeKey();
+    } else {
+      log.error("Expected artifact not found, can't send invalidate: " +
+		artifactid);
+      return null;
+    }
+  }
+
   protected void sendCacheInvalidate(ArtifactCache.InvalidateOp op,
 				     String key) {
-    if (jmsProducer != null) {
+    if (jmsProducer != null && key != null) {
       Map<String,Object> map = new HashMap<>();
       map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION,
 	      RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE);
@@ -863,6 +867,4 @@ public class CollectionsApiServiceImpl
       }
     }
   }
-
-
 }
