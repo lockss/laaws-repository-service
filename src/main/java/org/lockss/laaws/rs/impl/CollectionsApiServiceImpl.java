@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
+import javax.jms.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.lockss.laaws.error.LockssRestServiceException;
@@ -53,6 +54,7 @@ import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.spring.base.*;
+import org.lockss.util.jms.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -101,9 +103,10 @@ public class CollectionsApiServiceImpl
 
   @javax.annotation.PostConstruct
   private void init() {
-    setUpJms(JMS_SEND,
+    setUpJms(JMS_BOTH,
 	     RestLockssRepository.REST_ARTIFACT_CACHE_ID,
-	     RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC);
+	     RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC,
+	     new CacheInvalidateListener());
   }
 
   /**
@@ -862,7 +865,55 @@ public class CollectionsApiServiceImpl
       map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_KEY, key);
       try {
 	jmsProducer.sendMap(map);
-      } catch (javax.jms.JMSException e) {
+      } catch (JMSException e) {
+	log.error("Couldn't send cache invalidate notification", e);
+      }
+    }
+  }
+
+  // Respond to ECHO requests from client caches.  This verifies that the
+  // service supports sending cache invalidate messages, so it is safe to
+  // enable the Artifact cache
+
+  private class CacheInvalidateListener implements MessageListener {
+
+    @Override
+    public void onMessage(Message message) {
+      try {
+        Map<String, String> msgMap =
+	  (Map<String, String>)JmsUtil.convertMessage(message);
+	String action =
+	  msgMap.get(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION);
+	String key =
+	  msgMap.get(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_KEY);
+	log.debug("Received Artifact cache message: " + action + ": " + key);
+	if (action != null) {
+	  switch (action) {
+	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_ECHO:
+	    sendPingResponse(key);
+	    break;
+	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE:
+	    // expected, ignore
+	    break;
+	  default:
+	    log.warn("Unknown message action: " + action);
+	  }
+	}
+      } catch (JMSException | RuntimeException e) {
+	log.error("Malformed Artifact cache message: " + message, e);
+      }
+    }
+  }
+
+  protected void sendPingResponse(String key) {
+    if (jmsProducer != null) {
+      Map<String,Object> map = new HashMap<>();
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION,
+	      RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_ECHO_RESP);
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_KEY, key);
+      try {
+	jmsProducer.sendMap(map);
+      } catch (JMSException e) {
 	log.error("Couldn't send cache invalidate notification", e);
       }
     }
