@@ -84,7 +84,7 @@ public class LockssRepositoryConfig {
 
         if (log.isDebugEnabled()) {
 	    log.debug("Starting internal LOCKSS repository (repositorySpecification = {})", repositorySpecification);
-	    log.debug("repositoryPersistIndexName = {})", repositoryPersistIndexName);
+	    log.debug("repositoryPersistIndexName = {}", repositoryPersistIndexName);
         }
 
         if (repositorySpecification != null) {
