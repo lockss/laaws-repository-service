@@ -1,6 +1,6 @@
 /*
 
- Copyright (c) 2017-2018 Board of Trustees of Leland Stanford Jr. University,
+ Copyright (c) 2017-2019 Board of Trustees of Leland Stanford Jr. University,
  all rights reserved.
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,10 +34,9 @@ import org.lockss.app.LockssApp.AppSpec;
 import org.lockss.app.LockssApp.ManagerDesc;
 import org.lockss.app.LockssDaemon;
 import org.lockss.app.ServiceDescr;
+import org.lockss.log.L4JLogger;
 import org.lockss.plugin.PluginManager;
 import org.lockss.spring.base.BaseSpringBootApplication;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
@@ -56,8 +55,7 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
 @ComponentScan(basePackages = { "org.lockss.laaws.rs", "org.lockss.laaws.rs.api" })
 public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
-  private static final Logger logger =
-      LoggerFactory.getLogger(RepositoryApplication.class);
+  private static L4JLogger log = L4JLogger.getLogger();
 
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
@@ -71,7 +69,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
    *          A String[] with the command line arguments.
    */
   public static void main(String[] args) {
-    logger.info("Starting the application");
+    log.info("Starting the application");
     configure();
 
     // Start the REST service.
@@ -88,7 +86,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
     // Check whether there are command line arguments available.
     if (args != null && args.length > 0) {
       // Yes: Start the LOCKSS daemon.
-      logger.info("Starting the LOCKSS Repository Service");
+      log.info("Starting the LOCKSS Repository Service");
 
       AppSpec spec = new AppSpec()
 	.setService(ServiceDescr.SVC_REPO)

@@ -97,13 +97,13 @@ public class ServiceImplUtil {
 	.anyMatch(name -> collectionid.equals(name))) {
       String errorMessage = "The collection does not exist";
       log.warn(errorMessage);
-      log.warn("Parsed request: " + parsedRequest);
+      log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage, 
 	  parsedRequest);
     }
 
-    log.debug("collectionid '" + collectionid + "' is valid.");
+    log.debug2("collectionid '{}' is valid.", collectionid);
   }
 
   /**
@@ -203,7 +203,7 @@ public class ServiceImplUtil {
   private static int getArchiveFilenameSeparator(String fileName,
       String parsedRequest) {
     int separatorLocation = fileName.lastIndexOf(archiveFileSeparator);
-    log.trace("separatorLocation =  " + separatorLocation);
+    log.trace("separatorLocation = {}", separatorLocation);
 
     if (separatorLocation < 1) {
       String errorMessage = "Missing separator '" + archiveFileSeparator

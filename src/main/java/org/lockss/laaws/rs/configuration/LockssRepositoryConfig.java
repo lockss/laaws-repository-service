@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -82,10 +82,8 @@ public class LockssRepositoryConfig {
         String repositorySpecification = env.getProperty(REPO_SPEC_KEY);
         String repositoryPersistIndexName = env.getProperty(REPO_PERSISTINDEXNAME_KEY);
 
-        if (log.isDebugEnabled()) {
-	    log.debug("Starting internal LOCKSS repository (repositorySpecification = {})", repositorySpecification);
-	    log.debug("repositoryPersistIndexName = {}", repositoryPersistIndexName);
-        }
+        log.debug("Starting internal LOCKSS repository (repositorySpecification = {})", repositorySpecification);
+        log.debug("repositoryPersistIndexName = {}", repositoryPersistIndexName);
 
         if (repositorySpecification != null) {
             switch (repositorySpecification.trim().toLowerCase()) {
@@ -105,9 +103,7 @@ public class LockssRepositoryConfig {
 		    // Get the type of implementation configured.
 		    String repositoryType = specParts[0].trim().toLowerCase();
 
-		    if (log.isDebugEnabled()) {
-			log.debug("repositoryType = {}", repositoryType);
-		    }
+		    log.debug("repositoryType = {}", repositoryType);
 
 		    // Check whether a local implementation is configured.
 		    switch (repositoryType) {
@@ -115,19 +111,14 @@ public class LockssRepositoryConfig {
 			// Yes: Get the configured filesystem path.
 			String repositoryLocalPath = specParts[1];
 
-			if (log.isDebugEnabled()) {
-			    log.debug("repositoryLocalPath = {}", repositoryLocalPath);
-			}
+			log.debug("repositoryLocalPath = {}", repositoryLocalPath);
 
 			return new LocalLockssRepository(new File(repositoryLocalPath), repositoryPersistIndexName);
 		    }
 
 		    case "rest": {
 			String repositoryRestUrl = specParts[1];
-
-			if (log.isDebugEnabled()) {
-			    log.debug("repositoryRestUrl = {}", repositoryRestUrl);
-			}
+			log.debug("repositoryRestUrl = {}", repositoryRestUrl);
 
 			return new RestLockssRepository(new URL(repositoryRestUrl));
 		    }

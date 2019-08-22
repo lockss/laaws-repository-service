@@ -126,7 +126,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
     // The parsed request for diagnostic purposes.
     String parsedRequest = getParsedRequest(request, collectionid);
-    log.trace("Parsed request: " + parsedRequest);
+    log.trace("Parsed request: {}", parsedRequest);
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
@@ -251,7 +251,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
     // The parsed request for diagnostic purposes.
     String parsedRequest = getParsedRequest(request, collectionid);
-    log.trace("Parsed request: " + parsedRequest);
+    log.trace("Parsed request: {}", parsedRequest);
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
