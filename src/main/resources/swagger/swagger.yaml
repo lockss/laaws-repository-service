@@ -280,6 +280,11 @@ paths:
       required: false
       type: "string"
       description: "The version of the URL contained by the artifacts"
+    - name: "includeUncommitted"
+      in: "query"
+      required: false
+      type: "boolean"
+      description: "Indication of whether an uncommitted artifact can be returned"
   /collections/{collectionid}/aus/{auid}/size:
     get:
       tags:
