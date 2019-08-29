@@ -463,7 +463,7 @@ public class CollectionsApiServiceImpl
 
   /**
    * GET /collections/{collectionid}/aus/{auid}/artifacts:
-   * Get committed artifacts in a collection and Archival Unit.
+   * Get artifacts in a collection and Archival Unit.
    *
    * @param collectionid
    *          A String with the name of the collection containing the artifact.
@@ -476,14 +476,14 @@ public class CollectionsApiServiceImpl
    * @param version
    *          An Integer with the version of the URL contained by the artifacts.
    * @param includeUncommitted
-   *          A boolean with the indication of whether an uncommitted artifact
-   *          may be returned.
+   *          A boolean with the indication of whether uncommitted artifacts
+   *          should be returned.
    * @return a {@code ResponseEntity<List<Artifact>>}.
    */
   @Override
-  public ResponseEntity<List<Artifact>> getCommittedArtifacts(
-      String collectionid, String auid, String url, String urlPrefix,
-      String version, Boolean includeUncommitted) {
+  public ResponseEntity<List<Artifact>> getArtifacts(String collectionid,
+      String auid, String url, String urlPrefix, String version,
+      Boolean includeUncommitted) {
     String parsedRequest = String.format(
 	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
 	collectionid, auid, url, urlPrefix, version,
