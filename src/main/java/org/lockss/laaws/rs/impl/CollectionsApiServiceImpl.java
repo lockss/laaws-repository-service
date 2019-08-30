@@ -107,6 +107,18 @@ public class CollectionsApiServiceImpl
 	     new CacheInvalidateListener());
   }
 
+  /** When JMS connection is established, tell clients to flush their
+   * artifact cache to ensure that no stale cached artifacts.  (Normally
+   * shouldn't matter, as artifact IDs are stable, even after an index
+   * rebuild, but it's conceivable that the repository service that's
+   * starting isn't the same one that was previously running at the same
+   * address.)
+   */
+  @Override
+  protected void jmsSetUpDone() {
+    sendCacheFlush();
+  }
+
   /**
    * GET /collections:
    * Returns a list of collection names managed by this repository.
@@ -853,6 +865,19 @@ public class CollectionsApiServiceImpl
 	jmsProducer.sendMap(map);
       } catch (JMSException e) {
 	log.error("Couldn't send cache invalidate notification", e);
+      }
+    }
+  }
+
+  protected void sendCacheFlush() {
+    if (jmsProducer != null) {
+      Map<String,Object> map = new HashMap<>();
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION,
+	      RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_FLUSH);
+      try {
+	jmsProducer.sendMap(map);
+      } catch (JMSException e) {
+	log.error("Couldn't send cache flush notification", e);
       }
     }
   }
