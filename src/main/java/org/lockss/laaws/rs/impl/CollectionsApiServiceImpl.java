@@ -485,8 +485,8 @@ public class CollectionsApiServiceImpl
       String auid, String url, String urlPrefix, String version,
       Boolean includeUncommitted) {
     String parsedRequest = String.format(
-	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
-	collectionid, auid, url, urlPrefix, version,
+	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, includeUncommitted: %s, requestUrl: %s",
+	collectionid, auid, url, urlPrefix, version, includeUncommitted,
 	ServiceImplUtil.getFullRequestUrl(request));
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -495,9 +495,11 @@ public class CollectionsApiServiceImpl
     try {
       boolean isLatestVersion =
 	  version == null || version.toLowerCase().equals("latest");
+      log.trace("isLatestVersion = {}", isLatestVersion);
 
       boolean isAllVersions =
 	  version != null && version.toLowerCase().equals("all");
+      log.trace("isAllVersions = {}", isAllVersions);
 
       if (urlPrefix != null && url != null) {
 	String errorMessage =
@@ -511,7 +513,9 @@ public class CollectionsApiServiceImpl
       }
 
       boolean isSpecificVersion = !isAllVersions && !isLatestVersion;
+      log.trace("isSpecificVersion = {}", isSpecificVersion);
       boolean isAllUrls = url == null && urlPrefix == null;
+      log.trace("isAllUrls = {}", isAllUrls);
 
       if (isSpecificVersion && (isAllUrls || urlPrefix != null)) {
 	String errorMessage =
@@ -526,6 +530,7 @@ public class CollectionsApiServiceImpl
 
       boolean includeUncommittedValue = includeUncommitted != null
 	  && includeUncommitted.booleanValue();
+      log.trace("includeUncommittedValue = {}", includeUncommittedValue);
 
       if (!isSpecificVersion && includeUncommittedValue) {
 	String errorMessage =
@@ -543,6 +548,7 @@ public class CollectionsApiServiceImpl
       if (isSpecificVersion) {
 	try {
 	  numericVersion = Integer.parseInt(version);
+	  log.trace("numericVersion = {}", numericVersion);
 
 	  if (numericVersion <= 0) {
 	    String errorMessage =
@@ -603,6 +609,11 @@ public class CollectionsApiServiceImpl
 	}
       } else if (url != null && numericVersion > 0) {
 	log.trace("Given version of a URL");
+	log.trace("collectionid = {}", collectionid);
+	log.trace("auid = {}", auid);
+	log.trace("url = {}", url);
+	log.trace("numericVersion = {}", numericVersion);
+	log.trace("includeUncommittedValue = {}", includeUncommittedValue);
 	Artifact artifact = repo.getArtifactVersion(collectionid, auid, url,
 	    numericVersion, includeUncommittedValue);
 	log.trace("artifact = {}", artifact);

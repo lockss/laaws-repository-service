@@ -325,16 +325,16 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 		      () -> {repository.getArtifactVersion(null, null, null, null);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "collection",
-		      () -> {repository.getArtifactVersion(null, AUID1, URL1, 1);});
+		      () -> {repository.getArtifactVersion(null, AUID1, URL1, 1, false);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "au",
-		      () -> {repository.getArtifactVersion(COLL1, null, URL1, 1);});
+		      () -> {repository.getArtifactVersion(COLL1, null, URL1, 1, true);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "url",
 		      () -> {repository.getArtifactVersion(COLL1, AUID1, null, 1);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "version",
-		      () -> {repository.getArtifactVersion(COLL1, AUID1, URL1, null);});
+		      () -> {repository.getArtifactVersion(COLL1, AUID1, URL1, null, true);});
     // XXXAPI illegal version numbers
 //     assertThrowsMatch(IllegalArgumentException.class,
 // 		      "version",
@@ -1163,6 +1163,22 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 					 ver);
   }
 
+  Artifact getUncommittedArtifactVersion(LockssRepository repository,
+					 ArtifactSpec spec,
+					 int ver)
+      throws IOException {
+    log.debug(String.format("getArtifactVersion(%s, %s, %s, %d)",
+			    spec.getCollection(),
+			    spec.getAuid(),
+			    spec.getUrl(),
+			    ver));
+    return repository.getArtifactVersion(spec.getCollection(),
+					 spec.getAuid(),
+					 spec.getUrl(),
+					 ver,
+					 true);
+  }
+
   Artifact addUncommitted(ArtifactSpec spec) throws IOException {
     if (!spec.hasContent()) {
       spec.generateContent();
@@ -1193,6 +1209,13 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       // this test valid only when no other versions exist ArtifactSpec
       assertNull(oldArt);
     }
+
+    log.debug("newArt = " + newArt);
+    Artifact newArt2 = repository.getArtifactVersion(newArt.getCollection(),
+	newArt.getAuid(), newArt.getUri(), newArt.getVersion(), true);
+    log.debug("newArt2 = " + newArt2);
+    assertEquals(newArt, newArt2);
+
     spec.setVersion(newArt.getVersion());
     spec.setArtifactId(newArtId);
 
