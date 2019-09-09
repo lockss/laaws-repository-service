@@ -55,6 +55,6 @@ public class StatusApiServiceImpl extends SpringLockssBaseApiController
    */
   @Override
   public ApiStatus getApiStatus() {
-    return new ApiStatus("swagger/swagger.yaml").setReady(repo.isReady());
+    return getDefaultApiStatus();
   }
 }
