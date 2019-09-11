@@ -93,6 +93,16 @@ public class ServiceImplUtil {
    */
   static void validateCollectionId(LockssRepository repo, String collectionid,
       String parsedRequest) throws IOException {
+    log.debug2("repo = {}, collectionid = {}, parsedRequest = {}", repo,
+	collectionid, parsedRequest);
+
+    log.trace("repo.getCollectionIds().iterator().hasNext() = {}",
+	repo.getCollectionIds().iterator().hasNext());
+
+    for (String collectionInRepository : repo.getCollectionIds()) {
+      log.trace("collectionInRepository = {}", collectionInRepository);
+    }
+
     if (!StreamSupport.stream(repo.getCollectionIds().spliterator(), false)
 	.anyMatch(name -> collectionid.equals(name))) {
       String errorMessage = "The collection does not exist";

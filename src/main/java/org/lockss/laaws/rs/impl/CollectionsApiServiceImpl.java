@@ -475,7 +475,7 @@ public class CollectionsApiServiceImpl
 
   /**
    * GET /collections/{collectionid}/aus/{auid}/artifacts:
-   * Get committed artifacts in a collection and Archival Unit.
+   * Get artifacts in a collection and Archival Unit.
    *
    * @param collectionid
    *          A String with the name of the collection containing the artifact.
@@ -487,15 +487,18 @@ public class CollectionsApiServiceImpl
    *          A String with the prefix to be matched by the artifact URLs.
    * @param version
    *          An Integer with the version of the URL contained by the artifacts.
+   * @param includeUncommitted
+   *          A boolean with the indication of whether uncommitted artifacts
+   *          should be returned.
    * @return a {@code ResponseEntity<List<Artifact>>}.
    */
   @Override
-  public ResponseEntity<List<Artifact>> getCommittedArtifacts(
-      String collectionid, String auid, String url, String urlPrefix,
-      String version) {
+  public ResponseEntity<List<Artifact>> getArtifacts(String collectionid,
+      String auid, String url, String urlPrefix, String version,
+      Boolean includeUncommitted) {
     String parsedRequest = String.format(
-	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
-	collectionid, auid, url, urlPrefix, version,
+	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, includeUncommitted: %s, requestUrl: %s",
+	collectionid, auid, url, urlPrefix, version, includeUncommitted,
 	ServiceImplUtil.getFullRequestUrl(request));
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -504,9 +507,11 @@ public class CollectionsApiServiceImpl
     try {
       boolean isLatestVersion =
 	  version == null || version.toLowerCase().equals("latest");
+      log.trace("isLatestVersion = {}", isLatestVersion);
 
       boolean isAllVersions =
 	  version != null && version.toLowerCase().equals("all");
+      log.trace("isAllVersions = {}", isAllVersions);
 
       if (urlPrefix != null && url != null) {
 	String errorMessage =
@@ -520,11 +525,28 @@ public class CollectionsApiServiceImpl
       }
 
       boolean isSpecificVersion = !isAllVersions && !isLatestVersion;
+      log.trace("isSpecificVersion = {}", isSpecificVersion);
       boolean isAllUrls = url == null && urlPrefix == null;
+      log.trace("isAllUrls = {}", isAllUrls);
 
       if (isSpecificVersion && (isAllUrls || urlPrefix != null)) {
 	String errorMessage =
 	    "A specific 'version' argument requires a 'url' argument";
+
+	log.warn(errorMessage);
+	log.warn("Parsed request: {}", parsedRequest);
+
+	throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+	    errorMessage, parsedRequest);
+      }
+
+      boolean includeUncommittedValue = includeUncommitted != null
+	  && includeUncommitted.booleanValue();
+      log.trace("includeUncommittedValue = {}", includeUncommittedValue);
+
+      if (!isSpecificVersion && includeUncommittedValue) {
+	String errorMessage =
+	    "Including an uncommitted artifact requires a specific 'version' argument";
 
 	log.warn(errorMessage);
 	log.warn("Parsed request: {}", parsedRequest);
@@ -538,6 +560,7 @@ public class CollectionsApiServiceImpl
       if (isSpecificVersion) {
 	try {
 	  numericVersion = Integer.parseInt(version);
+	  log.trace("numericVersion = {}", numericVersion);
 
 	  if (numericVersion <= 0) {
 	    String errorMessage =
@@ -598,8 +621,13 @@ public class CollectionsApiServiceImpl
 	}
       } else if (url != null && numericVersion > 0) {
 	log.trace("Given version of a URL");
-	Artifact artifact =
-	    repo.getArtifactVersion(collectionid, auid, url, numericVersion);
+	log.trace("collectionid = {}", collectionid);
+	log.trace("auid = {}", auid);
+	log.trace("url = {}", url);
+	log.trace("numericVersion = {}", numericVersion);
+	log.trace("includeUncommittedValue = {}", includeUncommittedValue);
+	Artifact artifact = repo.getArtifactVersion(collectionid, auid, url,
+	    numericVersion, includeUncommittedValue);
 	log.trace("artifact = {}", artifact);
 
 	if (artifact != null) {
