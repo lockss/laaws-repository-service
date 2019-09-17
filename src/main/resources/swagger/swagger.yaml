@@ -237,8 +237,8 @@ paths:
     get:
       tags:
         - collections
-      summary: "Get committed artifacts in a collection and Archival Unit"
-      operationId: getCommittedArtifacts
+      summary: "Get artifacts in a collection and Archival Unit"
+      operationId: getArtifacts
       responses:
         200:
           description: "The requested artifacts"
@@ -279,7 +279,12 @@ paths:
       in: "query"
       required: false
       type: "string"
-      description: "The version of the URL contained by the artifacts"
+      description: "The version of the artifact"
+    - name: "includeUncommitted"
+      in: "query"
+      required: false
+      type: "boolean"
+      description: "Indication of whether uncommitted artifacts should be returned"
   /collections/{collectionid}/aus/{auid}/size:
     get:
       tags:
@@ -325,7 +330,7 @@ paths:
       in: "query"
       required: false
       type: "string"
-      description: "The version of the URL contained by the artifacts"
+      description: "The version of the artifact"
   /status:
     get:
       tags:
@@ -533,14 +538,30 @@ definitions:
   apiStatus:
     type: "object"
     required:
-    - "version"
+    - "apiVersion"
+    - "componentName"
+    - "componentVersion"
+    - "lockssVersion"
     - "ready"
+    - "serviceName"
     properties:
-      version:
+      apiVersion:
         type: "string"
-        description: "The version of the service"
+        description: "The version of the API"
+      componentName:
+        type: "string"
+        description: "The name of the component"
+      componentVersion:
+        type: "string"
+        description: "The version of the component software"
+      lockssVersion:
+        type: "string"
+        description: "The version of the LOCKSS system"
       ready:
         type: "boolean"
         description: "The indication of whether the service is available"
+      serviceName:
+        type: "string"
+        description: "The name of the service"
     description: "The status information of the service"
     

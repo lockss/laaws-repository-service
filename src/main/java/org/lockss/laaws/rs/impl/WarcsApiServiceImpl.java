@@ -111,7 +111,7 @@ public class WarcsApiServiceImpl implements WarcsApiDelegate {
     // The parsed request for diagnostic purposes.
     String parsedRequest = String.format("fileName: %s, requestUrl: %s",
 	fileName, ServiceImplUtil.getFullRequestUrl(request));
-    log.trace("Parsed request: " + parsedRequest);
+    log.trace("Parsed request: {}", parsedRequest);
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);

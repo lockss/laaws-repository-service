@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2018-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -30,8 +30,7 @@
 
 package org.lockss.laaws.error;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.lockss.log.L4JLogger;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,8 +39,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping(produces = "application/vnd.error+json")
 public class SpringControllerAdvice {
 
-  private static Logger log =
-      LoggerFactory.getLogger(SpringControllerAdvice.class);
+  private final static L4JLogger log =  L4JLogger.getLogger();
 
   /**
    * Handles a custom LOCKSS REST service exception.
