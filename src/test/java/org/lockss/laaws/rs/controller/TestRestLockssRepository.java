@@ -50,6 +50,7 @@ import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
+import org.lockss.test.ZeroInputStream;;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.*;
@@ -199,6 +200,19 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     assertThrowsMatch(IOException.class,
 	"Could not add artifact; remote server responded with status: 500 Internal Server Error",
 	() -> {addUncommitted(new ArtifactSpec().setUrl(null));});
+  }
+
+  @Test
+  public void testAddLargeArtifact() throws IOException {
+    long len = 100*1024*1024;
+    ArtifactSpec spec =
+      new ArtifactSpec().
+      setUrl("https://mr/ed/")
+      .setContentGenerator(() -> new ZeroInputStream((byte)27, len))
+      .setCollectionDate(0);
+    Artifact newArt = addUncommitted(spec);
+    Artifact commArt = commit(spec, newArt);
+    spec.assertArtifact(repository, commArt);
   }
 
   @Test
