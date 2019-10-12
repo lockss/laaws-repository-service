@@ -33,7 +33,7 @@ package org.lockss.laaws.rs.impl;
 
 import org.lockss.laaws.rs.api.StatusApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.status.model.ApiStatus;
+import org.lockss.util.rest.status.ApiStatus;
 import org.lockss.spring.status.SpringLockssBaseApiController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
