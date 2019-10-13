@@ -49,6 +49,7 @@ import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.util.test.LockssTestCase5;
+import org.lockss.util.rest.exception.*;
 import org.lockss.util.time.TimeBase;
 import org.lockss.test.ZeroInputStream;;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -197,7 +198,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     spec.assertArtifact(repository, commArt);
 
     // Try adding an artifact with no URL.
-    assertThrowsMatch(IOException.class,
+    assertThrowsMatch(LockssRestHttpException.class,
 	"500 Internal Server Error.*addArtifact",
 	() -> {addUncommitted(new ArtifactSpec().setUrl(null));});
   }
