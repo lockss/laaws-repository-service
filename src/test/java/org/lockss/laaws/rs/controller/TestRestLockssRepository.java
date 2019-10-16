@@ -316,9 +316,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 		      "Null",
 		      () -> {repository.getArtifactData(COLL1, null);});
 
-    // Artifact not found
-    // XXX should this throw?
-    assertNull(repository.getArtifactData(COLL1, NO_ARTID));
+    // Artifact ID not found
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+		      "artifact ID",
+		      () -> {repository.getArtifactData(COLL1, NO_ARTID);});
 
     ArtifactSpec cspec = anyCommittedSpec();
     if (cspec != null) {
@@ -507,6 +508,11 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       // Get the same artifact when uncommitted may be included.
       commArt = getArtifact(repository, commSpec, true);
       assertEquals(commArt, dupArt);
+
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+		      "non-existent artifact id",
+		      () -> {repository.commitArtifact(commSpec.getCollection(),
+						       "NOTANARTID");});
     }
   }
 
@@ -524,8 +530,8 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     // Delete non-existent artifact
     // XXXAPI
-    assertThrowsMatch(IllegalArgumentException.class,
-		      "Non-existent artifact id: " + NO_ARTID,
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+		      "Could not remove artifact id: " + NO_ARTID,
 		      () -> {repository.deleteArtifact(NO_COLL, NO_ARTID);});
 
     {
@@ -633,8 +639,8 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       // Delete it again.
       try {
 	repository.deleteArtifact(coll, id);
-	fail("Should have thrown IllegalArgumentException");
-      } catch (IllegalArgumentException iae) {}
+	fail("Should have thrown LockssNoSuchArtifactIdException");
+      } catch (LockssNoSuchArtifactIdException iae) {}
       assertFalse(repository.artifactExists(coll, id), "spec = " + spec);
     }
 
@@ -897,10 +903,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // non-existent collection, artifact id
 
     // XXXAPI
-    assertThrowsMatch(IllegalArgumentException.class,
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
 		      "Non-existent artifact id: " + NO_ARTID,
 		      () -> {repository.isArtifactCommitted(COLL1, NO_ARTID);});
-    assertThrowsMatch(IllegalArgumentException.class,
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
 		      "Non-existent artifact id: " + ARTID1,
 		      () -> {repository.isArtifactCommitted(NO_COLL, ARTID1);});
 
