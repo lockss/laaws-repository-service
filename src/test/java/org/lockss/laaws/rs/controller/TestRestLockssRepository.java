@@ -51,7 +51,7 @@ import org.lockss.laaws.rs.model.*;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.rest.exception.*;
 import org.lockss.util.time.TimeBase;
-import org.lockss.test.ZeroInputStream;;
+import org.lockss.test.ZeroInputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.*;
