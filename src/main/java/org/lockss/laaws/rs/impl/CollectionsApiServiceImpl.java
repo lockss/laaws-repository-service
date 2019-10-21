@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
@@ -48,6 +49,9 @@ import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
+import org.lockss.laaws.rs.model.ArtifactPageInfo;
+import org.lockss.laaws.rs.model.AuidPageInfo;
+import org.lockss.laaws.rs.model.PageInfo;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
@@ -474,35 +478,49 @@ public class CollectionsApiServiceImpl
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/artifacts:
-   * Get artifacts in a collection and Archival Unit.
+   * GET /collections/{collectionid}/aus/{auid}/artifacts: Get a list with all
+   * the artifacts in a collection and Archival Unit or a pageful of the list
+   * defined by the continuation token and size.
    *
-   * @param collectionid
-   *          A String with the name of the collection containing the artifact.
-   * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
-   * @param url
-   *          A String with the URL contained by the artifacts.
-   * @param urlPrefix
-   *          A String with the prefix to be matched by the artifact URLs.
-   * @param version
-   *          An Integer with the version of the URL contained by the artifacts.
-   * @param includeUncommitted
-   *          A boolean with the indication of whether uncommitted artifacts
-   *          should be returned.
-   * @return a {@code ResponseEntity<List<Artifact>>}.
+   * @param collectionid       A String with the name of the collection
+   *                           containing the artifact.
+   * @param auid               A String with the Archival Unit ID (AUID) of
+   *                           artifact.
+   * @param url                A String with the URL contained by the artifacts.
+   * @param urlPrefix          A String with the prefix to be matched by the
+   *                           artifact URLs.
+   * @param version            An Integer with the version of the URL contained
+   *                           by the artifacts.
+   * @param includeUncommitted A boolean with the indication of whether
+   *                           uncommitted artifacts should be returned.
+   * @param limit              An Integer with the maximum number of artifacts
+   *                           to be returned.
+   * @param continuationToken  A String with the continuation token of the next
+   *                           page of artifacts to be returned.
+   * @return a {@code ResponseEntity<ArtifactPageInfo>} with the requested
+   *         artifacts.
    */
   @Override
-  public ResponseEntity<List<Artifact>> getArtifacts(String collectionid,
+  public ResponseEntity<ArtifactPageInfo> getArtifacts(String collectionid,
       String auid, String url, String urlPrefix, String version,
-      Boolean includeUncommitted) {
-    String parsedRequest = String.format(
-	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, includeUncommitted: %s, requestUrl: %s",
-	collectionid, auid, url, urlPrefix, version, includeUncommitted,
-	ServiceImplUtil.getFullRequestUrl(request));
+      Boolean includeUncommitted, Integer limit, String continuationToken) {
+    String parsedRequest = String.format("collectionid: %s, auid: %s, url: %s, "
+	+ "urlPrefix: %s, version: %s, includeUncommitted: %s, limit: %s, "
+	+ "continuationToken: %s, requestUrl: %s",
+	collectionid, auid, url, urlPrefix, version, includeUncommitted, limit,
+	continuationToken, ServiceImplUtil.getFullRequestUrl(request));
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+
+    if (limit == null || limit.intValue() < 0) {
+      String message =
+	  "Limit of requested items must be a non-negative integer; it was '"
+	      + limit + "'";
+	log.warn(message);
+	throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	    parsedRequest);
+    }
 
     try {
       boolean isLatestVersion =
@@ -590,34 +608,34 @@ public class CollectionsApiServiceImpl
       // Check that the Archival Unit exists.
       validateAuId(collectionid, auid, parsedRequest);
 
-      List<Artifact> result = new ArrayList<>();
+      Iterable<Artifact> artifactIterable = null;
+      List<Artifact> artifacts = new ArrayList<>();
 
       if (isAllUrls && isAllVersions) {
 	log.trace("All versions of all URLs");
-	repo.getArtifactsAllVersions(collectionid, auid)
-	.forEach(result::add);
+	artifactIterable = repo.getArtifactsAllVersions(collectionid, auid);
       } else if (urlPrefix != null && isAllVersions) {
 	log.trace("All versions of all URLs matching a prefix");
-	repo.getArtifactsWithPrefixAllVersions(collectionid, auid, urlPrefix)
-	.forEach(result::add);
+	artifactIterable = repo.getArtifactsWithPrefixAllVersions(collectionid,
+	    auid, urlPrefix);
       } else if (url != null && isAllVersions) {
 	log.trace("All versions of a URL");
-	repo.getArtifactsAllVersions(collectionid, auid, url)
-	.forEach(result::add);
+	artifactIterable =
+	    repo.getArtifactsAllVersions(collectionid, auid, url);
       } else if (isAllUrls && isLatestVersion) {
 	log.trace("Latest versions of all URLs");
-	repo.getArtifacts(collectionid, auid).forEach(result::add);
+	artifactIterable = repo.getArtifacts(collectionid, auid);
       } else if (urlPrefix != null && isLatestVersion) {
 	log.trace("Latest versions of all URLs matching a prefix");
-	repo.getArtifactsWithPrefix(collectionid, auid, urlPrefix)
-	.forEach(result::add);
+	artifactIterable =
+	    repo.getArtifactsWithPrefix(collectionid, auid, urlPrefix);
       } else if (url != null && isLatestVersion) {
 	log.trace("Latest version of a URL");
 	Artifact artifact = repo.getArtifact(collectionid, auid, url);
 	log.trace("artifact = {}", artifact);
 
 	if (artifact != null) {
-	  result.add(artifact);
+	  artifacts.add(artifact);
 	}
       } else if (url != null && numericVersion > 0) {
 	log.trace("Given version of a URL");
@@ -631,7 +649,7 @@ public class CollectionsApiServiceImpl
 	log.trace("artifact = {}", artifact);
 
 	if (artifact != null) {
-	  result.add(artifact);
+	  artifacts.add(artifact);
 	}
       } else {
 	String errorMessage = "The request could not be understood";
@@ -643,9 +661,44 @@ public class CollectionsApiServiceImpl
 	    errorMessage, parsedRequest);
       }
 
-      log.debug2("result.size() = {}", result.size());
+      if (artifactIterable != null) {
+	Iterator<Artifact> iterator = artifactIterable.iterator();
+	int artifactCount = 0;
 
-      return new ResponseEntity<>(result, HttpStatus.OK);
+	while (artifactCount < limit && iterator.hasNext()) {
+	  Artifact artifact = iterator.next();
+	  artifacts.add(artifact);
+	  artifactCount++;
+	}
+      }
+
+      log.debug2("artifacts.size() = {}", artifacts.size());
+
+      PageInfo pageInfo = new PageInfo();
+
+      StringBuffer curLinkBuffer = new StringBuffer(
+	  request.getRequestURL().toString()).append("?limit=").append(limit);
+
+      if (continuationToken != null) {
+	curLinkBuffer.append("&continuationToken=").append(continuationToken);
+      }
+
+      if (log.isTraceEnabled())
+	log.trace("curLink = {}", curLinkBuffer.toString());
+
+      pageInfo.setCurLink(curLinkBuffer.toString());
+      pageInfo.setResultsPerPage(limit);
+
+      String nextLink = request.getRequestURL().toString() + "?limit=" + limit;
+      log.trace("nextLink = {}", nextLink);
+
+      pageInfo.setNextLink(nextLink);
+
+      ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
+      artifactPageInfo.setArtifacts(artifacts);
+      artifactPageInfo.setPageInfo(pageInfo);
+
+      return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
@@ -774,30 +827,77 @@ public class CollectionsApiServiceImpl
   }
 
   /**
-   * GET /collections/{collectionid}/aus: Get Archival Unit IDs (AUIDs) in a
-   * collection.
+   * GET /collections/{collectionid}/aus: Get all Archival Unit IDs (AUIDs) in a
+   * collection or a pageful of the list defined by the continuation token and
+   * size.
    *
-   * @param collectionid
-   *          A String with the name of the collection containing the archival
-   *          units.
-   * @return a {@code ResponseEntity<List<String>>}.
+   * @param collectionid      A String with the name of the collection
+   *                          containing the archival units.
+   * @param limit             An Integer with the maximum number of archival
+   *                          unit identifiers to be returned.
+   * @param continuationToken A String with the continuation token of the next
+   *                          page of archival unit identifiers to be returned.
+   * @return a {@code ResponseEntity<AuidPageInfo>}.
    */
   @Override
-  public ResponseEntity<List<String>> getAus(String collectionid) {
+  public ResponseEntity<AuidPageInfo> getAus(String collectionid, Integer limit,
+      String continuationToken) {
     String parsedRequest = String.format("collectionid: %s, requestUrl: %s",
 	collectionid, ServiceImplUtil.getFullRequestUrl(request));
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
+    if (limit == null || limit.intValue() < 0) {
+      String message =
+	  "Limit of requested items must be a non-negative integer; it was '"
+	      + limit + "'";
+	log.warn(message);
+	throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	    parsedRequest);
+    }
+
     try {
       // Check that the collection exists.
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
-      List<String> result = new ArrayList<>();
-      repo.getAuIds(collectionid).forEach(result::add);
-      log.debug2("result.size() = {}", result.size());
-      return new ResponseEntity<>(result, HttpStatus.OK);
+      List<String> auids = new ArrayList<>();
+
+      Iterator<String> iterator = repo.getAuIds(collectionid).iterator();
+      int auidCount = 0;
+
+      while (auidCount < limit && iterator.hasNext()) {
+	String auid = iterator.next();
+	auids.add(auid);
+	auidCount++;
+      }
+
+      log.debug2("auids.size() = {}", auids.size());
+
+      PageInfo pageInfo = new PageInfo();
+
+      StringBuffer curLinkBuffer = new StringBuffer(
+	  request.getRequestURL().toString()).append("?limit=").append(limit);
+
+      if (continuationToken != null) {
+	curLinkBuffer.append("&continuationToken=").append(continuationToken);
+      }
+
+      if (log.isTraceEnabled())
+	log.trace("curLink = {}", curLinkBuffer.toString());
+
+      pageInfo.setCurLink(curLinkBuffer.toString());
+      pageInfo.setResultsPerPage(limit);
+
+      String nextLink = request.getRequestURL().toString() + "?limit=" + limit;
+      log.trace("nextLink = {}", nextLink);
+
+      pageInfo.setNextLink(nextLink);
+
+      AuidPageInfo auidPageInfo = new AuidPageInfo();
+      auidPageInfo.setAuids(auids);
+      auidPageInfo.setPageInfo(pageInfo);
+      return new ResponseEntity<>(auidPageInfo, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;

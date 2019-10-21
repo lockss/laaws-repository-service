@@ -211,14 +211,14 @@ paths:
       tags:
         - collections
       summary: "Get Archival Unit IDs (AUIDs) in a collection"
+      description: "Get a list of all Archival Unit identifiers in a collection\
+        \ or a pageful of the list defined by the continuation token and size"
       operationId: getAus
       responses:
         200:
-          description: "OK"
+          description: "The requested Archival Unit identifiers"
           schema:
-            type: "array"
-            items:
-              type: "string"
+            $ref: '#/definitions/auidPageInfo'
         401:
           description: "Unauthorized request"
         403:
@@ -227,25 +227,39 @@ paths:
           description: "Collection not found"
         502:
           description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the collection containing the Archival Units"
+      parameters:
+        - name: "collectionid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Identifier of the collection containing the Archival\
+            \ Units"
+        - name: "limit"
+          in: "query"
+          description: "The number of Archival Unit identifiers per page"
+          required: false
+          type: "integer"
+          default: 50
+        - name: "continuationToken"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The continuation token of the next page of Archival\
+            \ Unit identifiers to be returned"
   /collections/{collectionid}/aus/{auid}/artifacts:
     get:
       tags:
         - collections
       summary: "Get artifacts in a collection and Archival Unit"
+      description: "Get a list of all artifacts in a collection and Archival\
+        \ Unit or a pageful of the list defined by the continuation token and\
+        \ size"
       operationId: getArtifacts
       responses:
         200:
           description: "The requested artifacts"
           schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/artifact"
+            $ref: '#/definitions/artifactPageInfo'
         401:
           description: "Unauthorized request"
         403:
@@ -254,37 +268,51 @@ paths:
           description: "Collection not found"
         502:
           description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the collection containing the artifacts"
-    - name: "auid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the Archival Unit containing the artifacts"
-    - name: "url"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The URL contained by the artifacts"
-    - name: "urlPrefix"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The prefix to be matched by the artifact URLs"
-    - name: "version"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The version of the artifact"
-    - name: "includeUncommitted"
-      in: "query"
-      required: false
-      type: "boolean"
-      description: "Indication of whether uncommitted artifacts should be returned"
+      parameters:
+        - name: "collectionid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Identifier of the collection containing the artifacts"
+        - name: "auid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Identifier of the Archival Unit containing the\
+            \ artifacts"
+        - name: "url"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The URL contained by the artifacts"
+        - name: "urlPrefix"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The prefix to be matched by the artifact URLs"
+        - name: "version"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The version of the artifact"
+        - name: "includeUncommitted"
+          in: "query"
+          required: false
+          type: "boolean"
+          description: "Indication of whether uncommitted artifacts should be\
+            \ returned"
+        - name: "limit"
+          in: "query"
+          description: "The number of artifacts per page"
+          required: false
+          type: "integer"
+          default: 50
+        - name: "continuationToken"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The continuation token of the next page of artifacts to\
+            \ be returned"
   /collections/{collectionid}/aus/{auid}/size:
     get:
       tags:
@@ -513,6 +541,20 @@ paths:
           required: false
           type: string
 definitions:
+  artifactPageInfo:
+    type: "object"
+    required:
+      - "artifacts"
+      - "pageInfo"
+    properties:
+      artifacts:
+        type: "array"
+        description: "The artifacts included in the page"
+        items:
+          $ref: "#/definitions/artifact"
+      pageInfo:
+        $ref: "#/definitions/pageInfo"
+    description: "A display page of artifacts"
   artifact:
     type: "object"
     properties:
@@ -564,4 +606,32 @@ definitions:
         type: "string"
         description: "The name of the service"
     description: "The status information of the service"
+  auidPageInfo:
+    type: "object"
+    required:
+      - "auids"
+      - "pageInfo"
+    properties:
+      auids:
+        type: "array"
+        description: "The Archival Unit identifiers included in the page"
+        items:
+          type: "string"
+      pageInfo:
+        $ref: "#/definitions/pageInfo"
+    description: "A display page of Archival Unit identifiers"
+  pageInfo:
+    type: "object"
+    required:
+      - "continuationToken"
+      - "resultsPerPage"
+    properties:
+      resultsPerPage:
+        type: "integer"
+        format: "int32"
+        description: "The number of results per page"
+      continuationToken:
+        type: "string"
+        description: "The continuation token"
+    description: "The information related to pagination of content"
     
