@@ -36,17 +36,17 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.multipart.MultipartFile;
-
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,6 +54,8 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(CollectionsApiController.class)
@@ -121,6 +123,109 @@ public class TestReposApiController extends LockssTestCase5 {
         given(this.repo.getCollectionIds()).willReturn(collectionIds);
         this.controller.perform(get("/collections")).andExpect(status().isOk()).andExpect(
             content().string("[\"test1\",\"test2\"]"));
+    }
+
+    /**
+     * Tests the endpoint used to get the auids for a given collection.
+     * 
+     * @throws Exception if there are problems.
+     */
+    @Test
+    public void getAuids() throws Exception {
+      // The mapper of received content text to a page information object.
+      ObjectMapper mapper = new ObjectMapper();
+      mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
+	  false);
+
+      String collId = "collId";
+      String endpointUrl = "/collections/" + collId + "/aus";
+
+      // Perform tests against a repository service that is not ready (should
+      // expect 503).
+      given(repo.isReady()).willReturn(false);
+      assertFalse(repo.isReady());
+
+      controller.perform(get(endpointUrl))
+      .andExpect(status().isServiceUnavailable());
+
+      // Perform tests against a ready repository service.
+      given(repo.isReady()).willReturn(true);
+
+      // Set up the collection.
+      List<String> collectionIds = new ArrayList<>();
+      collectionIds.add(collId);
+      given(repo.getCollectionIds()).willReturn(collectionIds);
+
+      // Set of auids - Start empty.
+      List<String> auids = new ArrayList<>();
+
+      // The repository will return an empty set.
+      given(repo.getAuIds(collId)).willReturn(auids);
+
+      // Perform the request and get the response.
+      String content =  controller.perform(get(endpointUrl))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      AuidPageInfo api = mapper.readValue(content, AuidPageInfo.class);
+
+      // Assert that we get an empty set of auids from the controller.
+      assertEquals(0, api.getAuids().size());
+
+      // Add auids to the collection that the repository will return.
+      auids.add("test1");
+      auids.add("test2");
+
+      // Perform the request and get the response.
+      content = controller.perform(get(endpointUrl)).andExpect(status().isOk())
+	  .andReturn().getResponse().getContentAsString();
+
+      // Get the auids included in the response.
+      List<String> auidBuffer =
+	  mapper.readValue(content, AuidPageInfo.class).getAuids();
+      
+      // Assert that we get back the same set of auids.
+      assertEquals(2, auidBuffer.size());
+      assertEquals("test1", auidBuffer.get(0));
+      assertEquals("test2", auidBuffer.get(1));
+
+      // Request the first page containing just one auid.
+      content = controller.perform(get(endpointUrl + "?limit=1"))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, AuidPageInfo.class);
+
+      // Get the first auid included in the response.
+      auidBuffer = api.getAuids();
+      assertEquals(1, auidBuffer.size());
+      assertEquals("test1", auidBuffer.get(0));
+
+      // There are more auids to be returned.
+      assertTrue(api.getPageInfo().getContinuationToken() != null);
+
+      // Get the link needed to get the next page.
+      String nextLink = api.getPageInfo().getNextLink();
+      assertTrue(nextLink != null);
+
+      // Request the next page.
+      content = controller.perform(get(new URL(nextLink).getFile()))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, AuidPageInfo.class);
+
+      // Get the second auid included in the response.
+      auidBuffer = api.getAuids();
+      assertEquals(1, auidBuffer.size());
+      assertEquals("test2", auidBuffer.get(0));
+
+      // There are no more auids to be returned.
+      assertTrue(api.getPageInfo().getContinuationToken() == null);
+      assertTrue(api.getPageInfo().getNextLink() == null);
     }
 
     @Test

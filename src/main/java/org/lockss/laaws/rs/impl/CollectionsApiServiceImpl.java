@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
 import javax.jms.*;
@@ -52,6 +53,7 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.laaws.rs.model.PageInfo;
+import org.lockss.laaws.rs.util.ArtifactComparators;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
@@ -88,6 +90,13 @@ public class CollectionsApiServiceImpl
 
   private final HttpServletRequest request;
 
+  // The artifact iterators used in pagination.
+  private Map<Integer, Iterator<Artifact>> artifactIterators =
+      new ConcurrentHashMap<>();
+
+  // The archival unit identifier iterators used in pagination.
+  private Map<Integer, Iterator<String>> auidIterators =
+      new ConcurrentHashMap<>();
   /**
    * Constructor for autowiring.
    * 
@@ -522,6 +531,18 @@ public class CollectionsApiServiceImpl
 	    parsedRequest);
     }
 
+    // Parse the request continuation token.
+    ArtifactContinuationToken requestAct = null;
+
+    try {
+      requestAct = new ArtifactContinuationToken(continuationToken);
+    } catch (IllegalArgumentException iae) {
+      String message = "Invalid continuation token '" + continuationToken + "'";
+      log.warn(message, iae);
+      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	  parsedRequest);
+    }
+
     try {
       boolean isLatestVersion =
 	  version == null || version.toLowerCase().equals("latest");
@@ -661,14 +682,84 @@ public class CollectionsApiServiceImpl
 	    errorMessage, parsedRequest);
       }
 
-      if (artifactIterable != null) {
-	Iterator<Artifact> iterator = artifactIterable.iterator();
-	int artifactCount = 0;
+      ArtifactContinuationToken responseAct = null;
 
-	while (artifactCount < limit && iterator.hasNext()) {
-	  Artifact artifact = iterator.next();
-	  artifacts.add(artifact);
-	  artifactCount++;
+      // Check whether an iterator is involved in obtaining the response.
+      if (artifactIterable != null) {
+	// Yes.
+	Iterator<Artifact> iterator = null;
+
+	// Get the iterator hash code (if any) used to provide a previous page
+	// of results.
+	Integer iteratorHashCode = requestAct.getIteratorHashCode();
+
+	// Check whether this request is for the first page.
+	if (iteratorHashCode == null) {
+	  // Yes: Get the iterator pointing to first page of results.
+	  iterator = artifactIterable.iterator();
+
+	  // Populate the results for this response.
+	  populateArtifacts(iterator, limit, artifacts);
+	} else {
+	  // No: Get the iterator (if any) used to provide a previous page of
+	  // results.
+	  iterator = artifactIterators.remove(iteratorHashCode);
+
+	  // Check whether the iterator was found.
+	  if (iterator != null) {
+	    // Yes: The iterator is pointing to the current page of results:
+	    // Populate the results for this response.
+	    populateArtifacts(iterator, limit, artifacts);
+	  } else {
+	    // No: This request is not for the first page of results, but the
+	    // iterator has been lost: Get the iterator pointing to first page
+	    // of results.
+	    iterator = artifactIterable.iterator();
+
+	    // Initialize an artifact with properties from the last one already
+	    // returned in the previous page of results.
+	    Artifact lastArtifact = new Artifact();
+	    lastArtifact.setCollection(requestAct.getCollectionId());
+	    lastArtifact.setAuid(requestAct.getAuid());
+	    lastArtifact.setUri(requestAct.getUri());
+	    lastArtifact.setVersion(requestAct.getVersion());
+
+	    // Loop through the artifacts skipping those already returned
+	    // through a previous response.
+	    while (iterator.hasNext()) {
+	      Artifact artifact = iterator.next();
+
+	      // Check whether this artifact comes after the last one returned
+	      // on the previous response for this operation.
+	      if (ArtifactComparators.BY_URI_BY_DECREASING_VERSION
+		  .compare(artifact, lastArtifact) > 0) {
+		// Yes: Add this artifact to the results.
+		artifacts.add(artifact);
+
+		// Add the rest of the artifacts to the results for this
+		// response separately.
+		break;
+	      }
+	    }
+
+	    // Populate the the rest of the results for this response.
+	    populateArtifacts(iterator, limit, artifacts);
+	  }
+	}
+
+	// Check whether the iterator may be used in the future to provide more
+	// results.
+	if (iterator.hasNext()) {
+	  // Yes: Store it locally.
+	  iteratorHashCode = iterator.hashCode();
+	  artifactIterators.put(iteratorHashCode, iterator);
+
+	  // Create the response continuation token.
+	  Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
+	  responseAct = new ArtifactContinuationToken(
+	      lastArtifact.getCollection(), lastArtifact.getAuid(),
+	      lastArtifact.getUri(), lastArtifact.getVersion(),
+	      iteratorHashCode);
 	}
       }
 
@@ -689,10 +780,18 @@ public class CollectionsApiServiceImpl
       pageInfo.setCurLink(curLinkBuffer.toString());
       pageInfo.setResultsPerPage(limit);
 
-      String nextLink = request.getRequestURL().toString() + "?limit=" + limit;
-      log.trace("nextLink = {}", nextLink);
+      // Check whether there is a response continuation token.
+      if (responseAct != null) {
+	// Yes.
+	pageInfo.setContinuationToken(
+	    responseAct.toWebResponseContinuationToken());
 
-      pageInfo.setNextLink(nextLink);
+	String nextLink = request.getRequestURL().toString() + "?limit=" + limit
+	    + "&continuationToken=" + pageInfo.getContinuationToken();
+	log.trace("nextLink = {}", nextLink);
+
+	pageInfo.setNextLink(nextLink);
+      }
 
       ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
       artifactPageInfo.setArtifacts(artifacts);
@@ -857,19 +956,84 @@ public class CollectionsApiServiceImpl
 	    parsedRequest);
     }
 
+    // Parse the request continuation token.
+    AuidContinuationToken requestAct = null;
+
+    try {
+      requestAct = new AuidContinuationToken(continuationToken);
+    } catch (IllegalArgumentException iae) {
+      String message = "Invalid continuation token '" + continuationToken + "'";
+      log.warn(message, iae);
+      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	  parsedRequest);
+    }
+
     try {
       // Check that the collection exists.
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
       List<String> auids = new ArrayList<>();
+      AuidContinuationToken responseAct = null;
+      Iterator<String> iterator = null;
 
-      Iterator<String> iterator = repo.getAuIds(collectionid).iterator();
-      int auidCount = 0;
+      // Get the iterator hash code (if any) used to provide a previous page
+      // of results.
+      Integer iteratorHashCode = requestAct.getIteratorHashCode();
 
-      while (auidCount < limit && iterator.hasNext()) {
-	String auid = iterator.next();
-	auids.add(auid);
-	auidCount++;
+      // Check whether this request is for the first page.
+      if (iteratorHashCode == null) {
+	// Yes: Get the iterator pointing to first page of results.
+	iterator = repo.getAuIds(collectionid).iterator();
+
+	// Populate the results for this response.
+	populateAus(iterator, limit, auids);
+      } else {
+	// No: Get the iterator (if any) used to provide a previous page of
+	// results.
+	iterator = auidIterators.remove(iteratorHashCode);
+
+	// Check whether the iterator was found.
+	if (iterator != null) {
+	  // Yes: The iterator is pointing to the current page of results:
+	  // Populate the results for this response.
+	  populateAus(iterator, limit, auids);
+	} else {
+	  // No: This request is not for the first page of results, but the
+	  // iterator has been lost.
+	  String lastAuid = requestAct.getAuid();
+
+	  // Get the iterator pointing to first page of results.
+	  iterator = repo.getAuIds(collectionid).iterator();
+
+	  // Loop through the auids skipping those already returned through a
+	  // previous response.
+	  while (iterator.hasNext()) {
+	    String auid = iterator.next();
+
+	    // Check whether this auid comes after the last one returned on the
+	    // previous response for this operation.
+	    if (auid.compareTo(lastAuid) > 0) {
+	      // Yes: Add this auid to the results.
+	      auids.add(auid);
+	      break;
+	    }
+	  }
+
+	  // Populate the the rest of the results for this response.
+	  populateAus(iterator, limit, auids);
+	}
+      }
+
+      // Check whether the iterator may be used in the future to provide more
+      // results.
+      if (iterator.hasNext()) {
+	// Yes: Store it locally.
+	iteratorHashCode = iterator.hashCode();
+	auidIterators.put(iteratorHashCode, iterator);
+
+	// Create the response continuation token.
+	responseAct = new AuidContinuationToken(auids.get(auids.size() - 1),
+	    iteratorHashCode);
       }
 
       log.debug2("auids.size() = {}", auids.size());
@@ -889,10 +1053,18 @@ public class CollectionsApiServiceImpl
       pageInfo.setCurLink(curLinkBuffer.toString());
       pageInfo.setResultsPerPage(limit);
 
-      String nextLink = request.getRequestURL().toString() + "?limit=" + limit;
-      log.trace("nextLink = {}", nextLink);
+      // Check whether there is a response continuation token.
+      if (responseAct != null) {
+	// Yes.
+	pageInfo.setContinuationToken(
+	    responseAct.toWebResponseContinuationToken());
 
-      pageInfo.setNextLink(nextLink);
+	String nextLink = request.getRequestURL().toString() + "?limit=" + limit
+	    + "&continuationToken=" + pageInfo.getContinuationToken();
+	log.trace("nextLink = {}", nextLink);
+
+	pageInfo.setNextLink(nextLink);
+      }
 
       AuidPageInfo auidPageInfo = new AuidPageInfo();
       auidPageInfo.setAuids(auids);
@@ -1007,6 +1179,50 @@ public class CollectionsApiServiceImpl
       } catch (JMSException e) {
 	log.error("Couldn't send cache flush notification", e);
       }
+    }
+  }
+
+  /**
+   * Populates the artifacts to be included in the response.
+   * 
+   * @param iterator  An Iterator<Artifact> with the artifact source iterator.
+   * @param limit     An Integer with the maximum number of artifacts to be
+   *                  included in the response.
+   * @param artifacts A List<Artifact> with the artifacts to be included in the
+   *                  response.
+   */
+  private void populateArtifacts(Iterator<Artifact> iterator, Integer limit,
+      List<Artifact> artifacts) {
+    log.debug2("limit = {}, artifacts = {}", limit, artifacts);
+    int artifactCount = artifacts.size();
+
+    // Loop through as many artifacts that exist and are requested.
+    while (artifactCount < limit && iterator.hasNext()) {
+      // Add this artifact to the results.
+      artifacts.add(iterator.next());
+      artifactCount++;
+    }
+  }
+
+  /**
+   * Populates the auids to be included in the response.
+   * 
+   * @param iterator An Iterator<String> with the auid source iterator.
+   * @param limit    An Integer with the maximum number of auids to be included
+   *                 in the response.
+   * @param auids    A List<String> with the auids to be included in the
+   *                 response.
+   */
+  private void populateAus(Iterator<String> iterator, Integer limit,
+      List<String> auids) {
+    log.debug2("limit = {}, auids = {}", limit, auids);
+    int auidCount = auids.size();
+
+    // Loop through as many auids that exist and are requested.
+    while (auidCount < limit && iterator.hasNext()) {
+      // Add this auid to the results.
+      auids.add(iterator.next());
+      auidCount++;
     }
   }
 
