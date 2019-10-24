@@ -36,6 +36,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.impl.ArtifactContinuationToken;
+import org.lockss.laaws.rs.impl.AuidContinuationToken;
+import org.lockss.laaws.rs.model.Artifact;
+import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -174,8 +178,8 @@ public class TestReposApiController extends LockssTestCase5 {
       assertEquals(0, api.getAuids().size());
 
       // Add auids to the collection that the repository will return.
-      auids.add("test1");
-      auids.add("test2");
+      auids.add("test01");
+      auids.add("test02");
 
       // Perform the request and get the response.
       content = controller.perform(get(endpointUrl)).andExpect(status().isOk())
@@ -187,28 +191,81 @@ public class TestReposApiController extends LockssTestCase5 {
       
       // Assert that we get back the same set of auids.
       assertEquals(2, auidBuffer.size());
-      assertEquals("test1", auidBuffer.get(0));
-      assertEquals("test2", auidBuffer.get(1));
+      assertEquals("test01", auidBuffer.get(0));
+      assertEquals("test02", auidBuffer.get(1));
 
-      // Request the first page containing just one auid.
-      content = controller.perform(get(endpointUrl + "?limit=1"))
+      // There are no more auids to be returned.
+      assertNull(api.getPageInfo().getContinuationToken());
+      assertNull(api.getPageInfo().getNextLink());
+
+      // Add more auids to the collection that the repository will return.
+      auids.add("test03");
+      auids.add("test04");
+      auids.add("test05");
+      auids.add("test06");
+      auids.add("test07");
+      auids.add("test08");
+      auids.add("test09");
+      auids.add("test10");
+
+      // Request the first page containing just three auid.
+      content = controller.perform(get(endpointUrl + "?limit=3"))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
       // Convert the received content into a page information object.
       api = mapper.readValue(content, AuidPageInfo.class);
 
-      // Get the first auid included in the response.
+      // Get the first three auids included in the response.
       auidBuffer = api.getAuids();
-      assertEquals(1, auidBuffer.size());
-      assertEquals("test1", auidBuffer.get(0));
+      assertEquals(3, auidBuffer.size());
+      assertEquals("test01", auidBuffer.get(0));
+      assertEquals("test02", auidBuffer.get(1));
+      assertEquals("test03", auidBuffer.get(2));
 
       // There are more auids to be returned.
-      assertTrue(api.getPageInfo().getContinuationToken() != null);
+      String continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Get the iterator hash code.
+      Integer iteratorHashCode =
+	  new AuidContinuationToken(continuationToken).getIteratorHashCode();
+      assertNotNull(iteratorHashCode);
 
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
-      assertTrue(nextLink != null);
+      assertNotNull(nextLink);
+  
+      // Request the next page.
+      content = controller.perform(get(new URL(nextLink).getFile()))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, AuidPageInfo.class);
+
+      // Get the second group of three auids included in the response.
+      auidBuffer = api.getAuids();
+      assertEquals(3, auidBuffer.size());
+      assertEquals("test04", auidBuffer.get(0));
+      assertEquals("test05", auidBuffer.get(1));
+      assertEquals("test06", auidBuffer.get(2));
+
+      // There are more auids to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Verify that the iterator hash code is the same.
+      assertEquals(iteratorHashCode,
+	  new AuidContinuationToken(continuationToken).getIteratorHashCode());
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Remove the last digit of the next page link, resulting in the
+      // specification of a different iterator hash code.
+      nextLink = nextLink.substring(0, nextLink.length() - 1);
 
       // Request the next page.
       content = controller.perform(get(new URL(nextLink).getFile()))
@@ -218,14 +275,41 @@ public class TestReposApiController extends LockssTestCase5 {
       // Convert the received content into a page information object.
       api = mapper.readValue(content, AuidPageInfo.class);
 
-      // Get the second auid included in the response.
+      // Get the third group of three auids included in the response.
+      auidBuffer = api.getAuids();
+      assertEquals(3, auidBuffer.size());
+      assertEquals("test07", auidBuffer.get(0));
+      assertEquals("test08", auidBuffer.get(1));
+      assertEquals("test09", auidBuffer.get(2));
+
+      // There are more auids to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Verify that the iterator hash code is not the same.
+      assertNotEquals(iteratorHashCode,
+	  new AuidContinuationToken(continuationToken).getIteratorHashCode());
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Request the next page.
+      content = controller.perform(get(new URL(nextLink).getFile()))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, AuidPageInfo.class);
+
+      // Get the last auid included in the response.
       auidBuffer = api.getAuids();
       assertEquals(1, auidBuffer.size());
-      assertEquals("test2", auidBuffer.get(0));
+      assertEquals("test10", auidBuffer.get(0));
 
       // There are no more auids to be returned.
-      assertTrue(api.getPageInfo().getContinuationToken() == null);
-      assertTrue(api.getPageInfo().getNextLink() == null);
+      assertNull(api.getPageInfo().getContinuationToken());
+      assertNull(api.getPageInfo().getNextLink());
     }
 
     @Test
@@ -240,8 +324,244 @@ public class TestReposApiController extends LockssTestCase5 {
     public void reposRepositoryArtifactsArtifactidPut() throws Exception {
     }
 
+    /**
+     * Tests the endpoint used to get the artifacts for a given AU in a given
+     * collection.
+     * 
+     * @throws Exception if there are problems.
+     */
     @Test
     public void reposRepositoryArtifactsGet() throws Exception {
+      // The mapper of received content text to a page information object.
+      ObjectMapper mapper = new ObjectMapper();
+      mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
+	  false);
+
+      String collId = "collId";
+      String auId = "auId";
+      String endpointUrl =
+	  "/collections/" + collId + "/aus/" + auId + "/artifacts?version=all";
+
+      // Perform tests against a repository service that is not ready (should
+      // expect 503).
+      given(repo.isReady()).willReturn(false);
+      assertFalse(repo.isReady());
+
+      controller.perform(get(endpointUrl))
+      .andExpect(status().isServiceUnavailable());
+
+      // Perform tests against a ready repository service.
+      given(repo.isReady()).willReturn(true);
+
+      // Set up the collection.
+      List<String> collectionIds = new ArrayList<>();
+      collectionIds.add(collId);
+      given(repo.getCollectionIds()).willReturn(collectionIds);
+
+      // Set up the AU.
+      List<String> auIds = new ArrayList<>();
+      auIds.add(auId);
+      given(repo.getAuIds(collId)).willReturn(auIds);
+
+      // Set of artifacts - Start empty.
+      List<Artifact> artifacts = new ArrayList<>();
+
+      // The repository will return an empty set.
+      given(repo.getArtifactsAllVersions(collId, auId)).willReturn(artifacts);
+
+      // Perform the request and get the response.
+      String content =  controller.perform(get(endpointUrl))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      ArtifactPageInfo api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Assert that we get an empty set of artifacts from the controller.
+      assertEquals(0, api.getArtifacts().size());
+
+      // Add artifacts to the collection that the repository will return.
+      Artifact art1 = new Artifact("test01", "collId", "auId", "u1", 1, true,
+	  "surl", 1, null);
+      artifacts.add(art1);
+      Artifact art2 = new Artifact("test02", "collId", "auId", "u2", 1, true,
+	  "surl", 1, null);
+      artifacts.add(art2);
+      Artifact art3 = new Artifact("test03", "collId", "auId", "u2/b", 1, true,
+	  "surl", 1, null);
+      artifacts.add(art3);
+      Artifact art4 = new Artifact("test04", "collId", "auId", "u2,a", 1, true,
+	  "surl", 1, null);
+      artifacts.add(art4);
+      Artifact art5 = new Artifact("test05", "collId", "auId", "u3", 3, true,
+	  "surl", 1, null);
+      artifacts.add(art5);
+      Artifact art6 = new Artifact("test06", "collId", "auId", "u3", 2, true,
+	  "surl", 1, null);
+      artifacts.add(art6);
+      Artifact art7 = new Artifact("test07", "collId", "auId", "u4", 8, true,
+	  "surl", 1, null);
+      artifacts.add(art7);
+      Artifact art8 = new Artifact("test08", "collId", "auId", "u4", 4, true,
+	  "surl", 1, null);
+      artifacts.add(art8);
+      Artifact art9 = new Artifact("test09", "collId", "auId", "u3", 1, true,
+	  "surl", 1, null);
+      artifacts.add(art9);
+
+      // Perform the request and get the response.
+      content = controller.perform(get(endpointUrl)).andExpect(status().isOk())
+	  .andReturn().getResponse().getContentAsString();
+
+      // Get the artifacts included in the response.
+      List<Artifact> artifactBuffer =
+	  mapper.readValue(content, ArtifactPageInfo.class).getArtifacts();
+
+      // Assert that we get back the same set of artifacts.
+      assertEquals(9, artifactBuffer.size());
+      assertEquals(art1, artifactBuffer.get(0));
+      assertEquals(art2, artifactBuffer.get(1));
+      assertEquals(art3, artifactBuffer.get(2));
+      assertEquals(art4, artifactBuffer.get(3));
+      assertEquals(art5, artifactBuffer.get(4));
+      assertEquals(art6, artifactBuffer.get(5));
+      assertEquals(art7, artifactBuffer.get(6));
+      assertEquals(art8, artifactBuffer.get(7));
+      assertEquals(art9, artifactBuffer.get(8));
+
+      // There are no more artifacts to be returned.
+      assertNull(api.getPageInfo().getContinuationToken());
+      assertNull(api.getPageInfo().getNextLink());
+
+      // Request the first page containing just two artifacts.
+      content = controller.perform(get(endpointUrl + "&limit=2"))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the first two artifacts included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(art1, artifactBuffer.get(0));
+      assertEquals(art2, artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      String continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Get the iterator hash code.
+      Integer iteratorHashCode = new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode();
+      assertNotNull(iteratorHashCode);
+
+      // Get the link needed to get the next page.
+      String nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Request the next page.
+      content = controller.perform(get(new URL(nextLink).getFile()))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the second group of two artifacts included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(art3, artifactBuffer.get(0));
+      assertEquals(art4, artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Verify that the new iterator hash code is the same.
+      assertEquals(iteratorHashCode, new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode());
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Remove the last digit of the next page link, resulting in the
+      // specification of a different iterator hash code.
+      nextLink = nextLink.substring(0, nextLink.length() - 1);
+
+      // Request the next page.
+      content = controller.perform(get(new URL(nextLink).getFile()))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the third group of two artifacts included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(art5, artifactBuffer.get(0));
+      assertEquals(art6, artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Get the new iterator hash code.
+      Integer newIteratorHashCode = new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode();
+      assertNotNull(newIteratorHashCode);
+
+      // Verify that the new iterator hash code is not the same.
+      assertNotEquals(iteratorHashCode, newIteratorHashCode);
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+      
+      // Request the next page.
+      content = controller.perform(get(new URL(nextLink).getFile()))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the fourth group of two artifacts included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(art7, artifactBuffer.get(0));
+      assertEquals(art8, artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Verify that the new iterator hash code is the same.
+      assertEquals(newIteratorHashCode, new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode());
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Request the next page.
+      content = controller.perform(get(new URL(nextLink).getFile()))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the last artifact included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(1, artifactBuffer.size());
+      assertEquals(art9, artifactBuffer.get(0));
+
+      // There are no more artifacts to be returned.
+      assertNull(api.getPageInfo().getContinuationToken());
+      assertNull(api.getPageInfo().getNextLink());
     }
 
 

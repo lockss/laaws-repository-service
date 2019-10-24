@@ -59,7 +59,10 @@ import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.*;
+import org.lockss.util.TimerQueue;
 import org.lockss.util.jms.*;
+import org.lockss.util.time.Deadline;
+import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -68,6 +71,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Service for accessing the repository artifacts.
@@ -83,6 +87,9 @@ public class CollectionsApiServiceImpl
   private static final MediaType APPLICATION_HTTP_RESPONSE =
       MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
 
+  private static final Deadline iteratorDeadline =
+      Deadline.in(48 * TimeUtil.HOUR);
+
   @Autowired
   LockssRepository repo;
 
@@ -94,9 +101,28 @@ public class CollectionsApiServiceImpl
   private Map<Integer, Iterator<Artifact>> artifactIterators =
       new ConcurrentHashMap<>();
 
+  // Timer callback for an artifact iterator timeout.
+  private TimerQueue.Callback artifactIteratorTimeoutCallback =
+      new TimerQueue.Callback() {
+    @SuppressWarnings("unchecked")
+    public void timerExpired(Object cookie) {
+      artifactIterators.remove(((Iterator<Artifact>)cookie).hashCode());
+    }
+  };
+
   // The archival unit identifier iterators used in pagination.
   private Map<Integer, Iterator<String>> auidIterators =
       new ConcurrentHashMap<>();
+
+  // Timer callback for an auid iterator timeout.
+  private TimerQueue.Callback auidIteratorTimeoutCallback =
+      new TimerQueue.Callback() {
+    @SuppressWarnings("unchecked")
+    public void timerExpired(Object cookie) {
+      auidIterators.remove(((Iterator<String>)cookie).hashCode());
+    }
+  };
+
   /**
    * Constructor for autowiring.
    * 
@@ -698,23 +724,24 @@ public class CollectionsApiServiceImpl
 	  // Yes: Get the iterator pointing to first page of results.
 	  iterator = artifactIterable.iterator();
 
-	  // Populate the results for this response.
-	  populateArtifacts(iterator, limit, artifacts);
+	  // Set up the iterator timeout.
+          TimerQueue.schedule(iteratorDeadline, artifactIteratorTimeoutCallback,
+              iterator);
 	} else {
 	  // No: Get the iterator (if any) used to provide a previous page of
 	  // results.
 	  iterator = artifactIterators.remove(iteratorHashCode);
 
-	  // Check whether the iterator was found.
-	  if (iterator != null) {
-	    // Yes: The iterator is pointing to the current page of results:
-	    // Populate the results for this response.
-	    populateArtifacts(iterator, limit, artifacts);
-	  } else {
-	    // No: This request is not for the first page of results, but the
+	  // Check whether the iterator was not found.
+	  if (iterator == null) {
+	    // Yes: This request is not for the first page of results, but the
 	    // iterator has been lost: Get the iterator pointing to first page
 	    // of results.
 	    iterator = artifactIterable.iterator();
+
+	    // Set up the iterator timeout.
+	    TimerQueue.schedule(iteratorDeadline,
+		artifactIteratorTimeoutCallback, iterator);
 
 	    // Initialize an artifact with properties from the last one already
 	    // returned in the previous page of results.
@@ -741,11 +768,11 @@ public class CollectionsApiServiceImpl
 		break;
 	      }
 	    }
-
-	    // Populate the the rest of the results for this response.
-	    populateArtifacts(iterator, limit, artifacts);
 	  }
 	}
+
+	// Populate the the rest of the results for this response.
+	populateArtifacts(iterator, limit, artifacts);
 
 	// Check whether the iterator may be used in the future to provide more
 	// results.
@@ -766,19 +793,41 @@ public class CollectionsApiServiceImpl
       log.debug2("artifacts.size() = {}", artifacts.size());
 
       PageInfo pageInfo = new PageInfo();
+      pageInfo.setResultsPerPage(limit);
 
-      StringBuffer curLinkBuffer = new StringBuffer(
-	  request.getRequestURL().toString()).append("?limit=").append(limit);
+      // Start building the current link.
+      UriComponentsBuilder curLinkbuilder = UriComponentsBuilder
+	  .fromUriString(request.getRequestURL().toString())
+	  .queryParam("limit", limit);
 
-      if (continuationToken != null) {
-	curLinkBuffer.append("&continuationToken=").append(continuationToken);
+      if (url != null) {
+	curLinkbuilder.queryParam("url", url);
       }
 
-      if (log.isTraceEnabled())
-	log.trace("curLink = {}", curLinkBuffer.toString());
+      if (urlPrefix != null) {
+	curLinkbuilder.queryParam("urlPrefix", urlPrefix);
+      }
 
-      pageInfo.setCurLink(curLinkBuffer.toString());
-      pageInfo.setResultsPerPage(limit);
+      if (version != null) {
+	curLinkbuilder.queryParam("version", version);
+      }
+
+      if (includeUncommitted != null) {
+	curLinkbuilder.queryParam("includeUncommitted", includeUncommitted);
+      }
+
+      // The next link differs from the current link in the continuation token,
+      // at most.
+      UriComponentsBuilder nextLinkBuilder = curLinkbuilder.cloneBuilder();
+
+      if (continuationToken != null) {
+	curLinkbuilder.queryParam("continuationToken", continuationToken);
+      }
+
+      String curLink = curLinkbuilder.build().encode().toUriString();
+      if (log.isTraceEnabled()) log.trace("curLink = {}", curLink);
+
+      pageInfo.setCurLink(curLink);
 
       // Check whether there is a response continuation token.
       if (responseAct != null) {
@@ -786,8 +835,9 @@ public class CollectionsApiServiceImpl
 	pageInfo.setContinuationToken(
 	    responseAct.toWebResponseContinuationToken());
 
-	String nextLink = request.getRequestURL().toString() + "?limit=" + limit
-	    + "&continuationToken=" + pageInfo.getContinuationToken();
+	String nextLink = nextLinkBuilder
+	    .queryParam("continuationToken", pageInfo.getContinuationToken())
+	    .build().encode().toUriString();
 	log.trace("nextLink = {}", nextLink);
 
 	pageInfo.setNextLink(nextLink);
@@ -985,25 +1035,26 @@ public class CollectionsApiServiceImpl
 	// Yes: Get the iterator pointing to first page of results.
 	iterator = repo.getAuIds(collectionid).iterator();
 
-	// Populate the results for this response.
-	populateAus(iterator, limit, auids);
+	// Set up the iterator timeout.
+        TimerQueue.schedule(iteratorDeadline, auidIteratorTimeoutCallback,
+            iterator);
       } else {
 	// No: Get the iterator (if any) used to provide a previous page of
 	// results.
 	iterator = auidIterators.remove(iteratorHashCode);
 
-	// Check whether the iterator was found.
-	if (iterator != null) {
-	  // Yes: The iterator is pointing to the current page of results:
-	  // Populate the results for this response.
-	  populateAus(iterator, limit, auids);
-	} else {
-	  // No: This request is not for the first page of results, but the
+	// Check whether the iterator was not found.
+	if (iterator == null) {
+	  // Yes: This request is not for the first page of results, but the
 	  // iterator has been lost.
 	  String lastAuid = requestAct.getAuid();
 
 	  // Get the iterator pointing to first page of results.
 	  iterator = repo.getAuIds(collectionid).iterator();
+
+	  // Set up the iterator timeout.
+	  TimerQueue.schedule(iteratorDeadline, auidIteratorTimeoutCallback,
+	      iterator);
 
 	  // Loop through the auids skipping those already returned through a
 	  // previous response.
@@ -1015,14 +1066,17 @@ public class CollectionsApiServiceImpl
 	    if (auid.compareTo(lastAuid) > 0) {
 	      // Yes: Add this auid to the results.
 	      auids.add(auid);
+
+	      // Add the rest of the artifacts to the results for this response
+	      // separately.
 	      break;
 	    }
 	  }
-
-	  // Populate the the rest of the results for this response.
-	  populateAus(iterator, limit, auids);
 	}
       }
+
+      // Populate the results for this response.
+      populateAus(iterator, limit, auids);
 
       // Check whether the iterator may be used in the future to provide more
       // results.
@@ -1039,19 +1093,25 @@ public class CollectionsApiServiceImpl
       log.debug2("auids.size() = {}", auids.size());
 
       PageInfo pageInfo = new PageInfo();
+      pageInfo.setResultsPerPage(limit);
 
-      StringBuffer curLinkBuffer = new StringBuffer(
-	  request.getRequestURL().toString()).append("?limit=").append(limit);
+      // Start building the current link.
+      UriComponentsBuilder curLinkbuilder = UriComponentsBuilder
+	  .fromUriString(request.getRequestURL().toString())
+	  .queryParam("limit", limit);
+
+      // The next link differs from the current link in the continuation token,
+      // at most.
+      UriComponentsBuilder nextLinkBuilder = curLinkbuilder.cloneBuilder();
 
       if (continuationToken != null) {
-	curLinkBuffer.append("&continuationToken=").append(continuationToken);
+	curLinkbuilder.queryParam("continuationToken", continuationToken);
       }
 
-      if (log.isTraceEnabled())
-	log.trace("curLink = {}", curLinkBuffer.toString());
+      String curLink = curLinkbuilder.build().encode().toUriString();
+      if (log.isTraceEnabled()) log.trace("curLink = {}", curLink);
 
-      pageInfo.setCurLink(curLinkBuffer.toString());
-      pageInfo.setResultsPerPage(limit);
+      pageInfo.setCurLink(curLink);
 
       // Check whether there is a response continuation token.
       if (responseAct != null) {
@@ -1059,8 +1119,9 @@ public class CollectionsApiServiceImpl
 	pageInfo.setContinuationToken(
 	    responseAct.toWebResponseContinuationToken());
 
-	String nextLink = request.getRequestURL().toString() + "?limit=" + limit
-	    + "&continuationToken=" + pageInfo.getContinuationToken();
+	String nextLink = nextLinkBuilder
+	    .queryParam("continuationToken", pageInfo.getContinuationToken())
+	    .build().encode().toUriString();
 	log.trace("nextLink = {}", nextLink);
 
 	pageInfo.setNextLink(nextLink);
