@@ -41,6 +41,7 @@ import org.lockss.laaws.rs.impl.AuidContinuationToken;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
+import org.lockss.util.UrlUtil;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -50,7 +51,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.multipart.MultipartFile;
-import java.net.URL;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -141,15 +142,16 @@ public class TestReposApiController extends LockssTestCase5 {
       mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
 	  false);
 
-      String collId = "collId";
-      String endpointUrl = "/collections/" + collId + "/aus";
+      String collId = "coll/Id:ABC";
+      URI endpointUri =
+	  new URI("/collections/" + UrlUtil.encodeUrl(collId) + "/aus");
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
       given(repo.isReady()).willReturn(false);
       assertFalse(repo.isReady());
 
-      controller.perform(get(endpointUrl))
+      controller.perform(get(endpointUri))
       .andExpect(status().isServiceUnavailable());
 
       // Perform tests against a ready repository service.
@@ -167,7 +169,7 @@ public class TestReposApiController extends LockssTestCase5 {
       given(repo.getAuIds(collId)).willReturn(auids);
 
       // Perform the request and get the response.
-      String content =  controller.perform(get(endpointUrl))
+      String content =  controller.perform(get(endpointUri))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -182,7 +184,7 @@ public class TestReposApiController extends LockssTestCase5 {
       auids.add("test02");
 
       // Perform the request and get the response.
-      content = controller.perform(get(endpointUrl)).andExpect(status().isOk())
+      content = controller.perform(get(endpointUri)).andExpect(status().isOk())
 	  .andReturn().getResponse().getContentAsString();
 
       // Get the auids included in the response.
@@ -209,7 +211,9 @@ public class TestReposApiController extends LockssTestCase5 {
       auids.add("test10");
 
       // Request the first page containing just three auid.
-      content = controller.perform(get(endpointUrl + "?limit=3"))
+      endpointUri =
+	  new URI("/collections/" + UrlUtil.encodeUrl(collId) + "/aus?limit=3");
+      content = controller.perform(get(endpointUri))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -237,7 +241,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URL(nextLink).getFile()))
+      content = controller.perform(get(new URI(nextLink)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -268,7 +272,7 @@ public class TestReposApiController extends LockssTestCase5 {
       nextLink = nextLink.substring(0, nextLink.length() - 1);
 
       // Request the next page.
-      content = controller.perform(get(new URL(nextLink).getFile()))
+      content = controller.perform(get(new URI(nextLink)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -295,7 +299,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URL(nextLink).getFile()))
+      content = controller.perform(get(new URI(nextLink)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -337,17 +341,18 @@ public class TestReposApiController extends LockssTestCase5 {
       mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
 	  false);
 
-      String collId = "collId";
-      String auId = "auId";
-      String endpointUrl =
-	  "/collections/" + collId + "/aus/" + auId + "/artifacts?version=all";
+      String collId = "coll/Id:ABC";
+      String auId = "org|lockss|plugin|TestPlugin&"
+	  + "base_url~http://test.com/&journal_issn~1234-5678&volume_name~987";
+      URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
+      	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all");
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
       given(repo.isReady()).willReturn(false);
       assertFalse(repo.isReady());
 
-      controller.perform(get(endpointUrl))
+      controller.perform(get(endpointUri))
       .andExpect(status().isServiceUnavailable());
 
       // Perform tests against a ready repository service.
@@ -370,7 +375,7 @@ public class TestReposApiController extends LockssTestCase5 {
       given(repo.getArtifactsAllVersions(collId, auId)).willReturn(artifacts);
 
       // Perform the request and get the response.
-      String content =  controller.perform(get(endpointUrl))
+      String content =  controller.perform(get(endpointUri))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -381,36 +386,36 @@ public class TestReposApiController extends LockssTestCase5 {
       assertEquals(0, api.getArtifacts().size());
 
       // Add artifacts to the collection that the repository will return.
-      Artifact art1 = new Artifact("test01", "collId", "auId", "u1", 1, true,
+      Artifact art1 = new Artifact("test01", collId, auId, "http://u1", 1, true,
 	  "surl", 1, null);
       artifacts.add(art1);
-      Artifact art2 = new Artifact("test02", "collId", "auId", "u2", 1, true,
+      Artifact art2 = new Artifact("test02", collId, auId, "http://u2", 1, true,
 	  "surl", 1, null);
       artifacts.add(art2);
-      Artifact art3 = new Artifact("test03", "collId", "auId", "u2/b", 1, true,
-	  "surl", 1, null);
+      Artifact art3 = new Artifact("test03", collId, auId, "http://u2/b", 1,
+	  true, "surl", 1, null);
       artifacts.add(art3);
-      Artifact art4 = new Artifact("test04", "collId", "auId", "u2,a", 1, true,
-	  "surl", 1, null);
+      Artifact art4 = new Artifact("test04", collId, auId, "http://u2,a", 1,
+	  true, "surl", 1, null);
       artifacts.add(art4);
-      Artifact art5 = new Artifact("test05", "collId", "auId", "u3", 3, true,
+      Artifact art5 = new Artifact("test05", collId, auId, "http://u3", 3, true,
 	  "surl", 1, null);
       artifacts.add(art5);
-      Artifact art6 = new Artifact("test06", "collId", "auId", "u3", 2, true,
+      Artifact art6 = new Artifact("test06", collId, auId, "http://u3", 2, true,
 	  "surl", 1, null);
       artifacts.add(art6);
-      Artifact art7 = new Artifact("test07", "collId", "auId", "u4", 8, true,
+      Artifact art7 = new Artifact("test07", collId, auId, "http://u4", 8, true,
 	  "surl", 1, null);
       artifacts.add(art7);
-      Artifact art8 = new Artifact("test08", "collId", "auId", "u4", 4, true,
+      Artifact art8 = new Artifact("test08", collId, auId, "http://u4", 4, true,
 	  "surl", 1, null);
       artifacts.add(art8);
-      Artifact art9 = new Artifact("test09", "collId", "auId", "u3", 1, true,
+      Artifact art9 = new Artifact("test09", collId, auId, "http://u4", 1, true,
 	  "surl", 1, null);
       artifacts.add(art9);
 
       // Perform the request and get the response.
-      content = controller.perform(get(endpointUrl)).andExpect(status().isOk())
+      content = controller.perform(get(endpointUri)).andExpect(status().isOk())
 	  .andReturn().getResponse().getContentAsString();
 
       // Get the artifacts included in the response.
@@ -433,19 +438,30 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNull(api.getPageInfo().getContinuationToken());
       assertNull(api.getPageInfo().getNextLink());
 
+      // Test the pagination for all versions.
+      runAllVersionsPaginationTest(collId, auId, artifacts, mapper);
+
+      // Test the pagination for all versions with a prefix.
+      runUrlPrefixPaginationTest(collId, auId, "http://u", artifacts, mapper);
+    }
+
+    private void runAllVersionsPaginationTest(String collId, String auId,
+	List<Artifact> artifacts, ObjectMapper mapper) throws Exception {
       // Request the first page containing just two artifacts.
-      content = controller.perform(get(endpointUrl + "&limit=2"))
+      URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
+    	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=2");
+      String content = controller.perform(get(endpointUri))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
       // Convert the received content into a page information object.
-      api = mapper.readValue(content, ArtifactPageInfo.class);
+      ArtifactPageInfo api = mapper.readValue(content, ArtifactPageInfo.class);
 
       // Get the first two artifacts included in the response.
-      artifactBuffer = api.getArtifacts();
+      List<Artifact> artifactBuffer = api.getArtifacts();
       assertEquals(2, artifactBuffer.size());
-      assertEquals(art1, artifactBuffer.get(0));
-      assertEquals(art2, artifactBuffer.get(1));
+      assertEquals(artifacts.get(0), artifactBuffer.get(0));
+      assertEquals(artifacts.get(1), artifactBuffer.get(1));
 
       // There are more artifacts to be returned.
       String continuationToken = api.getPageInfo().getContinuationToken();
@@ -461,7 +477,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URL(nextLink).getFile()))
+      content = controller.perform(get(new URI(nextLink)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -471,8 +487,8 @@ public class TestReposApiController extends LockssTestCase5 {
       // Get the second group of two artifacts included in the response.
       artifactBuffer = api.getArtifacts();
       assertEquals(2, artifactBuffer.size());
-      assertEquals(art3, artifactBuffer.get(0));
-      assertEquals(art4, artifactBuffer.get(1));
+      assertEquals(artifacts.get(2), artifactBuffer.get(0));
+      assertEquals(artifacts.get(3), artifactBuffer.get(1));
 
       // There are more artifacts to be returned.
       continuationToken = api.getPageInfo().getContinuationToken();
@@ -491,7 +507,7 @@ public class TestReposApiController extends LockssTestCase5 {
       nextLink = nextLink.substring(0, nextLink.length() - 1);
 
       // Request the next page.
-      content = controller.perform(get(new URL(nextLink).getFile()))
+      content = controller.perform(get(new URI(nextLink)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -501,8 +517,8 @@ public class TestReposApiController extends LockssTestCase5 {
       // Get the third group of two artifacts included in the response.
       artifactBuffer = api.getArtifacts();
       assertEquals(2, artifactBuffer.size());
-      assertEquals(art5, artifactBuffer.get(0));
-      assertEquals(art6, artifactBuffer.get(1));
+      assertEquals(artifacts.get(4), artifactBuffer.get(0));
+      assertEquals(artifacts.get(5), artifactBuffer.get(1));
 
       // There are more artifacts to be returned.
       continuationToken = api.getPageInfo().getContinuationToken();
@@ -521,7 +537,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
       
       // Request the next page.
-      content = controller.perform(get(new URL(nextLink).getFile()))
+      content = controller.perform(get(new URI(nextLink)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -531,8 +547,8 @@ public class TestReposApiController extends LockssTestCase5 {
       // Get the fourth group of two artifacts included in the response.
       artifactBuffer = api.getArtifacts();
       assertEquals(2, artifactBuffer.size());
-      assertEquals(art7, artifactBuffer.get(0));
-      assertEquals(art8, artifactBuffer.get(1));
+      assertEquals(artifacts.get(6), artifactBuffer.get(0));
+      assertEquals(artifacts.get(7), artifactBuffer.get(1));
 
       // There are more artifacts to be returned.
       continuationToken = api.getPageInfo().getContinuationToken();
@@ -547,7 +563,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URL(nextLink).getFile()))
+      content = controller.perform(get(new URI(nextLink)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -557,13 +573,153 @@ public class TestReposApiController extends LockssTestCase5 {
       // Get the last artifact included in the response.
       artifactBuffer = api.getArtifacts();
       assertEquals(1, artifactBuffer.size());
-      assertEquals(art9, artifactBuffer.get(0));
+      assertEquals(artifacts.get(8), artifactBuffer.get(0));
 
       // There are no more artifacts to be returned.
       assertNull(api.getPageInfo().getContinuationToken());
       assertNull(api.getPageInfo().getNextLink());
     }
 
+    private void runUrlPrefixPaginationTest(String collId, String auId,
+	String urlPrefix, List<Artifact> artifacts, ObjectMapper mapper)
+	    throws Exception {
+      // The repository will return the set of artifacts with the URL prefix.
+      given(repo.getArtifactsWithPrefixAllVersions(collId, auId, urlPrefix))
+      .willReturn(artifacts);
+
+      // Request the first page containing just two artifacts by prefix.
+      URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
+    	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=2"
+    	+ "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));
+      String content = controller.perform(get(endpointUri))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      ArtifactPageInfo api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the first two artifacts included in the response.
+      List<Artifact> artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(artifacts.get(0), artifactBuffer.get(0));
+      assertEquals(artifacts.get(1), artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      String continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Get the iterator hash code.
+      Integer iteratorHashCode = new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode();
+      assertNotNull(iteratorHashCode);
+
+      // Get the link needed to get the next page.
+      String nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Request the next page.
+      content = controller.perform(get(new URI(nextLink)))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the second group of two artifacts included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(artifacts.get(2), artifactBuffer.get(0));
+      assertEquals(artifacts.get(3), artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Verify that the new iterator hash code is the same.
+      assertEquals(iteratorHashCode, new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode());
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Remove the last digit of the next page link, resulting in the
+      // specification of a different iterator hash code.
+      nextLink = nextLink.substring(0, nextLink.length() - 1);
+
+      // Request the next page.
+      content = controller.perform(get(new URI(nextLink)))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the third group of two artifacts included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(artifacts.get(4), artifactBuffer.get(0));
+      assertEquals(artifacts.get(5), artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Get the new iterator hash code.
+      Integer newIteratorHashCode = new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode();
+      assertNotNull(newIteratorHashCode);
+
+      // Verify that the new iterator hash code is not the same.
+      assertNotEquals(iteratorHashCode, newIteratorHashCode);
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+      
+      // Request the next page.
+      content = controller.perform(get(new URI(nextLink)))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the fourth group of two artifacts included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(2, artifactBuffer.size());
+      assertEquals(artifacts.get(6), artifactBuffer.get(0));
+      assertEquals(artifacts.get(7), artifactBuffer.get(1));
+
+      // There are more artifacts to be returned.
+      continuationToken = api.getPageInfo().getContinuationToken();
+      assertNotNull(continuationToken);
+
+      // Verify that the new iterator hash code is the same.
+      assertEquals(newIteratorHashCode, new ArtifactContinuationToken(
+	  continuationToken).getIteratorHashCode());
+
+      // Get the link needed to get the next page.
+      nextLink = api.getPageInfo().getNextLink();
+      assertNotNull(nextLink);
+  
+      // Request the next page.
+      content = controller.perform(get(new URI(nextLink)))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
+
+      // Convert the received content into a page information object.
+      api = mapper.readValue(content, ArtifactPageInfo.class);
+
+      // Get the last artifact included in the response.
+      artifactBuffer = api.getArtifacts();
+      assertEquals(1, artifactBuffer.size());
+      assertEquals(artifacts.get(8), artifactBuffer.get(0));
+
+      // There are no more artifacts to be returned.
+      assertNull(api.getPageInfo().getContinuationToken());
+      assertNull(api.getPageInfo().getNextLink());
+    }
 
     /**
      * Test POST-ing with WARC record

@@ -60,6 +60,7 @@ import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.*;
 import org.lockss.util.TimerQueue;
+import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.*;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
@@ -87,9 +88,6 @@ public class CollectionsApiServiceImpl
   private static final MediaType APPLICATION_HTTP_RESPONSE =
       MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
 
-  private static final Deadline iteratorDeadline =
-      Deadline.in(48 * TimeUtil.HOUR);
-
   @Autowired
   LockssRepository repo;
 
@@ -104,9 +102,8 @@ public class CollectionsApiServiceImpl
   // Timer callback for an artifact iterator timeout.
   private TimerQueue.Callback artifactIteratorTimeoutCallback =
       new TimerQueue.Callback() {
-    @SuppressWarnings("unchecked")
     public void timerExpired(Object cookie) {
-      artifactIterators.remove(((Iterator<Artifact>)cookie).hashCode());
+      artifactIterators.remove((Integer)cookie);
     }
   };
 
@@ -117,9 +114,8 @@ public class CollectionsApiServiceImpl
   // Timer callback for an auid iterator timeout.
   private TimerQueue.Callback auidIteratorTimeoutCallback =
       new TimerQueue.Callback() {
-    @SuppressWarnings("unchecked")
     public void timerExpired(Object cookie) {
-      auidIterators.remove(((Iterator<String>)cookie).hashCode());
+      auidIterators.remove((Integer)cookie);
     }
   };
 
@@ -562,9 +558,10 @@ public class CollectionsApiServiceImpl
 
     try {
       requestAct = new ArtifactContinuationToken(continuationToken);
+      log.trace("requestAct = {}", requestAct);
     } catch (IllegalArgumentException iae) {
       String message = "Invalid continuation token '" + continuationToken + "'";
-      log.warn(message, iae);
+      log.warn(message);
       throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
 	  parsedRequest);
     }
@@ -657,25 +654,49 @@ public class CollectionsApiServiceImpl
 
       Iterable<Artifact> artifactIterable = null;
       List<Artifact> artifacts = new ArrayList<>();
+      Iterator<Artifact> iterator = null;
+      boolean missingIterator = false;
+
+      // Get the iterator hash code (if any) used to provide a previous page
+      // of results.
+      Integer iteratorHashCode = requestAct.getIteratorHashCode();
+
+      // Check whether this request is for a previous page of results.
+      if (iteratorHashCode != null) {
+	// Yes: Get the iterator (if any) used to provide a previous page of
+	// results.
+	iterator = artifactIterators.remove(iteratorHashCode);
+	missingIterator = iterator == null;
+      }
 
       if (isAllUrls && isAllVersions) {
 	log.trace("All versions of all URLs");
-	artifactIterable = repo.getArtifactsAllVersions(collectionid, auid);
+	if (iterator == null) {
+	  artifactIterable = repo.getArtifactsAllVersions(collectionid, auid);
+	}
       } else if (urlPrefix != null && isAllVersions) {
 	log.trace("All versions of all URLs matching a prefix");
-	artifactIterable = repo.getArtifactsWithPrefixAllVersions(collectionid,
-	    auid, urlPrefix);
+	if (iterator == null) {
+	  artifactIterable = repo.getArtifactsWithPrefixAllVersions(
+	      collectionid, auid, urlPrefix);
+	}
       } else if (url != null && isAllVersions) {
 	log.trace("All versions of a URL");
-	artifactIterable =
-	    repo.getArtifactsAllVersions(collectionid, auid, url);
+	if (iterator == null) {
+	  artifactIterable =
+	      repo.getArtifactsAllVersions(collectionid, auid, url);
+	}
       } else if (isAllUrls && isLatestVersion) {
 	log.trace("Latest versions of all URLs");
-	artifactIterable = repo.getArtifacts(collectionid, auid);
+	if (iterator == null) {
+	  artifactIterable = repo.getArtifacts(collectionid, auid);
+	}
       } else if (urlPrefix != null && isLatestVersion) {
 	log.trace("Latest versions of all URLs matching a prefix");
-	artifactIterable =
-	    repo.getArtifactsWithPrefix(collectionid, auid, urlPrefix);
+	if (iterator == null) {
+	  artifactIterable =
+	      repo.getArtifactsWithPrefix(collectionid, auid, urlPrefix);
+	}
       } else if (url != null && isLatestVersion) {
 	log.trace("Latest version of a URL");
 	Artifact artifact = repo.getArtifact(collectionid, auid, url);
@@ -711,40 +732,21 @@ public class CollectionsApiServiceImpl
       ArtifactContinuationToken responseAct = null;
 
       // Check whether an iterator is involved in obtaining the response.
-      if (artifactIterable != null) {
-	// Yes.
-	Iterator<Artifact> iterator = null;
-
-	// Get the iterator hash code (if any) used to provide a previous page
-	// of results.
-	Integer iteratorHashCode = requestAct.getIteratorHashCode();
-
-	// Check whether this request is for the first page.
-	if (iteratorHashCode == null) {
-	  // Yes: Get the iterator pointing to first page of results.
+      if (iterator != null || artifactIterable != null) {
+	// Yes: Check whether a new iterator is needed.
+	if (iterator == null) {
+	  // Yes: Get the iterator pointing to the first page of results.
 	  iterator = artifactIterable.iterator();
 
 	  // Set up the iterator timeout.
-          TimerQueue.schedule(iteratorDeadline, artifactIteratorTimeoutCallback,
-              iterator);
-	} else {
-	  // No: Get the iterator (if any) used to provide a previous page of
-	  // results.
-	  iterator = artifactIterators.remove(iteratorHashCode);
+	  TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
+	      artifactIteratorTimeoutCallback, iterator.hashCode());
 
-	  // Check whether the iterator was not found.
-	  if (iterator == null) {
-	    // Yes: This request is not for the first page of results, but the
-	    // iterator has been lost: Get the iterator pointing to first page
-	    // of results.
-	    iterator = artifactIterable.iterator();
-
-	    // Set up the iterator timeout.
-	    TimerQueue.schedule(iteratorDeadline,
-		artifactIteratorTimeoutCallback, iterator);
-
-	    // Initialize an artifact with properties from the last one already
-	    // returned in the previous page of results.
+	  // Check whether the artifacts provided in a previous response need to
+	  // be skipped.
+	  if (missingIterator) {
+	    // Yes: Initialize an artifact with properties from the last one
+	    // already returned in the previous page of results.
 	    Artifact lastArtifact = new Artifact();
 	    lastArtifact.setCollection(requestAct.getCollectionId());
 	    lastArtifact.setAuid(requestAct.getAuid());
@@ -787,25 +789,29 @@ public class CollectionsApiServiceImpl
 	      lastArtifact.getCollection(), lastArtifact.getAuid(),
 	      lastArtifact.getUri(), lastArtifact.getVersion(),
 	      iteratorHashCode);
+	  log.trace("responseAct = {}", responseAct);
 	}
       }
 
-      log.debug2("artifacts.size() = {}", artifacts.size());
+      log.trace("artifacts.size() = {}", artifacts.size());
 
       PageInfo pageInfo = new PageInfo();
-      pageInfo.setResultsPerPage(limit);
+      pageInfo.setResultsPerPage(artifacts.size());
 
       // Start building the current link.
       UriComponentsBuilder curLinkbuilder = UriComponentsBuilder
-	  .fromUriString(request.getRequestURL().toString())
-	  .queryParam("limit", limit);
+	  .fromUriString(request.getRequestURL().toString());
+
+      if (ServiceImplUtil.getFullRequestUrl(request).indexOf("limit=") > 0) {
+	curLinkbuilder.queryParam("limit", limit);
+      }
 
       if (url != null) {
-	curLinkbuilder.queryParam("url", url);
+	curLinkbuilder.queryParam("url", UrlUtil.encodeUrl(url));
       }
 
       if (urlPrefix != null) {
-	curLinkbuilder.queryParam("urlPrefix", urlPrefix);
+	curLinkbuilder.queryParam("urlPrefix", UrlUtil.encodeUrl(urlPrefix));
       }
 
       if (version != null) {
@@ -821,11 +827,12 @@ public class CollectionsApiServiceImpl
       UriComponentsBuilder nextLinkBuilder = curLinkbuilder.cloneBuilder();
 
       if (continuationToken != null) {
-	curLinkbuilder.queryParam("continuationToken", continuationToken);
+	curLinkbuilder.queryParam("continuationToken",
+	    UrlUtil.encodeUrl(continuationToken));
       }
 
-      String curLink = curLinkbuilder.build().encode().toUriString();
-      if (log.isTraceEnabled()) log.trace("curLink = {}", curLink);
+      String curLink = curLinkbuilder.build().toUriString();
+      log.trace("curLink = {}", curLink);
 
       pageInfo.setCurLink(curLink);
 
@@ -835,9 +842,9 @@ public class CollectionsApiServiceImpl
 	pageInfo.setContinuationToken(
 	    responseAct.toWebResponseContinuationToken());
 
-	String nextLink = nextLinkBuilder
-	    .queryParam("continuationToken", pageInfo.getContinuationToken())
-	    .build().encode().toUriString();
+	String nextLink = nextLinkBuilder.queryParam("continuationToken",
+	    UrlUtil.encodeUrl(pageInfo.getContinuationToken())).build()
+	    .toUriString();
 	log.trace("nextLink = {}", nextLink);
 
 	pageInfo.setNextLink(nextLink);
@@ -846,7 +853,9 @@ public class CollectionsApiServiceImpl
       ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
       artifactPageInfo.setArtifacts(artifacts);
       artifactPageInfo.setPageInfo(pageInfo);
+      log.trace("artifactPageInfo = {}", artifactPageInfo);
 
+      log.debug2("Returning OK.");
       return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
@@ -1011,9 +1020,10 @@ public class CollectionsApiServiceImpl
 
     try {
       requestAct = new AuidContinuationToken(continuationToken);
+      log.trace("requestAct = {}", requestAct);
     } catch (IllegalArgumentException iae) {
       String message = "Invalid continuation token '" + continuationToken + "'";
-      log.warn(message, iae);
+      log.warn(message);
       throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
 	  parsedRequest);
     }
@@ -1036,8 +1046,8 @@ public class CollectionsApiServiceImpl
 	iterator = repo.getAuIds(collectionid).iterator();
 
 	// Set up the iterator timeout.
-        TimerQueue.schedule(iteratorDeadline, auidIteratorTimeoutCallback,
-            iterator);
+        TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
+            auidIteratorTimeoutCallback, iterator);
       } else {
 	// No: Get the iterator (if any) used to provide a previous page of
 	// results.
@@ -1053,8 +1063,8 @@ public class CollectionsApiServiceImpl
 	  iterator = repo.getAuIds(collectionid).iterator();
 
 	  // Set up the iterator timeout.
-	  TimerQueue.schedule(iteratorDeadline, auidIteratorTimeoutCallback,
-	      iterator);
+	  TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
+	      auidIteratorTimeoutCallback, iterator);
 
 	  // Loop through the auids skipping those already returned through a
 	  // previous response.
@@ -1088,28 +1098,33 @@ public class CollectionsApiServiceImpl
 	// Create the response continuation token.
 	responseAct = new AuidContinuationToken(auids.get(auids.size() - 1),
 	    iteratorHashCode);
+	log.trace("responseAct = {}", responseAct);
       }
 
-      log.debug2("auids.size() = {}", auids.size());
+      log.trace("auids.size() = {}", auids.size());
 
       PageInfo pageInfo = new PageInfo();
-      pageInfo.setResultsPerPage(limit);
+      pageInfo.setResultsPerPage(auids.size());
 
       // Start building the current link.
       UriComponentsBuilder curLinkbuilder = UriComponentsBuilder
-	  .fromUriString(request.getRequestURL().toString())
-	  .queryParam("limit", limit);
+	  .fromUriString(request.getRequestURL().toString());
+
+      if (ServiceImplUtil.getFullRequestUrl(request).indexOf("limit=") > 0) {
+	curLinkbuilder.queryParam("limit", limit);
+      }
 
       // The next link differs from the current link in the continuation token,
       // at most.
       UriComponentsBuilder nextLinkBuilder = curLinkbuilder.cloneBuilder();
 
       if (continuationToken != null) {
-	curLinkbuilder.queryParam("continuationToken", continuationToken);
+	curLinkbuilder.queryParam("continuationToken",
+	    UrlUtil.encodeUrl(continuationToken));
       }
 
       String curLink = curLinkbuilder.build().encode().toUriString();
-      if (log.isTraceEnabled()) log.trace("curLink = {}", curLink);
+      log.trace("curLink = {}", curLink);
 
       pageInfo.setCurLink(curLink);
 
@@ -1119,9 +1134,9 @@ public class CollectionsApiServiceImpl
 	pageInfo.setContinuationToken(
 	    responseAct.toWebResponseContinuationToken());
 
-	String nextLink = nextLinkBuilder
-	    .queryParam("continuationToken", pageInfo.getContinuationToken())
-	    .build().encode().toUriString();
+	String nextLink = nextLinkBuilder.queryParam("continuationToken",
+	    UrlUtil.encodeUrl(pageInfo.getContinuationToken())).build()
+	    .toUriString();
 	log.trace("nextLink = {}", nextLink);
 
 	pageInfo.setNextLink(nextLink);
@@ -1130,6 +1145,9 @@ public class CollectionsApiServiceImpl
       AuidPageInfo auidPageInfo = new AuidPageInfo();
       auidPageInfo.setAuids(auids);
       auidPageInfo.setPageInfo(pageInfo);
+      log.trace("auidPageInfo = {}", auidPageInfo);
+
+      log.debug2("Returning OK.");
       return new ResponseEntity<>(auidPageInfo, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
@@ -1153,6 +1171,9 @@ public class CollectionsApiServiceImpl
 
   private void validateAuId(String collectionid, String auid,
       String parsedRequest) throws IOException {
+    log.debug2("collectionid = '{}'", collectionid);
+    log.debug2("auid = '{}'", auid);
+    log.debug2("parsedRequest = '{}'", parsedRequest);
     if (!StreamSupport.stream(repo.getAuIds(collectionid).spliterator(), false)
 	.anyMatch(name -> auid.equals(name))) {
       String errorMessage = "The archival unit does not exist";
@@ -1167,6 +1188,8 @@ public class CollectionsApiServiceImpl
   }
 
   private void validateUri(String uri, String parsedRequest) {
+    log.debug2("uri = '{}'", uri);
+    log.debug2("parsedRequest = '{}'", parsedRequest);
     if (uri.isEmpty()) {
       String errorMessage = "The URI has not been provided";
       log.warn(errorMessage);
@@ -1181,6 +1204,9 @@ public class CollectionsApiServiceImpl
 
   private void validateArtifactExists(String collectionid, String artifactid, String errorMessage,
       String parsedRequest) throws IOException {
+    log.debug2("collectionid = '{}'", collectionid);
+    log.debug2("artifactid = '{}'", artifactid);
+    log.debug2("parsedRequest = '{}'", parsedRequest);
     if (!repo.artifactExists(collectionid, artifactid)) {
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);

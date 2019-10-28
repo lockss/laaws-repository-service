@@ -236,10 +236,11 @@ paths:
             \ Units"
         - name: "limit"
           in: "query"
-          description: "The number of Archival Unit identifiers per page"
+          description: "The maximum number of Archival Unit identifiers per\
+            \ response"
           required: false
           type: "integer"
-          default: 50
+          default: 10000
         - name: "continuationToken"
           in: "query"
           required: false
@@ -303,10 +304,10 @@ paths:
             \ returned"
         - name: "limit"
           in: "query"
-          description: "The number of artifacts per page"
+          description: "The maximum number of artifacts per response"
           required: false
           type: "integer"
-          default: 50
+          default: 1000
         - name: "continuationToken"
           in: "query"
           required: false
@@ -623,9 +624,16 @@ definitions:
   pageInfo:
     type: "object"
     required:
-      - "continuationToken"
+      - "totalCount"
       - "resultsPerPage"
+      - "continuationToken"
+      - "curLink"
+      - "nextLink"
     properties:
+      totalCount:
+        type: "integer"
+        format: "int32"
+        description: "The total number of results"
       resultsPerPage:
         type: "integer"
         format: "int32"
@@ -633,5 +641,11 @@ definitions:
       continuationToken:
         type: "string"
         description: "The continuation token"
+      curLink:
+        type: "string"
+        description: "The link of the current request"
+      nextLink:
+        type: "string"
+        description: "The link of the next request"
     description: "The information related to pagination of content"
     

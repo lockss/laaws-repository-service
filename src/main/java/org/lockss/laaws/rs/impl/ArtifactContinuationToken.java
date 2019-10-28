@@ -34,6 +34,7 @@ package org.lockss.laaws.rs.impl;
 import java.util.List;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.StringUtil;
+import org.lockss.util.UrlUtil;
 
 /**
  * The continuation token used to paginate through a list of artifacts.
@@ -42,7 +43,7 @@ import org.lockss.util.StringUtil;
  */
 public class ArtifactContinuationToken {
   private final static L4JLogger log = L4JLogger.getLogger();
-  private static final String separator = "ART-CONT-TOKEN-SEP";
+  private static final String separator = ":";
 
   private String collectionId = null;
   private String auid = null;
@@ -76,13 +77,13 @@ public class ArtifactContinuationToken {
 	    StringUtil.breakAt(webRequestContinuationToken.trim(), separator);
 	log.trace("tokenItems = {}", tokenItems);
 
-	collectionId = tokenItems.get(0).trim();
+	collectionId = UrlUtil.decodeUrl(tokenItems.get(0).trim());
 	log.trace("collectionId = {}", collectionId);
 
-	auid = tokenItems.get(1).trim();
+	auid = UrlUtil.decodeUrl(tokenItems.get(1).trim());
 	log.trace("auid = {}", auid);
 
-	uri = tokenItems.get(2).trim();
+	uri = UrlUtil.decodeUrl(tokenItems.get(2).trim());
 	log.trace("uri = {}", uri);
 
 	version = Integer.valueOf(tokenItems.get(3).trim());
@@ -185,8 +186,11 @@ public class ArtifactContinuationToken {
   public String toWebResponseContinuationToken() {
     if (collectionId != null && auid != null && uri != null && version != null
 	&& iteratorHashCode != null) {
-      return collectionId + separator + auid + separator + uri + separator
-	  + version + separator + iteratorHashCode;
+      String encodedToken = UrlUtil.encodeUrl(collectionId) + separator
+	  + UrlUtil.encodeUrl(auid) + separator + UrlUtil.encodeUrl(uri)
+	  + separator + version + separator + iteratorHashCode;
+      log.trace("encodedToken = {}", encodedToken);
+      return encodedToken;
     }
 
     return null;

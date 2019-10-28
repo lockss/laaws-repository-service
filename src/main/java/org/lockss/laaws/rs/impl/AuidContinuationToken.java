@@ -34,6 +34,7 @@ package org.lockss.laaws.rs.impl;
 import java.util.List;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.StringUtil;
+import org.lockss.util.UrlUtil;
 
 /**
  * The continuation token used to paginate through a list of archival unit
@@ -43,7 +44,7 @@ import org.lockss.util.StringUtil;
  */
 public class AuidContinuationToken {
   private final static L4JLogger log = L4JLogger.getLogger();
-  private static final String separator = "AUID-CONT-TOKEN-SEP";
+  private static final String separator = ":";
 
   private String auid = null;
   private Integer iteratorHashCode = null;
@@ -74,7 +75,7 @@ public class AuidContinuationToken {
 	    StringUtil.breakAt(webRequestContinuationToken.trim(), separator);
 	log.trace("tokenItems = {}", tokenItems);
 
-	auid = tokenItems.get(0).trim();
+	auid = UrlUtil.decodeUrl(tokenItems.get(0).trim());
 	log.trace("auid = {}", auid);
 
 	iteratorHashCode = Integer.valueOf(tokenItems.get(1).trim());
@@ -135,7 +136,10 @@ public class AuidContinuationToken {
    */
   public String toWebResponseContinuationToken() {
     if (auid != null && iteratorHashCode != null) {
-      return auid + separator + iteratorHashCode;
+      String encodedToken =
+	  UrlUtil.encodeUrl(auid) + separator + iteratorHashCode;
+      log.trace("encodedToken = {}", encodedToken);
+      return encodedToken;
     }
 
     return null;
