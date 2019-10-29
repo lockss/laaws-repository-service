@@ -40,6 +40,7 @@ import java.util.stream.*;
 
 import org.apache.commons.collections4.*;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.*;
 import org.apache.commons.logging.*;
 import org.apache.http.*;
@@ -89,6 +90,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   protected static String URL1 = "http://host1.com/path";
   protected static String URL2 = "http://host2.com/fil,1";
   protected static String URL3 = "http://host2.com/fil/2";
+  protected static String LONG_URL_4000 = "http://host2.com" +
+    StringUtils.repeat("/123456789", 400) + "/foo.txt";
+  protected static String LONG_URL_40000 = "http://host2.com" +
+    StringUtils.repeat("/123456789", 4000) + "/foo.txt";
   protected static String PREFIX1 = "http://host2.com/";
 
   protected static String CONTENT1 = "content string 1";
@@ -214,6 +219,27 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
     spec.assertArtifact(repository, commArt);
+  }
+
+  @Test
+  public void testAddLongUrl() throws IOException {
+    ArtifactSpec spec1 =
+      new ArtifactSpec()
+      .setUrl(LONG_URL_4000)
+      .setContent(CONTENT1)
+      .setCollectionDate(0);
+    Artifact newArt1 = addUncommitted(spec1);
+    Artifact commArt1 = commit(spec1, newArt1);
+    spec1.assertArtifact(repository, commArt1);
+
+    ArtifactSpec spec2 =
+      new ArtifactSpec()
+      .setUrl(LONG_URL_40000)
+      .setContent(StringUtils.repeat(CONTENT1, 1000))
+      .setCollectionDate(0);
+    Artifact newArt2 = addUncommitted(spec2);
+    Artifact commArt2 = commit(spec2, newArt2);
+    spec2.assertArtifact(repository, commArt2);
   }
 
   @Test
