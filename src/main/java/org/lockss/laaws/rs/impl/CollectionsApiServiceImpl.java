@@ -798,40 +798,15 @@ public class CollectionsApiServiceImpl
       PageInfo pageInfo = new PageInfo();
       pageInfo.setResultsPerPage(artifacts.size());
 
-      // Start building the current link.
-      UriComponentsBuilder curLinkbuilder = UriComponentsBuilder
-	  .fromUriString(request.getRequestURL().toString());
-
-      if (ServiceImplUtil.getFullRequestUrl(request).indexOf("limit=") > 0) {
-	curLinkbuilder.queryParam("limit", limit);
+      // Get the current link.
+      StringBuffer curLinkBuffer = request.getRequestURL();
+      
+      if (request.getQueryString() != null
+	  && !request.getQueryString().trim().isEmpty()) {
+	curLinkBuffer.append("?").append(request.getQueryString());
       }
 
-      if (url != null) {
-	curLinkbuilder.queryParam("url", UrlUtil.encodeUrl(url));
-      }
-
-      if (urlPrefix != null) {
-	curLinkbuilder.queryParam("urlPrefix", UrlUtil.encodeUrl(urlPrefix));
-      }
-
-      if (version != null) {
-	curLinkbuilder.queryParam("version", version);
-      }
-
-      if (includeUncommitted != null) {
-	curLinkbuilder.queryParam("includeUncommitted", includeUncommitted);
-      }
-
-      // The next link differs from the current link in the continuation token,
-      // at most.
-      UriComponentsBuilder nextLinkBuilder = curLinkbuilder.cloneBuilder();
-
-      if (continuationToken != null) {
-	curLinkbuilder.queryParam("continuationToken",
-	    UrlUtil.encodeUrl(continuationToken));
-      }
-
-      String curLink = curLinkbuilder.build().toUriString();
+      String curLink = curLinkBuffer.toString();
       log.trace("curLink = {}", curLink);
 
       pageInfo.setCurLink(curLink);
@@ -839,12 +814,79 @@ public class CollectionsApiServiceImpl
       // Check whether there is a response continuation token.
       if (responseAct != null) {
 	// Yes.
-	pageInfo.setContinuationToken(
-	    responseAct.toWebResponseContinuationToken());
+	continuationToken = responseAct.toWebResponseContinuationToken();
+	pageInfo.setContinuationToken(continuationToken);
 
-	String nextLink = nextLinkBuilder.queryParam("continuationToken",
-	    UrlUtil.encodeUrl(pageInfo.getContinuationToken())).build()
-	    .toUriString();
+	// Start building the next link.
+	StringBuffer nextLinkBuffer = request.getRequestURL();
+	boolean hasQueryParameters = false;
+
+	if (curLink.indexOf("limit=") > 0) {
+	  nextLinkBuffer.append("?limit=").append(limit);
+	  hasQueryParameters = true;
+	}
+
+	if (url != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("url=").append(UrlUtil.encodeUrl(url));
+	}
+
+	if (urlPrefix != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("urlPrefix=")
+	  .append(UrlUtil.encodeUrl(urlPrefix));
+	}
+
+	if (version != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("version=").append(version);
+	}
+
+	if (includeUncommitted != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("includeUncommitted=")
+	  .append(includeUncommitted);
+	}
+
+	continuationToken = pageInfo.getContinuationToken();
+
+	if (continuationToken != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("continuationToken=")
+	  .append(UrlUtil.encodeUrl(continuationToken));
+	}
+
+	String nextLink = nextLinkBuffer.toString();
 	log.trace("nextLink = {}", nextLink);
 
 	pageInfo.setNextLink(nextLink);
@@ -1106,24 +1148,15 @@ public class CollectionsApiServiceImpl
       PageInfo pageInfo = new PageInfo();
       pageInfo.setResultsPerPage(auids.size());
 
-      // Start building the current link.
-      UriComponentsBuilder curLinkbuilder = UriComponentsBuilder
-	  .fromUriString(request.getRequestURL().toString());
-
-      if (ServiceImplUtil.getFullRequestUrl(request).indexOf("limit=") > 0) {
-	curLinkbuilder.queryParam("limit", limit);
+      // Get the current link.
+      StringBuffer curLinkBuffer = request.getRequestURL();
+      
+      if (request.getQueryString() != null
+	  && !request.getQueryString().trim().isEmpty()) {
+	curLinkBuffer.append("?").append(request.getQueryString());
       }
 
-      // The next link differs from the current link in the continuation token,
-      // at most.
-      UriComponentsBuilder nextLinkBuilder = curLinkbuilder.cloneBuilder();
-
-      if (continuationToken != null) {
-	curLinkbuilder.queryParam("continuationToken",
-	    UrlUtil.encodeUrl(continuationToken));
-      }
-
-      String curLink = curLinkbuilder.build().encode().toUriString();
+      String curLink = curLinkBuffer.toString();
       log.trace("curLink = {}", curLink);
 
       pageInfo.setCurLink(curLink);
@@ -1131,12 +1164,31 @@ public class CollectionsApiServiceImpl
       // Check whether there is a response continuation token.
       if (responseAct != null) {
 	// Yes.
-	pageInfo.setContinuationToken(
-	    responseAct.toWebResponseContinuationToken());
+	continuationToken = responseAct.toWebResponseContinuationToken();
+	pageInfo.setContinuationToken(continuationToken);
 
-	String nextLink = nextLinkBuilder.queryParam("continuationToken",
-	    UrlUtil.encodeUrl(pageInfo.getContinuationToken())).build()
-	    .toUriString();
+	// Start building the next link.
+	StringBuffer nextLinkBuffer = request.getRequestURL();
+	boolean hasQueryParameters = false;
+
+	if (curLink.indexOf("limit=") > 0) {
+	  nextLinkBuffer.append("?limit=").append(limit);
+	  hasQueryParameters = true;
+	}
+
+	if (continuationToken != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("continuationToken=")
+	  .append(UrlUtil.encodeUrl(continuationToken));
+	}
+
+	String nextLink = nextLinkBuffer.toString();
 	log.trace("nextLink = {}", nextLink);
 
 	pageInfo.setNextLink(nextLink);

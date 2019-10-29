@@ -193,7 +193,9 @@ public class ArtifactContinuationToken {
       return encodedToken;
     }
 
-    return null;
+    String message = "Cannot get web request continuation token from " + this;
+    log.warn(message);
+    throw new IllegalArgumentException(message);
   }
 
   @Override
