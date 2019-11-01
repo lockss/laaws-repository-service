@@ -36,7 +36,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
 import javax.jms.*;
@@ -48,13 +50,22 @@ import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
+import org.lockss.laaws.rs.model.ArtifactPageInfo;
+import org.lockss.laaws.rs.model.AuidPageInfo;
+import org.lockss.laaws.rs.model.PageInfo;
+import org.lockss.laaws.rs.util.ArtifactComparators;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.*;
+import org.lockss.util.TimerQueue;
+import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.*;
+import org.lockss.util.time.Deadline;
+import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -77,12 +88,73 @@ public class CollectionsApiServiceImpl
   private static final MediaType APPLICATION_HTTP_RESPONSE =
       MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
 
+  // Constants for the configuartion of response pagination sizes.
+  private static final String ARTIFACT_PAGESIZE_DEFAULT_KEY =
+      "repo.artifact.pagesize.default";
+  private static final String ARTIFACT_PAGESIZE_DEFAULT_UNSET_VALUE = "1000";
+  private static final String ARTIFACT_PAGESIZE_MAX_KEY =
+      "repo.artifact.pagesize.max";
+  private static final String ARTIFACT_PAGESIZE_MAX_UNSET_VALUE = "2000";
+  private static final String AUID_PAGESIZE_DEFAULT_KEY =
+      "repo.auid.pagesize.default";
+  private static final String AUID_PAGESIZE_DEFAULT_UNSET_VALUE = "10000";
+  private static final String AUID_PAGESIZE_MAX_KEY = "repo.auid.pagesize.max";
+  private static final String AUID_PAGESIZE_MAX_UNSET_VALUE = "20000";
+
   @Autowired
   LockssRepository repo;
 
   private final ObjectMapper objectMapper;
 
   private final HttpServletRequest request;
+
+  // The artifact iterators used in pagination.
+  private Map<Integer, Iterator<Artifact>> artifactIterators =
+      new ConcurrentHashMap<>();
+
+  // Timer callback for an artifact iterator timeout.
+  private TimerQueue.Callback artifactIteratorTimeoutCallback =
+      new TimerQueue.Callback() {
+    public void timerExpired(Object cookie) {
+      artifactIterators.remove((Integer)cookie);
+    }
+  };
+
+  // The archival unit identifier iterators used in pagination.
+  private Map<Integer, Iterator<String>> auidIterators =
+      new ConcurrentHashMap<>();
+
+  // Timer callback for an auid iterator timeout.
+  private TimerQueue.Callback auidIteratorTimeoutCallback =
+      new TimerQueue.Callback() {
+    public void timerExpired(Object cookie) {
+      auidIterators.remove((Integer)cookie);
+    }
+  };
+
+  // The default artifact response pagination size.
+  @Value("${" + ARTIFACT_PAGESIZE_DEFAULT_KEY + ":"
+      + ARTIFACT_PAGESIZE_DEFAULT_UNSET_VALUE + "}")
+  private String configDefaultArtifactPageSize;
+  private int defaultArtifactPageSize;
+
+  // The maximum artifact response pagination size.
+  @Value("${" + ARTIFACT_PAGESIZE_MAX_KEY + ":"
+      + ARTIFACT_PAGESIZE_MAX_UNSET_VALUE + "}")
+  private String configMaxArtifactPageSize;
+  private int maxArtifactPageSize;
+
+  // The default auid response pagination size.
+  @Value("${" + AUID_PAGESIZE_DEFAULT_KEY + ":"
+      + AUID_PAGESIZE_DEFAULT_UNSET_VALUE + "}")
+  private String configDefaultAuidPageSize;
+  private int defaultAuidPageSize;
+
+  // The maximum auid response pagination size.
+  @Value("${" + AUID_PAGESIZE_MAX_KEY + ":"
+      + AUID_PAGESIZE_MAX_UNSET_VALUE + "}")
+  private String configMaxAuidPageSize;
+  private int maxAuidPageSize;
 
   /**
    * Constructor for autowiring.
@@ -105,6 +177,51 @@ public class CollectionsApiServiceImpl
 	     RestLockssRepository.REST_ARTIFACT_CACHE_ID,
 	     RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC,
 	     new CacheInvalidateListener());
+
+    parseConfiguredPageSizes();
+  }
+
+  /**
+   * Parses the configured values for pagination sizes.
+   */
+  private void parseConfiguredPageSizes() {
+    defaultArtifactPageSize =
+	parseConfiguredPageSize(configDefaultArtifactPageSize);
+
+    maxArtifactPageSize = parseConfiguredPageSize(configMaxArtifactPageSize);
+    defaultAuidPageSize = parseConfiguredPageSize(configDefaultAuidPageSize);
+    maxAuidPageSize = parseConfiguredPageSize(configMaxAuidPageSize);
+  }
+
+  /**
+   * Parses the configured value for one pagination size.
+   * 
+   * @param configPageSize A String with the value obtained from the Spring
+   *                       configuration.
+   * @return an int with the configured value.
+   */
+  static int parseConfiguredPageSize(String configPageSize) {
+    log.debug2("configPageSize = {}", configPageSize);
+
+    int result = -1;
+
+    try {
+      result = Integer.parseUnsignedInt(configPageSize);
+    } catch (NumberFormatException nfe) {
+      // Do nothing.
+    }
+
+    // Check whether the parsed value is not a positive integer.
+    if (result < 1) {
+      // Yes: Report the problem.
+      String message = "Page size must be a positive integer; it was '"
+	  + configPageSize + "'";
+      log.warn(message);
+      throw new RuntimeException(message);
+    }
+
+    log.debug2("result = {}", result);
+    return result;
   }
 
   /** When JMS connection is established, tell clients to flush their
@@ -474,35 +591,57 @@ public class CollectionsApiServiceImpl
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/artifacts:
-   * Get artifacts in a collection and Archival Unit.
+   * GET /collections/{collectionid}/aus/{auid}/artifacts: Get a list with all
+   * the artifacts in a collection and Archival Unit or a pageful of the list
+   * defined by the continuation token and size.
    *
-   * @param collectionid
-   *          A String with the name of the collection containing the artifact.
-   * @param auid
-   *          A String with the Archival Unit ID (AUID) of artifact.
-   * @param url
-   *          A String with the URL contained by the artifacts.
-   * @param urlPrefix
-   *          A String with the prefix to be matched by the artifact URLs.
-   * @param version
-   *          An Integer with the version of the URL contained by the artifacts.
-   * @param includeUncommitted
-   *          A boolean with the indication of whether uncommitted artifacts
-   *          should be returned.
-   * @return a {@code ResponseEntity<List<Artifact>>}.
+   * @param collectionid       A String with the name of the collection
+   *                           containing the artifact.
+   * @param auid               A String with the Archival Unit ID (AUID) of
+   *                           artifact.
+   * @param url                A String with the URL contained by the artifacts.
+   * @param urlPrefix          A String with the prefix to be matched by the
+   *                           artifact URLs.
+   * @param version            An Integer with the version of the URL contained
+   *                           by the artifacts.
+   * @param includeUncommitted A boolean with the indication of whether
+   *                           uncommitted artifacts should be returned.
+   * @param limit              An Integer with the maximum number of artifacts
+   *                           to be returned.
+   * @param continuationToken  A String with the continuation token of the next
+   *                           page of artifacts to be returned.
+   * @return a {@code ResponseEntity<ArtifactPageInfo>} with the requested
+   *         artifacts.
    */
   @Override
-  public ResponseEntity<List<Artifact>> getArtifacts(String collectionid,
+  public ResponseEntity<ArtifactPageInfo> getArtifacts(String collectionid,
       String auid, String url, String urlPrefix, String version,
-      Boolean includeUncommitted) {
-    String parsedRequest = String.format(
-	"collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, includeUncommitted: %s, requestUrl: %s",
-	collectionid, auid, url, urlPrefix, version, includeUncommitted,
-	ServiceImplUtil.getFullRequestUrl(request));
+      Boolean includeUncommitted, Integer limit, String continuationToken) {
+    String parsedRequest = String.format("collectionid: %s, auid: %s, url: %s, "
+	+ "urlPrefix: %s, version: %s, includeUncommitted: %s, limit: %s, "
+	+ "continuationToken: %s, requestUrl: %s",
+	collectionid, auid, url, urlPrefix, version, includeUncommitted, limit,
+	continuationToken, ServiceImplUtil.getFullRequestUrl(request));
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+
+    Integer requestLimit = limit;
+    limit = validateLimit(requestLimit, defaultArtifactPageSize,
+	maxArtifactPageSize, parsedRequest);
+
+    // Parse the request continuation token.
+    ArtifactContinuationToken requestAct = null;
+
+    try {
+      requestAct = new ArtifactContinuationToken(continuationToken);
+      log.trace("requestAct = {}", requestAct);
+    } catch (IllegalArgumentException iae) {
+      String message = "Invalid continuation token '" + continuationToken + "'";
+      log.warn(message);
+      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	  parsedRequest);
+    }
 
     try {
       boolean isLatestVersion =
@@ -590,34 +729,58 @@ public class CollectionsApiServiceImpl
       // Check that the Archival Unit exists.
       validateAuId(collectionid, auid, parsedRequest);
 
-      List<Artifact> result = new ArrayList<>();
+      Iterable<Artifact> artifactIterable = null;
+      List<Artifact> artifacts = new ArrayList<>();
+      Iterator<Artifact> iterator = null;
+      boolean missingIterator = false;
+
+      // Get the iterator hash code (if any) used to provide a previous page
+      // of results.
+      Integer iteratorHashCode = requestAct.getIteratorHashCode();
+
+      // Check whether this request is for a previous page of results.
+      if (iteratorHashCode != null) {
+	// Yes: Get the iterator (if any) used to provide a previous page of
+	// results.
+	iterator = artifactIterators.remove(iteratorHashCode);
+	missingIterator = iterator == null;
+      }
 
       if (isAllUrls && isAllVersions) {
 	log.trace("All versions of all URLs");
-	repo.getArtifactsAllVersions(collectionid, auid)
-	.forEach(result::add);
+	if (iterator == null) {
+	  artifactIterable = repo.getArtifactsAllVersions(collectionid, auid);
+	}
       } else if (urlPrefix != null && isAllVersions) {
 	log.trace("All versions of all URLs matching a prefix");
-	repo.getArtifactsWithPrefixAllVersions(collectionid, auid, urlPrefix)
-	.forEach(result::add);
+	if (iterator == null) {
+	  artifactIterable = repo.getArtifactsWithPrefixAllVersions(
+	      collectionid, auid, urlPrefix);
+	}
       } else if (url != null && isAllVersions) {
 	log.trace("All versions of a URL");
-	repo.getArtifactsAllVersions(collectionid, auid, url)
-	.forEach(result::add);
+	if (iterator == null) {
+	  artifactIterable =
+	      repo.getArtifactsAllVersions(collectionid, auid, url);
+	}
       } else if (isAllUrls && isLatestVersion) {
 	log.trace("Latest versions of all URLs");
-	repo.getArtifacts(collectionid, auid).forEach(result::add);
+	if (iterator == null) {
+	  artifactIterable = repo.getArtifacts(collectionid, auid);
+	}
       } else if (urlPrefix != null && isLatestVersion) {
 	log.trace("Latest versions of all URLs matching a prefix");
-	repo.getArtifactsWithPrefix(collectionid, auid, urlPrefix)
-	.forEach(result::add);
+	if (iterator == null) {
+	  artifactIterable =
+	      repo.getArtifactsWithPrefix(collectionid, auid, urlPrefix);
+	}
       } else if (url != null && isLatestVersion) {
 	log.trace("Latest version of a URL");
 	Artifact artifact = repo.getArtifact(collectionid, auid, url);
 	log.trace("artifact = {}", artifact);
 
 	if (artifact != null) {
-	  result.add(artifact);
+	  artifacts.add(artifact);
 	}
       } else if (url != null && numericVersion > 0) {
 	log.trace("Given version of a URL");
@@ -631,7 +794,7 @@ public class CollectionsApiServiceImpl
 	log.trace("artifact = {}", artifact);
 
 	if (artifact != null) {
-	  result.add(artifact);
+	  artifacts.add(artifact);
 	}
       } else {
 	String errorMessage = "The request could not be understood";
@@ -643,9 +806,176 @@ public class CollectionsApiServiceImpl
 	    errorMessage, parsedRequest);
       }
 
-      log.debug2("result.size() = {}", result.size());
+      ArtifactContinuationToken responseAct = null;
 
-      return new ResponseEntity<>(result, HttpStatus.OK);
+      // Check whether an iterator is involved in obtaining the response.
+      if (iterator != null || artifactIterable != null) {
+	// Yes: Check whether a new iterator is needed.
+	if (iterator == null) {
+	  // Yes: Get the iterator pointing to the first page of results.
+	  iterator = artifactIterable.iterator();
+
+	  // Set up the iterator timeout.
+	  TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
+	      artifactIteratorTimeoutCallback, iterator.hashCode());
+
+	  // Check whether the artifacts provided in a previous response need to
+	  // be skipped.
+	  if (missingIterator) {
+	    // Yes: Initialize an artifact with properties from the last one
+	    // already returned in the previous page of results.
+	    Artifact lastArtifact = new Artifact();
+	    lastArtifact.setCollection(requestAct.getCollectionId());
+	    lastArtifact.setAuid(requestAct.getAuid());
+	    lastArtifact.setUri(requestAct.getUri());
+	    lastArtifact.setVersion(requestAct.getVersion());
+
+	    // Loop through the artifacts skipping those already returned
+	    // through a previous response.
+	    while (iterator.hasNext()) {
+	      Artifact artifact = iterator.next();
+
+	      // Check whether this artifact comes after the last one returned
+	      // on the previous response for this operation.
+	      if (ArtifactComparators.BY_URI_BY_DECREASING_VERSION
+		  .compare(artifact, lastArtifact) > 0) {
+		// Yes: Add this artifact to the results.
+		artifacts.add(artifact);
+
+		// Add the rest of the artifacts to the results for this
+		// response separately.
+		break;
+	      }
+	    }
+	  }
+	}
+
+	// Populate the the rest of the results for this response.
+	populateArtifacts(iterator, limit, artifacts);
+
+	// Check whether the iterator may be used in the future to provide more
+	// results.
+	if (iterator.hasNext()) {
+	  // Yes: Store it locally.
+	  iteratorHashCode = iterator.hashCode();
+	  artifactIterators.put(iteratorHashCode, iterator);
+
+	  // Create the response continuation token.
+	  Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
+	  responseAct = new ArtifactContinuationToken(
+	      lastArtifact.getCollection(), lastArtifact.getAuid(),
+	      lastArtifact.getUri(), lastArtifact.getVersion(),
+	      iteratorHashCode);
+	  log.trace("responseAct = {}", responseAct);
+	}
+      }
+
+      log.trace("artifacts.size() = {}", artifacts.size());
+
+      PageInfo pageInfo = new PageInfo();
+      pageInfo.setResultsPerPage(artifacts.size());
+
+      // Get the current link.
+      StringBuffer curLinkBuffer = request.getRequestURL();
+      
+      if (request.getQueryString() != null
+	  && !request.getQueryString().trim().isEmpty()) {
+	curLinkBuffer.append("?").append(request.getQueryString());
+      }
+
+      String curLink = curLinkBuffer.toString();
+      log.trace("curLink = {}", curLink);
+
+      pageInfo.setCurLink(curLink);
+
+      // Check whether there is a response continuation token.
+      if (responseAct != null) {
+	// Yes.
+	continuationToken = responseAct.toWebResponseContinuationToken();
+	pageInfo.setContinuationToken(continuationToken);
+
+	// Start building the next link.
+	StringBuffer nextLinkBuffer = request.getRequestURL();
+	boolean hasQueryParameters = false;
+
+	if (curLink.indexOf("limit=") > 0) {
+	  nextLinkBuffer.append("?limit=").append(requestLimit);
+	  hasQueryParameters = true;
+	}
+
+	if (url != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("url=").append(UrlUtil.encodeUrl(url));
+	}
+
+	if (urlPrefix != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("urlPrefix=")
+	  .append(UrlUtil.encodeUrl(urlPrefix));
+	}
+
+	if (version != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("version=").append(version);
+	}
+
+	if (includeUncommitted != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("includeUncommitted=")
+	  .append(includeUncommitted);
+	}
+
+	continuationToken = pageInfo.getContinuationToken();
+
+	if (continuationToken != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("continuationToken=")
+	  .append(UrlUtil.encodeUrl(continuationToken));
+	}
+
+	String nextLink = nextLinkBuffer.toString();
+	log.trace("nextLink = {}", nextLink);
+
+	pageInfo.setNextLink(nextLink);
+      }
+
+      ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
+      artifactPageInfo.setArtifacts(artifacts);
+      artifactPageInfo.setPageInfo(pageInfo);
+      log.trace("artifactPageInfo = {}", artifactPageInfo);
+
+      log.debug2("Returning OK.");
+      return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
@@ -774,30 +1104,175 @@ public class CollectionsApiServiceImpl
   }
 
   /**
-   * GET /collections/{collectionid}/aus: Get Archival Unit IDs (AUIDs) in a
-   * collection.
+   * GET /collections/{collectionid}/aus: Get all Archival Unit IDs (AUIDs) in a
+   * collection or a pageful of the list defined by the continuation token and
+   * size.
    *
-   * @param collectionid
-   *          A String with the name of the collection containing the archival
-   *          units.
-   * @return a {@code ResponseEntity<List<String>>}.
+   * @param collectionid      A String with the name of the collection
+   *                          containing the archival units.
+   * @param limit             An Integer with the maximum number of archival
+   *                          unit identifiers to be returned.
+   * @param continuationToken A String with the continuation token of the next
+   *                          page of archival unit identifiers to be returned.
+   * @return a {@code ResponseEntity<AuidPageInfo>}.
    */
   @Override
-  public ResponseEntity<List<String>> getAus(String collectionid) {
+  public ResponseEntity<AuidPageInfo> getAus(String collectionid, Integer limit,
+      String continuationToken) {
     String parsedRequest = String.format("collectionid: %s, requestUrl: %s",
 	collectionid, ServiceImplUtil.getFullRequestUrl(request));
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
+    Integer requestLimit = limit;
+    limit = validateLimit(requestLimit, defaultAuidPageSize, maxAuidPageSize,
+	parsedRequest);
+
+    // Parse the request continuation token.
+    AuidContinuationToken requestAct = null;
+
+    try {
+      requestAct = new AuidContinuationToken(continuationToken);
+      log.trace("requestAct = {}", requestAct);
+    } catch (IllegalArgumentException iae) {
+      String message = "Invalid continuation token '" + continuationToken + "'";
+      log.warn(message);
+      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	  parsedRequest);
+    }
+
     try {
       // Check that the collection exists.
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
-      List<String> result = new ArrayList<>();
-      repo.getAuIds(collectionid).forEach(result::add);
-      log.debug2("result.size() = {}", result.size());
-      return new ResponseEntity<>(result, HttpStatus.OK);
+      List<String> auids = new ArrayList<>();
+      AuidContinuationToken responseAct = null;
+      Iterator<String> iterator = null;
+
+      // Get the iterator hash code (if any) used to provide a previous page
+      // of results.
+      Integer iteratorHashCode = requestAct.getIteratorHashCode();
+
+      // Check whether this request is for the first page.
+      if (iteratorHashCode == null) {
+	// Yes: Get the iterator pointing to first page of results.
+	iterator = repo.getAuIds(collectionid).iterator();
+
+	// Set up the iterator timeout.
+        TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
+            auidIteratorTimeoutCallback, iterator);
+      } else {
+	// No: Get the iterator (if any) used to provide a previous page of
+	// results.
+	iterator = auidIterators.remove(iteratorHashCode);
+
+	// Check whether the iterator was not found.
+	if (iterator == null) {
+	  // Yes: This request is not for the first page of results, but the
+	  // iterator has been lost.
+	  String lastAuid = requestAct.getAuid();
+
+	  // Get the iterator pointing to first page of results.
+	  iterator = repo.getAuIds(collectionid).iterator();
+
+	  // Set up the iterator timeout.
+	  TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
+	      auidIteratorTimeoutCallback, iterator);
+
+	  // Loop through the auids skipping those already returned through a
+	  // previous response.
+	  while (iterator.hasNext()) {
+	    String auid = iterator.next();
+
+	    // Check whether this auid comes after the last one returned on the
+	    // previous response for this operation.
+	    if (auid.compareTo(lastAuid) > 0) {
+	      // Yes: Add this auid to the results.
+	      auids.add(auid);
+
+	      // Add the rest of the artifacts to the results for this response
+	      // separately.
+	      break;
+	    }
+	  }
+	}
+      }
+
+      // Populate the results for this response.
+      populateAus(iterator, limit, auids);
+
+      // Check whether the iterator may be used in the future to provide more
+      // results.
+      if (iterator.hasNext()) {
+	// Yes: Store it locally.
+	iteratorHashCode = iterator.hashCode();
+	auidIterators.put(iteratorHashCode, iterator);
+
+	// Create the response continuation token.
+	responseAct = new AuidContinuationToken(auids.get(auids.size() - 1),
+	    iteratorHashCode);
+	log.trace("responseAct = {}", responseAct);
+      }
+
+      log.trace("auids.size() = {}", auids.size());
+
+      PageInfo pageInfo = new PageInfo();
+      pageInfo.setResultsPerPage(auids.size());
+
+      // Get the current link.
+      StringBuffer curLinkBuffer = request.getRequestURL();
+      
+      if (request.getQueryString() != null
+	  && !request.getQueryString().trim().isEmpty()) {
+	curLinkBuffer.append("?").append(request.getQueryString());
+      }
+
+      String curLink = curLinkBuffer.toString();
+      log.trace("curLink = {}", curLink);
+
+      pageInfo.setCurLink(curLink);
+
+      // Check whether there is a response continuation token.
+      if (responseAct != null) {
+	// Yes.
+	continuationToken = responseAct.toWebResponseContinuationToken();
+	pageInfo.setContinuationToken(continuationToken);
+
+	// Start building the next link.
+	StringBuffer nextLinkBuffer = request.getRequestURL();
+	boolean hasQueryParameters = false;
+
+	if (curLink.indexOf("limit=") > 0) {
+	  nextLinkBuffer.append("?limit=").append(requestLimit);
+	  hasQueryParameters = true;
+	}
+
+	if (continuationToken != null) {
+	  if (!hasQueryParameters) {
+	    nextLinkBuffer.append("?");
+	    hasQueryParameters = true;
+	  } else {
+	    nextLinkBuffer.append("&");
+	  }
+
+	  nextLinkBuffer.append("continuationToken=")
+	  .append(UrlUtil.encodeUrl(continuationToken));
+	}
+
+	String nextLink = nextLinkBuffer.toString();
+	log.trace("nextLink = {}", nextLink);
+
+	pageInfo.setNextLink(nextLink);
+      }
+
+      AuidPageInfo auidPageInfo = new AuidPageInfo();
+      auidPageInfo.setAuids(auids);
+      auidPageInfo.setPageInfo(pageInfo);
+      log.trace("auidPageInfo = {}", auidPageInfo);
+
+      log.debug2("Returning OK.");
+      return new ResponseEntity<>(auidPageInfo, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
@@ -820,6 +1295,9 @@ public class CollectionsApiServiceImpl
 
   private void validateAuId(String collectionid, String auid,
       String parsedRequest) throws IOException {
+    log.debug2("collectionid = '{}'", collectionid);
+    log.debug2("auid = '{}'", auid);
+    log.debug2("parsedRequest = '{}'", parsedRequest);
     if (!StreamSupport.stream(repo.getAuIds(collectionid).spliterator(), false)
 	.anyMatch(name -> auid.equals(name))) {
       String errorMessage = "The archival unit does not exist";
@@ -834,6 +1312,8 @@ public class CollectionsApiServiceImpl
   }
 
   private void validateUri(String uri, String parsedRequest) {
+    log.debug2("uri = '{}'", uri);
+    log.debug2("parsedRequest = '{}'", parsedRequest);
     if (uri.isEmpty()) {
       String errorMessage = "The URI has not been provided";
       log.warn(errorMessage);
@@ -848,6 +1328,9 @@ public class CollectionsApiServiceImpl
 
   private void validateArtifactExists(String collectionid, String artifactid, String errorMessage,
       String parsedRequest) throws IOException {
+    log.debug2("collectionid = '{}'", collectionid);
+    log.debug2("artifactid = '{}'", artifactid);
+    log.debug2("parsedRequest = '{}'", parsedRequest);
     if (!repo.artifactExists(collectionid, artifactid)) {
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
@@ -908,6 +1391,83 @@ public class CollectionsApiServiceImpl
 	log.error("Couldn't send cache flush notification", e);
       }
     }
+  }
+
+  /**
+   * Populates the artifacts to be included in the response.
+   * 
+   * @param iterator  An Iterator<Artifact> with the artifact source iterator.
+   * @param limit     An Integer with the maximum number of artifacts to be
+   *                  included in the response.
+   * @param artifacts A List<Artifact> with the artifacts to be included in the
+   *                  response.
+   */
+  private void populateArtifacts(Iterator<Artifact> iterator, Integer limit,
+      List<Artifact> artifacts) {
+    log.debug2("limit = {}, artifacts = {}", limit, artifacts);
+    int artifactCount = artifacts.size();
+
+    // Loop through as many artifacts that exist and are requested.
+    while (artifactCount < limit && iterator.hasNext()) {
+      // Add this artifact to the results.
+      artifacts.add(iterator.next());
+      artifactCount++;
+    }
+  }
+
+  /**
+   * Populates the auids to be included in the response.
+   * 
+   * @param iterator An Iterator<String> with the auid source iterator.
+   * @param limit    An Integer with the maximum number of auids to be included
+   *                 in the response.
+   * @param auids    A List<String> with the auids to be included in the
+   *                 response.
+   */
+  private void populateAus(Iterator<String> iterator, Integer limit,
+      List<String> auids) {
+    log.debug2("limit = {}, auids = {}", limit, auids);
+    int auidCount = auids.size();
+
+    // Loop through as many auids that exist and are requested.
+    while (auidCount < limit && iterator.hasNext()) {
+      // Add this auid to the results.
+      auids.add(iterator.next());
+      auidCount++;
+    }
+  }
+
+  /**
+   * Validates the page size specified in the request.
+   * 
+   * @param requestLimit An Integer with the page size specified in the request.
+   * @param defaultValue An int with the value to be used when no page size is
+   *                     specified in the request.
+   * @param maxValue     An int with the maximum allowed value for the page
+   *                     size.
+   * @return an int with the validated value for the page size.
+   */
+  static int validateLimit(Integer requestLimit, int defaultValue, int maxValue,
+      String parsedRequest) {
+    log.debug2("requestLimit = {}, defaultValue = {}, maxValue = {}",
+	requestLimit, defaultValue, maxValue);
+
+    // Check whether it's not a positive integer.
+    if (requestLimit != null && requestLimit.intValue() <= 0) {
+      // Yes: Report the problem.
+      String message =
+	  "Limit of requested items must be a positive integer; it was '"
+	      + requestLimit + "'";
+      log.warn(message);
+      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	  parsedRequest);
+    }
+
+    // No: Get the result.
+    int result = requestLimit == null ?
+	Math.min(defaultValue, maxValue) : Math.min(requestLimit, maxValue);
+    log.debug2("result = {}", result);
+    return result;
   }
 
   // Respond to ECHO requests from client caches.  This verifies that the

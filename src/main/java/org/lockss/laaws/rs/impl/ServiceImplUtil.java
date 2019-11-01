@@ -58,6 +58,11 @@ public class ServiceImplUtil {
    * @return a String with the full URL of the request.
    */
   static String getFullRequestUrl(HttpServletRequest request) {
+    if (request.getQueryString() == null
+	|| request.getQueryString().trim().isEmpty()) {
+      return "'" + request.getMethod() + " " + request.getRequestURL() + "'";
+    }
+
     return "'" + request.getMethod() + " " + request.getRequestURL() + "?"
 	+ request.getQueryString() + "'";
   }
