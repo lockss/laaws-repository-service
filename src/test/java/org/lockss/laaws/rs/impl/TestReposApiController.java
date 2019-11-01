@@ -28,7 +28,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.lockss.laaws.rs.controller;
+package org.lockss.laaws.rs.impl;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -36,8 +36,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.impl.ArtifactContinuationToken;
-import org.lockss.laaws.rs.impl.AuidContinuationToken;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
@@ -54,6 +52,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -345,7 +344,7 @@ public class TestReposApiController extends LockssTestCase5 {
       String auId = "org|lockss|plugin|TestPlugin&"
 	  + "base_url~http://test.com/&journal_issn~1234-5678&volume_name~987";
       URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
-      	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all");
+      	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=9");
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -791,4 +790,35 @@ public class TestReposApiController extends LockssTestCase5 {
         */
 
     }
+
+  /**
+   * Tests the parsing of configured page sizes.
+   */
+  @Test
+  public void testParseConfiguredPageSize() {
+    String [] invalidValues = {null, "", " ", "A", "0", "-1"};
+
+    for (int i = 0; i < invalidValues.length; i++) {
+      final String configPageSize = invalidValues[i];
+      assertThrows(RuntimeException.class,() ->
+      {CollectionsApiServiceImpl.parseConfiguredPageSize(configPageSize);});
+    }
+
+    assertEquals(1,
+	CollectionsApiServiceImpl.parseConfiguredPageSize("1"));
+  }
+
+  /**
+   * Tests the validation of request limits.
+   */
+  @Test
+  public void testValidateLimit() {
+    assertEquals(1, CollectionsApiServiceImpl.validateLimit(null, 1, 10, ""));
+    assertEquals(1, CollectionsApiServiceImpl.validateLimit(null, 10, 1, ""));
+    assertEquals(1, CollectionsApiServiceImpl.validateLimit(1, 1, 10, ""));
+    assertEquals(5, CollectionsApiServiceImpl.validateLimit(5, 1, 10, ""));
+    assertEquals(10, CollectionsApiServiceImpl.validateLimit(10, 1, 10, ""));
+    assertEquals(10, CollectionsApiServiceImpl.validateLimit(100, 1, 10, ""));
+    assertEquals(10, CollectionsApiServiceImpl.validateLimit(100, 50, 10, ""));
+  }
 }

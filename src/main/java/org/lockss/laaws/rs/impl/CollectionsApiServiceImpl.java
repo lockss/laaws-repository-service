@@ -65,6 +65,7 @@ import org.lockss.util.jms.*;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -72,7 +73,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Service for accessing the repository artifacts.
@@ -87,6 +87,19 @@ public class CollectionsApiServiceImpl
       "application/http;msgtype=response";
   private static final MediaType APPLICATION_HTTP_RESPONSE =
       MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
+
+  // Constants for the configuartion of response pagination sizes.
+  private static final String ARTIFACT_PAGESIZE_DEFAULT_KEY =
+      "repo.artifact.pagesize.default";
+  private static final String ARTIFACT_PAGESIZE_DEFAULT_UNSET_VALUE = "1000";
+  private static final String ARTIFACT_PAGESIZE_MAX_KEY =
+      "repo.artifact.pagesize.max";
+  private static final String ARTIFACT_PAGESIZE_MAX_UNSET_VALUE = "2000";
+  private static final String AUID_PAGESIZE_DEFAULT_KEY =
+      "repo.auid.pagesize.default";
+  private static final String AUID_PAGESIZE_DEFAULT_UNSET_VALUE = "10000";
+  private static final String AUID_PAGESIZE_MAX_KEY = "repo.auid.pagesize.max";
+  private static final String AUID_PAGESIZE_MAX_UNSET_VALUE = "20000";
 
   @Autowired
   LockssRepository repo;
@@ -119,6 +132,30 @@ public class CollectionsApiServiceImpl
     }
   };
 
+  // The default artifact response pagination size.
+  @Value("${" + ARTIFACT_PAGESIZE_DEFAULT_KEY + ":"
+      + ARTIFACT_PAGESIZE_DEFAULT_UNSET_VALUE + "}")
+  private String configDefaultArtifactPageSize;
+  private int defaultArtifactPageSize;
+
+  // The maximum artifact response pagination size.
+  @Value("${" + ARTIFACT_PAGESIZE_MAX_KEY + ":"
+      + ARTIFACT_PAGESIZE_MAX_UNSET_VALUE + "}")
+  private String configMaxArtifactPageSize;
+  private int maxArtifactPageSize;
+
+  // The default auid response pagination size.
+  @Value("${" + AUID_PAGESIZE_DEFAULT_KEY + ":"
+      + AUID_PAGESIZE_DEFAULT_UNSET_VALUE + "}")
+  private String configDefaultAuidPageSize;
+  private int defaultAuidPageSize;
+
+  // The maximum auid response pagination size.
+  @Value("${" + AUID_PAGESIZE_MAX_KEY + ":"
+      + AUID_PAGESIZE_MAX_UNSET_VALUE + "}")
+  private String configMaxAuidPageSize;
+  private int maxAuidPageSize;
+
   /**
    * Constructor for autowiring.
    * 
@@ -140,6 +177,51 @@ public class CollectionsApiServiceImpl
 	     RestLockssRepository.REST_ARTIFACT_CACHE_ID,
 	     RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC,
 	     new CacheInvalidateListener());
+
+    parseConfiguredPageSizes();
+  }
+
+  /**
+   * Parses the configured values for pagination sizes.
+   */
+  private void parseConfiguredPageSizes() {
+    defaultArtifactPageSize =
+	parseConfiguredPageSize(configDefaultArtifactPageSize);
+
+    maxArtifactPageSize = parseConfiguredPageSize(configMaxArtifactPageSize);
+    defaultAuidPageSize = parseConfiguredPageSize(configDefaultAuidPageSize);
+    maxAuidPageSize = parseConfiguredPageSize(configMaxAuidPageSize);
+  }
+
+  /**
+   * Parses the configured value for one pagination size.
+   * 
+   * @param configPageSize A String with the value obtained from the Spring
+   *                       configuration.
+   * @return an int with the configured value.
+   */
+  static int parseConfiguredPageSize(String configPageSize) {
+    log.debug2("configPageSize = {}", configPageSize);
+
+    int result = -1;
+
+    try {
+      result = Integer.parseUnsignedInt(configPageSize);
+    } catch (NumberFormatException nfe) {
+      // Do nothing.
+    }
+
+    // Check whether the parsed value is not a positive integer.
+    if (result < 1) {
+      // Yes: Report the problem.
+      String message = "Page size must be a positive integer; it was '"
+	  + configPageSize + "'";
+      log.warn(message);
+      throw new RuntimeException(message);
+    }
+
+    log.debug2("result = {}", result);
+    return result;
   }
 
   /** When JMS connection is established, tell clients to flush their
@@ -544,14 +626,9 @@ public class CollectionsApiServiceImpl
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    if (limit == null || limit.intValue() < 0) {
-      String message =
-	  "Limit of requested items must be a non-negative integer; it was '"
-	      + limit + "'";
-	log.warn(message);
-	throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
-	    parsedRequest);
-    }
+    Integer requestLimit = limit;
+    limit = validateLimit(requestLimit, defaultArtifactPageSize,
+	maxArtifactPageSize, parsedRequest);
 
     // Parse the request continuation token.
     ArtifactContinuationToken requestAct = null;
@@ -822,7 +899,7 @@ public class CollectionsApiServiceImpl
 	boolean hasQueryParameters = false;
 
 	if (curLink.indexOf("limit=") > 0) {
-	  nextLinkBuffer.append("?limit=").append(limit);
+	  nextLinkBuffer.append("?limit=").append(requestLimit);
 	  hasQueryParameters = true;
 	}
 
@@ -1048,14 +1125,9 @@ public class CollectionsApiServiceImpl
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    if (limit == null || limit.intValue() < 0) {
-      String message =
-	  "Limit of requested items must be a non-negative integer; it was '"
-	      + limit + "'";
-	log.warn(message);
-	throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
-	    parsedRequest);
-    }
+    Integer requestLimit = limit;
+    limit = validateLimit(requestLimit, defaultAuidPageSize, maxAuidPageSize,
+	parsedRequest);
 
     // Parse the request continuation token.
     AuidContinuationToken requestAct = null;
@@ -1172,7 +1244,7 @@ public class CollectionsApiServiceImpl
 	boolean hasQueryParameters = false;
 
 	if (curLink.indexOf("limit=") > 0) {
-	  nextLinkBuffer.append("?limit=").append(limit);
+	  nextLinkBuffer.append("?limit=").append(requestLimit);
 	  hasQueryParameters = true;
 	}
 
@@ -1363,6 +1435,39 @@ public class CollectionsApiServiceImpl
       auids.add(iterator.next());
       auidCount++;
     }
+  }
+
+  /**
+   * Validates the page size specified in the request.
+   * 
+   * @param requestLimit An Integer with the page size specified in the request.
+   * @param defaultValue An int with the value to be used when no page size is
+   *                     specified in the request.
+   * @param maxValue     An int with the maximum allowed value for the page
+   *                     size.
+   * @return an int with the validated value for the page size.
+   */
+  static int validateLimit(Integer requestLimit, int defaultValue, int maxValue,
+      String parsedRequest) {
+    log.debug2("requestLimit = {}, defaultValue = {}, maxValue = {}",
+	requestLimit, defaultValue, maxValue);
+
+    // Check whether it's not a positive integer.
+    if (requestLimit != null && requestLimit.intValue() <= 0) {
+      // Yes: Report the problem.
+      String message =
+	  "Limit of requested items must be a positive integer; it was '"
+	      + requestLimit + "'";
+      log.warn(message);
+      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+	  parsedRequest);
+    }
+
+    // No: Get the result.
+    int result = requestLimit == null ?
+	Math.min(defaultValue, maxValue) : Math.min(requestLimit, maxValue);
+    log.debug2("result = {}", result);
+    return result;
   }
 
   // Respond to ECHO requests from client caches.  This verifies that the
