@@ -303,7 +303,6 @@ paths:
             \ returned"
         - name: "limit"
           in: "query"
-          description: "The maximum number of artifacts per response"
           description: "The requested maximum number of artifacts per response"
           required: false
           type: "integer"
