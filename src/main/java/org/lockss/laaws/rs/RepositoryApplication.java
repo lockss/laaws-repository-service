@@ -60,6 +60,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private static final ManagerDesc[] myManagerDescs = {
+    ACCOUNT_MANAGER_DESC,
   };
 
   /**
