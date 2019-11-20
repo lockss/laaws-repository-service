@@ -33,14 +33,14 @@ package org.lockss.laaws.rs.configuration;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
-import org.lockss.laaws.rs.security.AuthUtil;
 import org.lockss.laaws.rs.util.JmsFactorySource;
 import org.lockss.app.LockssDaemon;
+import org.lockss.config.CurrentConfig;
 import org.lockss.util.*;
 import org.lockss.util.jms.*;
 import org.lockss.jms.*;
 import org.lockss.log.L4JLogger;
-import org.lockss.spring.auth.Roles;
+import org.lockss.spring.auth.AuthUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -61,19 +61,10 @@ public class LockssRepositoryConfig {
     public final static String REPO_SPEC_KEY = "repo.spec";
     public final static String REPO_PERSISTINDEXNAME_KEY = "repo.persistIndexName";
 
-    public final static String NONE_AUTH_TYPE = "none";
-    public final static String PARAM_AUTH_TYPE_KEY =
-	"org.lockss.restAuth.authenticationType";
-    public final static String DEFAULT_AUTH_TYPE = NONE_AUTH_TYPE;
     public final static String PARAM_USER_NAME_KEY =
 	"org.lockss.platform.ui.username";
-    public final static String PARAM_USER_PWD_KEY =
-	"org.lockss.platform.ui.password";
     public final static String PARAM_USER_PWD_FILE_KEY =
 	"org.lockss.platform.ui.passwordfile";
-    public final static String PARAM_USER_ROLE_KEY =
-	"org.lockss.platform.ui.role";
-    public final static String DEFAULT_USER_ROLE = Roles.ROLE_AU_ADMIN;
 
     @Autowired
     ArtifactDataStore store;
@@ -139,20 +130,14 @@ public class LockssRepositoryConfig {
 		      String userName = null;
 		      String password = null;
 
-		      // Get the type of required authentication.
-		      String authenticationType = env.getProperty(
-			  PARAM_AUTH_TYPE_KEY, DEFAULT_AUTH_TYPE);
-		      log.trace("authenticationType = {}", authenticationType);
-
 		      // Check whether authentication is required.
-		      if (AuthUtil.isAuthenticationOn(authenticationType)) {
+		      if (AuthUtil.isAuthenticationOn()) {
 			// Yes: Get the authentication user account information.
-			userName = AuthUtil.getConfiguredUserName(
-			    env.getProperty(PARAM_USER_NAME_KEY));
+			userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
 			log.trace("userName = {}", userName);
 
-			password = AuthUtil.getConfiguredPassword(
-			    env.getProperty(PARAM_USER_PWD_FILE_KEY), null);
+			password = PasswordUtil.getPasswordFromResource(
+			    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
 
 			// Check whether no configured user was found.
 			if (userName == null || password == null) {	

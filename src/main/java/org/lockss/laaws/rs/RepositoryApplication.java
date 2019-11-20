@@ -38,21 +38,15 @@ import org.lockss.log.L4JLogger;
 import org.lockss.plugin.PluginManager;
 import org.lockss.spring.base.BaseSpringBootApplication;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.ExitCodeGenerator;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.security.SecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.solr.SolrAutoConfiguration;
-import org.springframework.context.annotation.ComponentScan;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
-
 /**
  * The Spring-Boot application.
  */
-// TODO: This disables Spring authentication
-@SpringBootApplication(exclude = {SecurityAutoConfiguration.class, SolrAutoConfiguration.class})
+@SpringBootApplication(exclude = {SolrAutoConfiguration.class})
 @EnableSwagger2
-@ComponentScan(basePackages = { "org.lockss.laaws.rs", "org.lockss.laaws.rs.api" })
 public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
   private static L4JLogger log = L4JLogger.getLogger();
@@ -60,6 +54,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private static final ManagerDesc[] myManagerDescs = {
+      ACCOUNT_MANAGER_DESC
   };
 
   /**

@@ -26,9 +26,13 @@
 
 #org.lockss.log.default.level=debug
 
-#org.lockss.platform.diskSpacePaths=./cache
+org.lockss.platform.diskSpacePaths=./cache
 
 org.lockss.config.reloadInterval = 5m
+
+# UI username-passwd = lockss-u/lockss-p
+org.lockss.platform.ui.username=lockss-u
+org.lockss.platform.ui.password=SHA1:ac4fc8fa9930a24c8d002d541c37ca993e1bc40f
 
 org.lockss.ui.start=no
 #org.lockss.ui.port=24621
@@ -70,3 +74,7 @@ org.lockss.ui.start=no
 
 # Using MySQL
 #org.lockss.configDbManager.datasource.className=com.mysql.jdbc.jdbc2.optional.MysqlDataSource
+
+#org.lockss.platform.ui.passwordfile=auth/RestClientPwd.txt
+#org.lockss.restAuth.authenticationType=basic
+

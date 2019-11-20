@@ -30,18 +30,14 @@
 
 package org.lockss.laaws.rs.impl;
 
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_AUTH_TYPE_KEY;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.DEFAULT_AUTH_TYPE;
 import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_NAME_KEY;
 import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_FILE_KEY;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_KEY;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -50,13 +46,15 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.lockss.config.CurrentConfig;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
-import org.lockss.laaws.rs.security.AuthUtil;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.util.PasswordUtil;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,7 +62,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.core.env.Environment;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -89,9 +86,6 @@ public class TestReposApiController extends LockssTestCase5 {
     @MockBean
     private LockssRepository repo;
 
-    @Autowired
-    private Environment env;
-
     // The value of the Authorization header to be used when calling the REST
     // service.
     private String authHeaderValue = null;
@@ -111,21 +105,14 @@ public class TestReposApiController extends LockssTestCase5 {
     public void setUp() {
       log.debug2("Invoked");
 
-      // Get the type of required authentication.
-      String authenticationType =
-	  env.getProperty(PARAM_AUTH_TYPE_KEY, DEFAULT_AUTH_TYPE);
-      log.trace("authenticationType = {}", authenticationType);
-
       // Check whether authentication is required.
-      if (AuthUtil.isAuthenticationOn(authenticationType)) {
+      if (AuthUtil.isAuthenticationOn()) {
 	// Yes: Get the authentication user account information.
-	String userName = AuthUtil.getConfiguredUserName(
-	    env.getProperty(PARAM_USER_NAME_KEY));
+	String userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
 	log.trace("userName = {}", userName);
 
-	String password = AuthUtil.getConfiguredPassword(
-	    env.getProperty(PARAM_USER_PWD_FILE_KEY),
-	    env.getProperty(PARAM_USER_PWD_KEY));
+	String password = PasswordUtil.getPasswordFromResource(
+	    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
 	log.trace("password = {}", password);
 
 	// Check whether no configured user was found.

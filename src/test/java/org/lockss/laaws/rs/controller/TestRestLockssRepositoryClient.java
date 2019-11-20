@@ -31,11 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.controller;
 
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.DEFAULT_AUTH_TYPE;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_AUTH_TYPE_KEY;
 import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_NAME_KEY;
 import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_FILE_KEY;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_KEY;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -50,6 +47,7 @@ import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.lockss.config.CurrentConfig;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
@@ -57,16 +55,15 @@ import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
-import org.lockss.laaws.rs.security.AuthUtil;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
+import org.lockss.spring.auth.AuthUtil;
 import org.lockss.util.LockssUncheckedException;
+import org.lockss.util.PasswordUtil;
 import org.lockss.util.rest.exception.*;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.log.L4JLogger;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -86,9 +83,6 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
     protected LockssRepository repository;
     protected MockRestServiceServer mockServer;
 
-    @Autowired
-    private Environment env;
-
     /**
      * Creates the REST repository client to be used in the test.
      * @throws Exception if there are problems.
@@ -102,21 +96,14 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
       String userName = null;
       String password = null;
 
-      // Get the type of required authentication.
-      String authenticationType =
-	  env.getProperty(PARAM_AUTH_TYPE_KEY, DEFAULT_AUTH_TYPE);
-      log.trace("authenticationType = {}", authenticationType);
-
       // Check whether authentication is required.
-      if (AuthUtil.isAuthenticationOn(authenticationType)) {
+      if (AuthUtil.isAuthenticationOn()) {
 	// Yes: Get the authentication user account information.
-	userName = AuthUtil.getConfiguredUserName(
-	    env.getProperty(PARAM_USER_NAME_KEY));
+	userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
 	log.trace("userName = {}", userName);
 
-	password = AuthUtil.getConfiguredPassword(
-	    env.getProperty(PARAM_USER_PWD_FILE_KEY),
-	    env.getProperty(PARAM_USER_PWD_KEY));
+	password = PasswordUtil.getPasswordFromResource(
+	    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
 	log.trace("password = {}", password);
 
 	// Check whether no configured user was found.

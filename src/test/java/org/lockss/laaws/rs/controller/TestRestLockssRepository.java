@@ -30,11 +30,8 @@
 
 package org.lockss.laaws.rs.controller;
 
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.DEFAULT_AUTH_TYPE;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_AUTH_TYPE_KEY;
 import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_NAME_KEY;
 import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_FILE_KEY;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_KEY;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.Charset;
@@ -51,12 +48,13 @@ import org.apache.http.*;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.*;
 import org.junit.runner.RunWith;
+import org.lockss.config.CurrentConfig;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.model.*;
-import org.lockss.laaws.rs.security.AuthUtil;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.auth.AuthUtil;
 import org.lockss.util.test.LockssTestCase5;
-import org.lockss.util.FileUtil;
+import org.lockss.util.PasswordUtil;
 import org.lockss.util.rest.exception.*;
 import org.lockss.util.time.TimeBase;
 import org.lockss.test.ZeroInputStream;
@@ -187,21 +185,14 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       String userName = null;
       String password = null;
 
-      // Get the type of required authentication.
-      String authenticationType =
-	  env.getProperty(PARAM_AUTH_TYPE_KEY, DEFAULT_AUTH_TYPE);
-      log.trace("authenticationType = {}", authenticationType);
-
       // Check whether authentication is required.
-      if (AuthUtil.isAuthenticationOn(authenticationType)) {
+      if (AuthUtil.isAuthenticationOn()) {
 	// Yes: Get the authentication user account information.
-	userName = AuthUtil.getConfiguredUserName(
-	    env.getProperty(PARAM_USER_NAME_KEY));
+	userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
 	log.trace("userName = {}", userName);
 
-	password = AuthUtil.getConfiguredPassword(
-	    env.getProperty(PARAM_USER_PWD_FILE_KEY),
-	    env.getProperty(PARAM_USER_PWD_KEY));
+	password = PasswordUtil.getPasswordFromResource(
+	    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
 	log.trace("password = {}", password);
 
 	// Check whether no configured user was found.

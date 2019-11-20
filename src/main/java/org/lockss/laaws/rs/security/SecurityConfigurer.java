@@ -31,13 +31,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.security;
 
-import org.lockss.log.L4JLogger;
 import org.lockss.spring.auth.SpringSecurityConfigurer;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 
 /**
  * Custom Spring security configurator.
@@ -49,25 +46,7 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfigurer extends SpringSecurityConfigurer {
-
-  private final static L4JLogger log = L4JLogger.getLogger();
-
-  /**
-   * Configures the authentication strategy and filter.
-   *
-   * @param http An HttpSecurity to be configured.
-   * @throws Exception if there are problems.
-   */
-  @Override
-  protected void configure(HttpSecurity http) throws Exception {
-    log.debug2("Invoked.");
-
-    // Force each and every request to be authenticated.
-    http.csrf().disable().authorizeRequests().anyRequest().authenticated();
-
-    // The Basic authentication filter to be used.
-    http.addFilterBefore(new SpringAuthenticationFilter(),
-        BasicAuthenticationFilter.class);
-    log.debug2("Done.");
-  }
+  // To use an authentication filter different than the default
+  // org.lockss.rs.auth.SpringAuthenticationFilter, override the
+  // configure(HttpSecurity http) method of this class.
 }
