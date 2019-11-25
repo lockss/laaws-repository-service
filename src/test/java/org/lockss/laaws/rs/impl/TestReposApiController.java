@@ -30,15 +30,27 @@
 
 package org.lockss.laaws.rs.impl;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
+import org.lockss.log.L4JLogger;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,18 +60,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.multipart.MultipartFile;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.NoSuchElementException;
-
-import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(CollectionsApiController.class)
@@ -67,7 +68,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
 public class TestReposApiController extends LockssTestCase5 {
-    private final static Log log = LogFactory.getLog(TestReposApiController.class);
+    private final static L4JLogger log = L4JLogger.getLogger();
 
     @Autowired
     private MockMvc controller;
@@ -81,7 +82,9 @@ public class TestReposApiController extends LockssTestCase5 {
     @MockBean
     private LockssRepository repo;
 
-
+    // The value of the Authorization header to be used when calling the REST
+    // service.
+    private String authHeaderValue = null;
 
 //    @TestConfiguration
 //    public static class RepoControllerTestConfig {
@@ -91,10 +94,6 @@ public class TestReposApiController extends LockssTestCase5 {
 //        }
 //    }
 //
-//    @Before
-//    public void setUp() throws Exception {
-//        // Populate the repository with test stuff
-//    }
 //
 //    @After
 //    public void tearDown() throws Exception {
@@ -103,10 +102,14 @@ public class TestReposApiController extends LockssTestCase5 {
 
     @Test
     public void getCollections() throws Exception {
+        log.debug2("Invoked");
+
         // Perform tests against a repository service that is not ready (should expect 503)
         given(this.repo.isReady()).willReturn(false);
         assertFalse(repo.isReady());
-        this.controller.perform(get("/collections")).andExpect(status().isServiceUnavailable());
+
+        this.controller.perform(getAuthBuilder(get("/collections")))
+        .andExpect(status().isServiceUnavailable());
 
         // Perform tests against a ready repository service
         given(this.repo.isReady()).willReturn(true);
@@ -116,8 +119,8 @@ public class TestReposApiController extends LockssTestCase5 {
 
         // Assert that we get an empty set of collection IDs from the controller if repository returns empty set
         given(this.repo.getCollectionIds()).willReturn(collectionIds);
-        this.controller.perform(get("/collections")).andExpect(status().isOk()).andExpect(
-            content().string("[]"));
+        this.controller.perform(getAuthBuilder(get("/collections")))
+        .andExpect(status().isOk()).andExpect(content().string("[]"));
 
         // Add collection IDs our set
         collectionIds.add("test1");
@@ -125,8 +128,10 @@ public class TestReposApiController extends LockssTestCase5 {
 
         // Assert that we get back the same set of collection IDs
         given(this.repo.getCollectionIds()).willReturn(collectionIds);
-        this.controller.perform(get("/collections")).andExpect(status().isOk()).andExpect(
-            content().string("[\"test1\",\"test2\"]"));
+        this.controller.perform(getAuthBuilder(get("/collections")))
+        .andExpect(status().isOk())
+        .andExpect(content().string("[\"test1\",\"test2\"]"));
+        log.debug2("Done");
     }
 
     /**
@@ -136,6 +141,7 @@ public class TestReposApiController extends LockssTestCase5 {
      */
     @Test
     public void getAuids() throws Exception {
+      log.debug2("Invoked");
       // The mapper of received content text to a page information object.
       ObjectMapper mapper = new ObjectMapper();
       mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
@@ -150,7 +156,7 @@ public class TestReposApiController extends LockssTestCase5 {
       given(repo.isReady()).willReturn(false);
       assertFalse(repo.isReady());
 
-      controller.perform(get(endpointUri))
+      controller.perform(getAuthBuilder(get(endpointUri)))
       .andExpect(status().isServiceUnavailable());
 
       // Perform tests against a ready repository service.
@@ -168,7 +174,7 @@ public class TestReposApiController extends LockssTestCase5 {
       given(repo.getAuIds(collId)).willReturn(auids);
 
       // Perform the request and get the response.
-      String content =  controller.perform(get(endpointUri))
+      String content =  controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -183,8 +189,9 @@ public class TestReposApiController extends LockssTestCase5 {
       auids.add("test02");
 
       // Perform the request and get the response.
-      content = controller.perform(get(endpointUri)).andExpect(status().isOk())
-	  .andReturn().getResponse().getContentAsString();
+      content = controller.perform(getAuthBuilder(get(endpointUri)))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
 
       // Get the auids included in the response.
       List<String> auidBuffer =
@@ -212,7 +219,7 @@ public class TestReposApiController extends LockssTestCase5 {
       // Request the first page containing just three auid.
       endpointUri =
 	  new URI("/collections/" + UrlUtil.encodeUrl(collId) + "/aus?limit=3");
-      content = controller.perform(get(endpointUri))
+      content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -240,7 +247,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -271,7 +278,7 @@ public class TestReposApiController extends LockssTestCase5 {
       nextLink = nextLink.substring(0, nextLink.length() - 1);
 
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -298,7 +305,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -313,6 +320,7 @@ public class TestReposApiController extends LockssTestCase5 {
       // There are no more auids to be returned.
       assertNull(api.getPageInfo().getContinuationToken());
       assertNull(api.getPageInfo().getNextLink());
+      log.debug2("Done");
     }
 
     @Test
@@ -335,6 +343,8 @@ public class TestReposApiController extends LockssTestCase5 {
      */
     @Test
     public void reposRepositoryArtifactsGet() throws Exception {
+      log.debug2("Invoked");
+ 
       // The mapper of received content text to a page information object.
       ObjectMapper mapper = new ObjectMapper();
       mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
@@ -351,8 +361,8 @@ public class TestReposApiController extends LockssTestCase5 {
       given(repo.isReady()).willReturn(false);
       assertFalse(repo.isReady());
 
-      controller.perform(get(endpointUri))
-      .andExpect(status().isServiceUnavailable());
+      controller.perform(getAuthBuilder(get(endpointUri))).andExpect(status()
+	  .isServiceUnavailable());
 
       // Perform tests against a ready repository service.
       given(repo.isReady()).willReturn(true);
@@ -374,7 +384,7 @@ public class TestReposApiController extends LockssTestCase5 {
       given(repo.getArtifactsAllVersions(collId, auId)).willReturn(artifacts);
 
       // Perform the request and get the response.
-      String content =  controller.perform(get(endpointUri))
+      String content =  controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -414,8 +424,9 @@ public class TestReposApiController extends LockssTestCase5 {
       artifacts.add(art9);
 
       // Perform the request and get the response.
-      content = controller.perform(get(endpointUri)).andExpect(status().isOk())
-	  .andReturn().getResponse().getContentAsString();
+      content = controller.perform(getAuthBuilder(get(endpointUri)))
+	  .andExpect(status().isOk()).andReturn().getResponse()
+	  .getContentAsString();
 
       // Get the artifacts included in the response.
       List<Artifact> artifactBuffer =
@@ -442,14 +453,16 @@ public class TestReposApiController extends LockssTestCase5 {
 
       // Test the pagination for all versions with a prefix.
       runUrlPrefixPaginationTest(collId, auId, "http://u", artifacts, mapper);
+      log.debug2("Done");
     }
 
     private void runAllVersionsPaginationTest(String collId, String auId,
 	List<Artifact> artifacts, ObjectMapper mapper) throws Exception {
+      log.debug2("Invoked");
       // Request the first page containing just two artifacts.
       URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
     	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=2");
-      String content = controller.perform(get(endpointUri))
+      String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -476,7 +489,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -506,7 +519,7 @@ public class TestReposApiController extends LockssTestCase5 {
       nextLink = nextLink.substring(0, nextLink.length() - 1);
 
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -536,7 +549,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
       
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -562,7 +575,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -577,11 +590,13 @@ public class TestReposApiController extends LockssTestCase5 {
       // There are no more artifacts to be returned.
       assertNull(api.getPageInfo().getContinuationToken());
       assertNull(api.getPageInfo().getNextLink());
+      log.debug2("Done");
     }
 
     private void runUrlPrefixPaginationTest(String collId, String auId,
 	String urlPrefix, List<Artifact> artifacts, ObjectMapper mapper)
 	    throws Exception {
+      log.debug2("Invoked");
       // The repository will return the set of artifacts with the URL prefix.
       given(repo.getArtifactsWithPrefixAllVersions(collId, auId, urlPrefix))
       .willReturn(artifacts);
@@ -590,7 +605,7 @@ public class TestReposApiController extends LockssTestCase5 {
       URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
     	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=2"
     	+ "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));
-      String content = controller.perform(get(endpointUri))
+      String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -617,7 +632,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -647,7 +662,7 @@ public class TestReposApiController extends LockssTestCase5 {
       nextLink = nextLink.substring(0, nextLink.length() - 1);
 
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -677,7 +692,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
       
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -703,7 +718,7 @@ public class TestReposApiController extends LockssTestCase5 {
       assertNotNull(nextLink);
   
       // Request the next page.
-      content = controller.perform(get(new URI(nextLink)))
+      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -718,6 +733,7 @@ public class TestReposApiController extends LockssTestCase5 {
       // There are no more artifacts to be returned.
       assertNull(api.getPageInfo().getContinuationToken());
       assertNull(api.getPageInfo().getNextLink());
+      log.debug2("Done");
     }
 
     /**
@@ -796,6 +812,7 @@ public class TestReposApiController extends LockssTestCase5 {
    */
   @Test
   public void testParseConfiguredPageSize() {
+    log.debug2("Invoked");
     String [] invalidValues = {null, "", " ", "A", "0", "-1"};
 
     for (int i = 0; i < invalidValues.length; i++) {
@@ -806,6 +823,7 @@ public class TestReposApiController extends LockssTestCase5 {
 
     assertEquals(1,
 	CollectionsApiServiceImpl.parseConfiguredPageSize("1"));
+    log.debug2("Done");
   }
 
   /**
@@ -813,6 +831,7 @@ public class TestReposApiController extends LockssTestCase5 {
    */
   @Test
   public void testValidateLimit() {
+    log.debug2("Invoked");
     assertEquals(1, CollectionsApiServiceImpl.validateLimit(null, 1, 10, ""));
     assertEquals(1, CollectionsApiServiceImpl.validateLimit(null, 10, 1, ""));
     assertEquals(1, CollectionsApiServiceImpl.validateLimit(1, 1, 10, ""));
@@ -820,5 +839,26 @@ public class TestReposApiController extends LockssTestCase5 {
     assertEquals(10, CollectionsApiServiceImpl.validateLimit(10, 1, 10, ""));
     assertEquals(10, CollectionsApiServiceImpl.validateLimit(100, 1, 10, ""));
     assertEquals(10, CollectionsApiServiceImpl.validateLimit(100, 50, 10, ""));
+    log.debug2("Done");
+  }
+
+  /**
+   * Provides an authenticated version of a mock request builder, if necessary.
+   * 
+   * @param builder A MockHttpServletRequestBuilder with the unauthenticated
+   *                version of the builder.
+   * @return a MockHttpServletRequestBuilder with the Authorization header, if
+   *         necessary.
+   */
+  private MockHttpServletRequestBuilder getAuthBuilder(
+      MockHttpServletRequestBuilder builder) {
+    // Check whether authentication is required.
+    if (authHeaderValue != null) {
+      // Yes: Add the authentication header.
+      return builder.header("Authorization", authHeaderValue);
+    }
+
+    // No: Return the passed builder unchanged.
+    return builder;
   }
 }

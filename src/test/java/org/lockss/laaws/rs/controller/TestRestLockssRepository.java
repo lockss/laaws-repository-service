@@ -37,7 +37,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.*;
-
 import org.apache.commons.collections4.*;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -61,7 +60,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
-
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -148,10 +146,17 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   // the repository
   Map<String,ArtifactSpec> highestCommittedVerSpec = new HashMap<String,ArtifactSpec>();
 
-
+  /**
+   * Provides a newly built LOCKSS repository implemented by a remote REST
+   * Repository service.
+   *
+   * @return a LockssRepository with the newly built LOCKSS repository.
+   * @throws Exception if there are problems.
+   */
     public LockssRepository makeLockssRepository() throws Exception {
       log.info("port = " + port);
-      return new RestLockssRepository(new URL(String.format("http://localhost:%d", port)));
+      return new RestLockssRepository(
+	  new URL(String.format("http://localhost:%d", port)), null, null);
     }
 
     @Before

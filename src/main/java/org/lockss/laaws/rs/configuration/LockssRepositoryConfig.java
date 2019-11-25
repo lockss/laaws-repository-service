@@ -48,6 +48,7 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.List;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal repository.
@@ -117,10 +118,42 @@ public class LockssRepositoryConfig {
 		    }
 
 		    case "rest": {
-			String repositoryRestUrl = specParts[1];
-			log.debug("repositoryRestUrl = {}", repositoryRestUrl);
+		      String repositoryRestUrl = specParts[1];
+		      log.debug("repositoryRestUrl = {}", repositoryRestUrl);
 
-			return new RestLockssRepository(new URL(repositoryRestUrl));
+		      // Get the REST client credentials.
+		      List<String> restClientCredentials = LockssDaemon
+			  .getLockssDaemon().getRestClientCredentials();
+		      log.trace("restClientCredentials = {}",
+			  restClientCredentials);
+
+		      String userName = null;
+		      String password = null;
+
+		      // Check whether there is a user name.
+		      if (restClientCredentials != null
+			  && restClientCredentials.size() > 0) {
+			// Yes: Get the user name.
+			userName = restClientCredentials.get(0);
+			log.trace("userName = " + userName);
+
+			// Check whether there is a user password.
+			if (restClientCredentials.size() > 1) {
+			  // Yes: Get the user password.
+			  password = restClientCredentials.get(1);
+			}
+
+			// Check whether no configured user was found.
+			if (userName == null || password == null) {	
+			  String errMsg =
+			      "No user has been configured for authentication";
+			  log.error(errMsg);
+			  throw new IllegalArgumentException(errMsg);
+			}
+		      }
+
+		      return new RestLockssRepository(
+			  new URL(repositoryRestUrl), userName, password);
 		    }
 
 		    default: {
