@@ -30,12 +30,9 @@
 
 package org.lockss.laaws.rs.controller;
 
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_NAME_KEY;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_FILE_KEY;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -44,17 +41,14 @@ import org.apache.commons.collections4.*;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.*;
+import org.apache.commons.logging.*;
 import org.apache.http.*;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.*;
 import org.junit.runner.RunWith;
-import org.lockss.config.CurrentConfig;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.model.*;
-import org.lockss.log.L4JLogger;
-import org.lockss.spring.auth.AuthUtil;
 import org.lockss.util.test.LockssTestCase5;
-import org.lockss.util.PasswordUtil;
 import org.lockss.util.rest.exception.*;
 import org.lockss.util.time.TimeBase;
 import org.lockss.test.ZeroInputStream;
@@ -63,7 +57,6 @@ import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.*;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -72,7 +65,8 @@ import org.springframework.test.context.junit4.SpringRunner;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class TestRestLockssRepository extends LockssTestCase5 {
-  private final static L4JLogger log = L4JLogger.getLogger();
+  private final static Log log =
+    LogFactory.getLog(TestRestLockssRepository.class);
 
   protected static int MAX_RANDOM_FILE = 50000;
   protected static int MAX_INCR_FILE = 20000;
@@ -131,9 +125,6 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     @Autowired
     ApplicationContext appCtx;
 
-    @Autowired
-    private Environment env;
-
     @TestConfiguration
     static class TestLockssRepositoryConfig {
         @Bean
@@ -155,56 +146,23 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   // the repository
   Map<String,ArtifactSpec> highestCommittedVerSpec = new HashMap<String,ArtifactSpec>();
 
-    /**
-     * Provides a newly built LOCKSS repository implemented by a remote REST
-     * Repository service.
-     *
-     * @param userName A String with the name of the user used to access the
-     *                 remote LOCKSS Repository service.
-     * @param password A String with the password of the user used to access the
-     *                 remote LOCKSS Repository service.
-     * @return a LockssRepository with the newly built LOCKSS repository.
-     * @throws Exception if there are problems.
-     */
-    public LockssRepository makeLockssRepository(String userName,
-	String password) throws Exception {
-      log.debug2("userName = {}", userName);
-      log.debug2("password = {}", password);
+  /**
+   * Provides a newly built LOCKSS repository implemented by a remote REST
+   * Repository service.
+   *
+   * @return a LockssRepository with the newly built LOCKSS repository.
+   * @throws Exception if there are problems.
+   */
+    public LockssRepository makeLockssRepository() throws Exception {
       log.info("port = " + port);
       return new RestLockssRepository(
-	  new URL(String.format("http://localhost:%d", port)), userName,
-	  password);
+	  new URL(String.format("http://localhost:%d", port)), null, null);
     }
 
     @Before
-    public void setUp() throws Exception {
-      log.debug2("Invoked");
+    public void setUpArtifactDataStore() throws Exception {
       TimeBase.setSimulated();
-
-      // The authentication credentials.
-      String userName = null;
-      String password = null;
-
-      // Check whether authentication is required.
-      if (AuthUtil.isAuthenticationOn()) {
-	// Yes: Get the authentication user account information.
-	userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
-	log.trace("userName = {}", userName);
-
-	password = PasswordUtil.getPasswordFromResource(
-	    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
-	log.trace("password = {}", password);
-
-	// Check whether no configured user was found.
-	if (userName == null || password == null) {	
-	  String message = "No user has been configured for authentication";
-	  log.error(message);
-	  throw new IllegalArgumentException(message);
-	}
-      }
-
-      this.repository = makeLockssRepository(userName, password);
-      log.debug2("Done");
+      this.repository = makeLockssRepository();
     }
 
     @After

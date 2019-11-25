@@ -31,8 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.controller;
 
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_NAME_KEY;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_FILE_KEY;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -47,7 +45,6 @@ import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.config.CurrentConfig;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
@@ -57,9 +54,7 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
-import org.lockss.spring.auth.AuthUtil;
 import org.lockss.util.LockssUncheckedException;
-import org.lockss.util.PasswordUtil;
 import org.lockss.util.rest.exception.*;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.log.L4JLogger;
@@ -95,24 +90,6 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
       // The authentication credentials.
       String userName = null;
       String password = null;
-
-      // Check whether authentication is required.
-      if (AuthUtil.isAuthenticationOn()) {
-	// Yes: Get the authentication user account information.
-	userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
-	log.trace("userName = {}", userName);
-
-	password = PasswordUtil.getPasswordFromResource(
-	    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
-	log.trace("password = {}", password);
-
-	// Check whether no configured user was found.
-	if (userName == null || password == null) {	
-	  String message = "No user has been configured for authentication";
-	  log.error(message);
-	  throw new IllegalArgumentException(message);
-	}
-      }
 
       repository = new RestLockssRepository(new URL(BASEURL), restTemplate,
 	  userName, password);

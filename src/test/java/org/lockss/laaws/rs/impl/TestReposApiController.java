@@ -30,8 +30,6 @@
 
 package org.lockss.laaws.rs.impl;
 
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_NAME_KEY;
-import static org.lockss.laaws.rs.configuration.LockssRepositoryConfig.PARAM_USER_PWD_FILE_KEY;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -46,15 +44,13 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.config.CurrentConfig;
+import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.log.L4JLogger;
-import org.lockss.spring.auth.AuthUtil;
-import org.lockss.util.PasswordUtil;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,39 +94,6 @@ public class TestReposApiController extends LockssTestCase5 {
 //        }
 //    }
 //
-    /**
-     * Common test setup.
-     */
-    @Before
-    public void setUp() {
-      log.debug2("Invoked");
-
-      // Check whether authentication is required.
-      if (AuthUtil.isAuthenticationOn()) {
-	// Yes: Get the authentication user account information.
-	String userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
-	log.trace("userName = {}", userName);
-
-	String password = PasswordUtil.getPasswordFromResource(
-	    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
-	log.trace("password = {}", password);
-
-	// Check whether no configured user was found.
-	if (userName == null || password == null) {	
-	  String message = "No user has been configured for authentication";
-	  log.error(message);
-	  throw new IllegalArgumentException(message);
-	}
-
-	// Prepare the Authorization header value.
-	String credentials = userName + ":" + password;
-	authHeaderValue = "Basic " + Base64.getEncoder()
-	.encodeToString(credentials.getBytes(StandardCharsets.US_ASCII));
-	log.trace("authHeaderValue = {}", authHeaderValue);
-      }
-
-      log.debug2("Done");
-    }
 //
 //    @After
 //    public void tearDown() throws Exception {

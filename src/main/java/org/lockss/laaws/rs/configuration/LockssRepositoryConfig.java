@@ -35,12 +35,10 @@ import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.util.JmsFactorySource;
 import org.lockss.app.LockssDaemon;
-import org.lockss.config.CurrentConfig;
 import org.lockss.util.*;
 import org.lockss.util.jms.*;
 import org.lockss.jms.*;
 import org.lockss.log.L4JLogger;
-import org.lockss.spring.auth.AuthUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,6 +48,7 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.List;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal repository.
@@ -60,11 +59,6 @@ public class LockssRepositoryConfig {
 
     public final static String REPO_SPEC_KEY = "repo.spec";
     public final static String REPO_PERSISTINDEXNAME_KEY = "repo.persistIndexName";
-
-    public final static String PARAM_USER_NAME_KEY =
-	"org.lockss.platform.ui.username";
-    public final static String PARAM_USER_PWD_FILE_KEY =
-	"org.lockss.platform.ui.passwordfile";
 
     @Autowired
     ArtifactDataStore store;
@@ -127,17 +121,27 @@ public class LockssRepositoryConfig {
 		      String repositoryRestUrl = specParts[1];
 		      log.debug("repositoryRestUrl = {}", repositoryRestUrl);
 
+		      // Get the REST client credentials.
+		      List<String> restClientCredentials = LockssDaemon
+			  .getLockssDaemon().getRestClientCredentials();
+		      log.trace("restClientCredentials = {}",
+			  restClientCredentials);
+
 		      String userName = null;
 		      String password = null;
 
-		      // Check whether authentication is required.
-		      if (AuthUtil.isAuthenticationOn()) {
-			// Yes: Get the authentication user account information.
-			userName = CurrentConfig.getParam(PARAM_USER_NAME_KEY);
-			log.trace("userName = {}", userName);
+		      // Check whether there is a user name.
+		      if (restClientCredentials != null
+			  && restClientCredentials.size() > 0) {
+			// Yes: Get the user name.
+			userName = restClientCredentials.get(0);
+			log.trace("userName = " + userName);
 
-			password = PasswordUtil.getPasswordFromResource(
-			    CurrentConfig.getParam(PARAM_USER_PWD_FILE_KEY));
+			// Check whether there is a user password.
+			if (restClientCredentials.size() > 1) {
+			  // Yes: Get the user password.
+			  password = restClientCredentials.get(1);
+			}
 
 			// Check whether no configured user was found.
 			if (userName == null || password == null) {	
