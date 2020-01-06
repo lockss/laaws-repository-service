@@ -1300,7 +1300,7 @@ public class CollectionsApiServiceImpl
     log.debug2("parsedRequest = '{}'", parsedRequest);
     if (!StreamSupport.stream(repo.getAuIds(collectionid).spliterator(), false)
 	.anyMatch(name -> auid.equals(name))) {
-      String errorMessage = "The archival unit does not exist";
+      String errorMessage = "The archival unit has no artifacts (possibly because it hasn't been collected yet)";
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
@@ -1492,6 +1492,8 @@ public class CollectionsApiServiceImpl
 	    sendPingResponse(key);
 	    break;
 	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE:
+	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_ECHO_RESP:
+	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_FLUSH:
 	    // expected, ignore
 	    break;
 	  default:
