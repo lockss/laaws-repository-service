@@ -1,6 +1,6 @@
 # Release Notes
 
-## Changes Since 2.0.8.0
+## 2.0.9.0
 
 ### Features
 
@@ -12,6 +12,6 @@
 
 ### Fixes
 
-*   Fix incorrect URl enumeration order
+*   Fix incorrect URL enumeration order
 *   Remove file size limit
 *   Increase URL length limit
