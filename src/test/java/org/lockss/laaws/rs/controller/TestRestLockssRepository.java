@@ -37,9 +37,9 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.*;
-
 import org.apache.commons.collections4.*;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.*;
 import org.apache.commons.logging.*;
 import org.apache.http.*;
@@ -49,7 +49,9 @@ import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.util.test.LockssTestCase5;
+import org.lockss.util.rest.exception.*;
 import org.lockss.util.time.TimeBase;
+import org.lockss.test.ZeroInputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.*;
@@ -58,7 +60,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
-
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -85,8 +86,12 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   protected static String ARTID1 = "art_id_1";
 
   protected static String URL1 = "http://host1.com/path";
-  protected static String URL2 = "http://host2.com/file1";
-  protected static String URL3 = "http://host2.com/file2";
+  protected static String URL2 = "http://host2.com/fil,1";
+  protected static String URL3 = "http://host2.com/fil/2";
+  protected static String LONG_URL_4000 = "http://host2.com" +
+    StringUtils.repeat("/123456789", 400) + "/foo.txt";
+  protected static String LONG_URL_40000 = "http://host2.com" +
+    StringUtils.repeat("/123456789", 4000) + "/foo.txt";
   protected static String PREFIX1 = "http://host2.com/";
 
   protected static String CONTENT1 = "content string 1";
@@ -112,7 +117,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   // differs only in case from previous, to check case-sensitivity
   protected static String[] COLLS = {COLL1, COLL2, "Coll2"};
   protected static String[] AUIDS = {AUID1, AUID2, "Auid2"};
-  protected static String[] URLS = {URL1, URL2, URL2.toUpperCase()};
+  protected static String[] URLS = {URL1, URL2, URL2.toUpperCase(), URL3};
 
     @LocalServerPort
     private int port;
@@ -141,10 +146,17 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   // the repository
   Map<String,ArtifactSpec> highestCommittedVerSpec = new HashMap<String,ArtifactSpec>();
 
-
+  /**
+   * Provides a newly built LOCKSS repository implemented by a remote REST
+   * Repository service.
+   *
+   * @return a LockssRepository with the newly built LOCKSS repository.
+   * @throws Exception if there are problems.
+   */
     public LockssRepository makeLockssRepository() throws Exception {
       log.info("port = " + port);
-      return new RestLockssRepository(new URL(String.format("http://localhost:%d", port)));
+      return new RestLockssRepository(
+	  new URL(String.format("http://localhost:%d", port)), null, null);
     }
 
     @Before
@@ -190,10 +202,49 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // up variants, and by testArtifactSizes(), but for the sake of
     // completeness ...
 
-    ArtifactSpec spec = new ArtifactSpec().setUrl("https://mr/ed/").setContent(CONTENT1);
+    ArtifactSpec spec = new ArtifactSpec().setUrl("https://mr/ed/").setContent(CONTENT1).setCollectionDate(0);
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
     spec.assertArtifact(repository, commArt);
+
+    // Try adding an artifact with no URL.
+    assertThrowsMatch(LockssRestHttpException.class,
+	"500 Internal Server Error.*addArtifact",
+	() -> {addUncommitted(new ArtifactSpec().setUrl(null));});
+  }
+
+  @Test
+  public void testAddLargeArtifact() throws IOException {
+    long len = 100*1024*1024;
+    ArtifactSpec spec =
+      new ArtifactSpec().
+      setUrl("https://mr/ed/")
+      .setContentGenerator(() -> new ZeroInputStream((byte)27, len))
+      .setCollectionDate(0);
+    Artifact newArt = addUncommitted(spec);
+    Artifact commArt = commit(spec, newArt);
+    spec.assertArtifact(repository, commArt);
+  }
+
+  @Test
+  public void testAddLongUrl() throws IOException {
+    ArtifactSpec spec1 =
+      new ArtifactSpec()
+      .setUrl(LONG_URL_4000)
+      .setContent(CONTENT1)
+      .setCollectionDate(0);
+    Artifact newArt1 = addUncommitted(spec1);
+    Artifact commArt1 = commit(spec1, newArt1);
+    spec1.assertArtifact(repository, commArt1);
+
+    ArtifactSpec spec2 =
+      new ArtifactSpec()
+      .setUrl(LONG_URL_40000)
+      .setContent(StringUtils.repeat(CONTENT1, 1000))
+      .setCollectionDate(0);
+    Artifact newArt2 = addUncommitted(spec2);
+    Artifact commArt2 = commit(spec2, newArt2);
+    spec2.assertArtifact(repository, commArt2);
   }
 
   @Test
@@ -248,6 +299,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     testCommitArtifact();
     testDeleteArtifact();
     testAllNoSideEffect();
+    testDeleteAllArtifacts();
   }
 
   public void testGetArtifact() throws IOException {
@@ -268,7 +320,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // Artifact not found
     for (ArtifactSpec spec : notFoundArtifactSpecs()) {
       log.info("s.b. notfound: " + spec);
-      assertNull(getArtifact(repository, spec),
+      assertNull(getArtifact(repository, spec, false),
 		 "Null or non-existent name shouldn't be found: " + spec);
     }
 
@@ -295,9 +347,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 		      "Null",
 		      () -> {repository.getArtifactData(COLL1, null);});
 
-    // Artifact not found
-    // XXX should this throw?
-    assertNull(repository.getArtifactData(COLL1, NO_ARTID));
+    // Artifact ID not found
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+		      "artifact ID",
+		      () -> {repository.getArtifactData(COLL1, NO_ARTID);});
 
     ArtifactSpec cspec = anyCommittedSpec();
     if (cspec != null) {
@@ -317,19 +370,34 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
 		      "collection",
-		      () -> {repository.getArtifactVersion(null, null, null, null);});
+		      () -> {repository.getArtifactVersion(null, null, null, null, false);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "collection",
-		      () -> {repository.getArtifactVersion(null, AUID1, URL1, 1);});
+		      () -> {repository.getArtifactVersion(null, null, null, null, true);});
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "collection",
+		      () -> {repository.getArtifactVersion(null, AUID1, URL1, 1, false);});
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "collection",
+		      () -> {repository.getArtifactVersion(null, AUID1, URL1, 1, true);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "au",
-		      () -> {repository.getArtifactVersion(COLL1, null, URL1, 1);});
+		      () -> {repository.getArtifactVersion(COLL1, null, URL1, 1, false);});
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "au",
+		      () -> {repository.getArtifactVersion(COLL1, null, URL1, 1, true);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "url",
-		      () -> {repository.getArtifactVersion(COLL1, AUID1, null, 1);});
+		      () -> {repository.getArtifactVersion(COLL1, AUID1, null, 1, false);});
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "url",
+		      () -> {repository.getArtifactVersion(COLL1, AUID1, null, 1, true);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "version",
-		      () -> {repository.getArtifactVersion(COLL1, AUID1, URL1, null);});
+		      () -> {repository.getArtifactVersion(COLL1, AUID1, URL1, null, false);});
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "version",
+		      () -> {repository.getArtifactVersion(COLL1, AUID1, URL1, null, true);});
     // XXXAPI illegal version numbers
 //     assertThrowsMatch(IllegalArgumentException.class,
 // 		      "version",
@@ -345,26 +413,34 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     for (ArtifactSpec spec : neverFoundArtifactSpecs) {
       log.info("s.b. notfound: " + spec);
-      assertNull(getArtifactVersion(repository, spec, 1),
+      assertNull(getArtifactVersion(repository, spec, 1, false),
 		 "Null or non-existent name shouldn't be found: " + spec);
-      assertNull(getArtifactVersion(repository, spec, 2),
+      assertNull(getArtifactVersion(repository, spec, 1, true),
+		 "Null or non-existent name shouldn't be found: " + spec);
+      assertNull(getArtifactVersion(repository, spec, 2, false),
+		 "Null or non-existent name shouldn't be found: " + spec);
+      assertNull(getArtifactVersion(repository, spec, 2, true),
 		 "Null or non-existent name shouldn't be found: " + spec);
     }
 
     // Get all added artifacts, check correctness
     for (ArtifactSpec spec : addedSpecs) {
+      spec.assertArtifact(repository, getArtifact(repository, spec, true));
+
       if (spec.isCommitted()) {
 	log.info("s.b. data: " + spec);
-	spec.assertArtifact(repository, getArtifact(repository, spec));
+	spec.assertArtifact(repository, getArtifact(repository, spec, false));
       } else {
 	log.info("s.b. uncommitted: " + spec);
-	assertNull(getArtifact(repository, spec),
+	assertNull(getArtifact(repository, spec, false),
 		   "Uncommitted shouldn't be found: " + spec);
       }
       // XXXAPI illegal version numbers
-      assertNull(getArtifactVersion(repository, spec, 0));
-      assertNull(getArtifactVersion(repository, spec, -1));
-    }    
+      assertNull(getArtifactVersion(repository, spec, 0, false));
+      assertNull(getArtifactVersion(repository, spec, 0, true));
+      assertNull(getArtifactVersion(repository, spec, -1, false));
+      assertNull(getArtifactVersion(repository, spec, -1, true));
+    }
 
     // Ensure that a non-existent version isn't found
     for (ArtifactSpec highSpec : highestVerSpec.values()) {
@@ -372,7 +448,13 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       assertNull(repository.getArtifactVersion(highSpec.getCollection(),
 					       highSpec.getAuid(),
 					       highSpec.getUrl(),
-					       highSpec.getVersion() + 1));
+					       highSpec.getVersion() + 1,
+					       false));
+      assertNull(repository.getArtifactVersion(highSpec.getCollection(),
+					       highSpec.getAuid(),
+					       highSpec.getUrl(),
+					       highSpec.getVersion() + 1,
+					       true));
     }
   }
 
@@ -444,7 +526,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     ArtifactSpec commSpec = anyCommittedSpec();
     if (commSpec != null) {
       // Get the existing artifact
-      Artifact commArt = getArtifact(repository, commSpec);
+      Artifact commArt = getArtifact(repository, commSpec, false);
       // XXXAPI should this throw?
 //       assertThrows(NullPointerException.class,
 // 		   () -> {repository.commitArtifact(commSpec.getCollection(),
@@ -453,6 +535,15 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 						  commSpec.getArtifactId());
       assertEquals(commArt, dupArt);
       commSpec.assertArtifact(repository, dupArt);
+
+      // Get the same artifact when uncommitted may be included.
+      commArt = getArtifact(repository, commSpec, true);
+      assertEquals(commArt, dupArt);
+
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+		      "non-existent artifact id",
+		      () -> {repository.commitArtifact(commSpec.getCollection(),
+						       "NOTANARTID");});
     }
   }
 
@@ -470,8 +561,8 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     // Delete non-existent artifact
     // XXXAPI
-    assertThrowsMatch(IllegalArgumentException.class,
-		      "Non-existent artifact id: " + NO_ARTID,
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+		      "Could not remove artifact id: " + NO_ARTID,
 		      () -> {repository.deleteArtifact(NO_COLL, NO_ARTID);});
 
     {
@@ -484,12 +575,14 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 	long totsize = repository.auSize(spec.getCollection(), spec.getAuid());
 	assertTrue(repository.artifactExists(spec.getCollection(),
 					     spec.getArtifactId()));
-	assertNotNull(getArtifact(repository, spec));
+	assertNotNull(getArtifact(repository, spec, false));
+	assertNotNull(getArtifact(repository, spec, true));
 	log.info("Deleting not highest: " + spec);
 	repository.deleteArtifact(spec.getCollection(), spec.getArtifactId());
 	assertFalse(repository.artifactExists(spec.getCollection(),
 					      spec.getArtifactId()));
-	assertNull(getArtifact(repository, spec));
+	assertNull(getArtifact(repository, spec, false));
+	assertNull(getArtifact(repository, spec, true));
 	delFromAll(spec);
 	assertEquals(totsize,
 		     (long)repository.auSize(spec.getCollection(),
@@ -507,12 +600,14 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 	long artsize = spec.getContentLength();
 	assertTrue(repository.artifactExists(spec.getCollection(),
 					     spec.getArtifactId()));
-	assertNotNull(getArtifact(repository, spec));
+	assertNotNull(getArtifact(repository, spec, false));
+	assertNotNull(getArtifact(repository, spec, true));
 	log.info("Deleting highest: " + spec);
 	repository.deleteArtifact(spec.getCollection(), spec.getArtifactId());
 	assertFalse(repository.artifactExists(spec.getCollection(),
 					      spec.getArtifactId()));
-	assertNull(getArtifact(repository, spec));
+	assertNull(getArtifact(repository, spec, false));
+	assertNull(getArtifact(repository, spec, true));
 	delFromAll(spec);
 	ArtifactSpec newHigh = highestCommittedVerSpec.get(spec.artButVerKey());
 	long exp = totsize - artsize;
@@ -536,12 +631,14 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 	  repository.auSize(uspec.getCollection(), uspec.getAuid());
 	assertTrue(repository.artifactExists(uspec.getCollection(),
 					     uspec.getArtifactId()));
-	assertNull(getArtifact(repository, uspec));
+	assertNull(getArtifact(repository, uspec, false));
+	assertNotNull(getArtifact(repository, uspec, true));
 	log.info("Deleting uncommitted: " + uspec);
 	repository.deleteArtifact(uspec.getCollection(), uspec.getArtifactId());
 	assertFalse(repository.artifactExists(uspec.getCollection(),
 					      uspec.getArtifactId()));
-	assertNull(getArtifact(repository, uspec));
+	assertNull(getArtifact(repository, uspec, false));
+	assertNull(getArtifact(repository, uspec, true));
 	delFromAll(uspec);
 	assertEquals(totsize,
 		     (long)repository.auSize(uspec.getCollection(),
@@ -549,10 +646,42 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 		     "AU size changed after deleting uncommitted");
       }
     }
+  }
+
+  public void testDeleteAllArtifacts() throws IOException {
     // TK Delete committed & uncommitted arts & check results each time
     // delete twice
     // check getAuIds() & getCollectionIds() as they run out
+    Iterator<String> collIter = repository.getCollectionIds().iterator();
 
+    // Loop through all the artifacts.
+    Iterator<ArtifactSpec> iter =
+	(Iterator<ArtifactSpec>)addedSpecStream().iterator();
+
+    while (iter.hasNext()) {
+      // Get the next artifact.
+      ArtifactSpec spec = iter.next();
+      String coll = spec.getCollection();
+      String id = spec.getArtifactId();
+      assertTrue(repository.artifactExists(coll, id), "spec = " + spec);
+      // Delete the artifact.
+      repository.deleteArtifact(coll, id);
+      assertFalse(repository.artifactExists(coll, id), "spec = " + spec);
+      // Delete it again.
+      try {
+	repository.deleteArtifact(coll, id);
+	fail("Should have thrown LockssNoSuchArtifactIdException");
+      } catch (LockssNoSuchArtifactIdException iae) {}
+      assertFalse(repository.artifactExists(coll, id), "spec = " + spec);
+    }
+
+    // There are no collections now.
+    assertFalse(repository.getCollectionIds().iterator().hasNext());
+
+    // There are no AUIds in any of the previously existing collections.
+    while (collIter.hasNext()) {
+      assertFalse(repository.getAuIds(collIter.next()).iterator().hasNext());
+    }
   }
 
   public void testGetAllArtifacts() throws IOException {
@@ -805,10 +934,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // non-existent collection, artifact id
 
     // XXXAPI
-    assertThrowsMatch(IllegalArgumentException.class,
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
 		      "Non-existent artifact id: " + NO_ARTID,
 		      () -> {repository.isArtifactCommitted(COLL1, NO_ARTID);});
-    assertThrowsMatch(IllegalArgumentException.class,
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
 		      "Non-existent artifact id: " + ARTID1,
 		      () -> {repository.isArtifactCommitted(NO_COLL, ARTID1);});
 
@@ -1126,17 +1255,19 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     }
   }
 
-  Artifact getArtifact(LockssRepository repository, ArtifactSpec spec)
-      throws IOException {
+  Artifact getArtifact(LockssRepository repository, ArtifactSpec spec,
+      boolean includeUncommitted) throws IOException {
     log.info(String.format("getArtifact(%s, %s, %s)",
 			   spec.getCollection(),
 			   spec.getAuid(),
-			   spec.getUrl()));
+			   spec.getUrl(),
+			   includeUncommitted));
     if (spec.hasVersion()) {
       return repository.getArtifactVersion(spec.getCollection(),
 					   spec.getAuid(),
 					   spec.getUrl(),
-					   spec.getVersion());
+					   spec.getVersion(),
+					   includeUncommitted);
     } else {
       return repository.getArtifact(spec.getCollection(),
 				    spec.getAuid(),
@@ -1145,17 +1276,19 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   }
 
   Artifact getArtifactVersion(LockssRepository repository, ArtifactSpec spec,
-			      int ver)
+			      int ver, boolean includeUncommitted)
       throws IOException {
     log.info(String.format("getArtifactVersion(%s, %s, %s, %d)",
 			   spec.getCollection(),
 			   spec.getAuid(),
 			   spec.getUrl(),
-			   ver));
+			   ver,
+			   includeUncommitted));
     return repository.getArtifactVersion(spec.getCollection(),
 					 spec.getAuid(),
 					 spec.getUrl(),
-					 ver);
+					 ver,
+					 includeUncommitted);
   }
 
   Artifact addUncommitted(ArtifactSpec spec) throws IOException {
@@ -1183,11 +1316,25 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     assertFalse(newArt.getCommitted());
     assertTrue(repository.artifactExists(spec.getCollection(), newArtId));
 
-    Artifact oldArt = getArtifact(repository, spec);
+    Artifact oldArt = getArtifact(repository, spec, false);
     if (expVers == 0) {
       // this test valid only when no other versions exist ArtifactSpec
       assertNull(oldArt);
     }
+
+    if (spec.hasVersion()) {
+      assertEquals(newArt, getArtifact(repository, spec, true));
+    }
+
+    assertNull(repository.getArtifactVersion(newArt.getCollection(),
+	newArt.getAuid(), newArt.getUri(), newArt.getVersion(), false));
+
+    log.debug("newArt = " + newArt);
+    Artifact newArt2 = repository.getArtifactVersion(newArt.getCollection(),
+	newArt.getAuid(), newArt.getUri(), newArt.getVersion(), true);
+    log.debug("newArt2 = " + newArt2);
+    assertEquals(newArt, newArt2);
+
     spec.setVersion(newArt.getVersion());
     spec.setArtifactId(newArtId);
 
@@ -1201,6 +1348,12 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   }
 
   Artifact commit(ArtifactSpec spec, Artifact art) throws IOException {
+    Artifact uncommittedArt = getArtifact(repository, spec, true);
+    assertNotNull(uncommittedArt);
+    assertFalse(repository.isArtifactCommitted(spec.getCollection(),
+					       uncommittedArt.getId()));
+    assertFalse(uncommittedArt.getCommitted());
+
     String artId = art.getId();
     log.info("committing: " + art);
     Artifact commArt = repository.commitArtifact(spec.getCollection(), artId);
@@ -1220,12 +1373,15 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     spec.assertArtifact(repository, commArt);
 
-    Artifact newArt = getArtifact(repository, spec);
+    Artifact newArt = getArtifact(repository, spec, false);
     assertNotNull(newArt);
     assertTrue(repository.isArtifactCommitted(spec.getCollection(),
 					      newArt.getId()));
     assertTrue(newArt.getCommitted());
     assertTrue(repository.artifactExists(spec.getCollection(), newArt.getId()));
+    // Get the same artifact when uncommitted may be included.
+    Artifact newArt2 = getArtifact(repository, spec, true);
+    assertEquals(newArt, newArt2);
     return newArt;
   }
 

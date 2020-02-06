@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -30,13 +30,12 @@
 
 package org.lockss.laaws.rs.configuration;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.hdfs.HdfsWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
+import org.lockss.log.L4JLogger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,7 +50,7 @@ import java.io.File;
  */
 @Configuration
 public class ArtifactDataStoreConfig {
-    private final static Log log = LogFactory.getLog(ArtifactDataStoreConfig.class);
+    private final static L4JLogger log =  L4JLogger.getLogger();
 
     private final static String DATASTORE_SPEC_KEY = "repo.datastore.spec";
     private final static String HDFS_SERVER_KEY = "repo.datastore.hdfs.server";

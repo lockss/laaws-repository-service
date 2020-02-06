@@ -1,0 +1,79 @@
+# Copyright (c) 2017-2019 Board of Trustees of Leland Stanford Jr. University,
+# all rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# STANFORD UNIVERSITY BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+# IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# Except as contained in this notice, the name of Stanford University shall not
+# be used in advertising or otherwise to promote the sale, use or other dealings
+# in this Software without prior written authorization from Stanford University.
+#
+# Don't make local changes in this file; put local settings in lockss.opt
+
+#org.lockss.log.default.level=debug
+
+org.lockss.platform.diskSpacePaths=./cache
+
+org.lockss.config.reloadInterval = 5m
+
+# UI username-passwd = lockss-u/lockss-p
+org.lockss.platform.ui.username=lockss-u
+org.lockss.platform.ui.password=SHA1:ac4fc8fa9930a24c8d002d541c37ca993e1bc40f
+
+org.lockss.ui.start=no
+#org.lockss.ui.port=24621
+
+# Identity
+#org.lockss.platform.v3.identity=TCP:[127.0.0.1]:9720
+
+
+#
+# The database manager used to store the Archival Unit configurations.
+#
+# Using Derby.
+#org.lockss.configDbManager.derby.infologAppend=true
+##org.lockss.configDbManager.derby.languageLogqueryplan=true
+#org.lockss.configDbManager.derby.languageLogstatementtext=true
+##org.lockss.configDbManager.derby.streamErrorFile=/tmp/derby.log
+#org.lockss.configDbManager.derby.streamErrorLogseveritylevel=0
+#org.lockss.configDbManager.datasource.className=org.apache.derby.jdbc.EmbeddedDataSource
+
+
+###org.lockss.configDbManager.datasource.className=org.apache.derby.jdbc.ClientDataSource
+###org.lockss.configDbManager.datasource.password=goodPassword
+
+
+##org.lockss.configDbManager.datasource.createDatabase=create
+#org.lockss.configDbManager.datasource.databaseName=LockssConfigDbManager
+##org.lockss.configDbManager.datasource.portNumber=1527
+##org.lockss.configDbManager.datasource.serverName=localhost
+##org.lockss.configDbManager.datasource.user=LOCKSS
+
+# Using PostgreSQL.
+#org.lockss.configDbManager.datasource.className=org.postgresql.ds.PGSimpleDataSource
+##org.lockss.configDbManager.datasource.databaseName=LockssConfigDbManager
+##org.lockss.configDbManager.datasource.password=goodPassword
+#org.lockss.configDbManager.datasource.portNumber=5432
+##org.lockss.configDbManager.datasource.serverName=localhost
+##org.lockss.configDbManager.datasource.user=LOCKSS
+##org.lockss.configDbManager.datasource.schemaName=LOCKSS
+
+# Using MySQL
+#org.lockss.configDbManager.datasource.className=com.mysql.jdbc.jdbc2.optional.MysqlDataSource
+
+#org.lockss.restAuth.authenticationType=basic
+

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -30,11 +30,10 @@
 
 package org.lockss.laaws.rs.configuration;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
+import org.lockss.log.L4JLogger;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -46,7 +45,7 @@ import javax.annotation.Resource;
  */
 @Configuration
 public class ArtifactIndexConfig {
-    private final static Log log = LogFactory.getLog(ArtifactIndexConfig.class);
+    private final static L4JLogger log =  L4JLogger.getLogger();
     private final static String INDEX_SPEC_KEY = "repo.index.spec";
     private final static String SOLR_URL_KEY = "repo.index.solr.solrUrl";
 

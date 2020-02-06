@@ -126,7 +126,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
     // The parsed request for diagnostic purposes.
     String parsedRequest = getParsedRequest(request, collectionid);
-    log.trace("Parsed request: " + parsedRequest);
+    log.trace("Parsed request: {}", parsedRequest);
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
@@ -251,7 +251,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
     // The parsed request for diagnostic purposes.
     String parsedRequest = getParsedRequest(request, collectionid);
-    log.trace("Parsed request: " + parsedRequest);
+    log.trace("Parsed request: {}", parsedRequest);
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
@@ -259,7 +259,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Check that the collection exists.
     try {
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-    } catch (IOException e) {
+    } catch (Exception e) {
       String message =
 	  "Cannot validate the collectionid = '" + collectionid + "'";
       log.error(message, e);

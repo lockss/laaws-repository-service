@@ -58,6 +58,11 @@ public class ServiceImplUtil {
    * @return a String with the full URL of the request.
    */
   static String getFullRequestUrl(HttpServletRequest request) {
+    if (request.getQueryString() == null
+	|| request.getQueryString().trim().isEmpty()) {
+      return "'" + request.getMethod() + " " + request.getRequestURL() + "'";
+    }
+
     return "'" + request.getMethod() + " " + request.getRequestURL() + "?"
 	+ request.getQueryString() + "'";
   }
@@ -93,17 +98,27 @@ public class ServiceImplUtil {
    */
   static void validateCollectionId(LockssRepository repo, String collectionid,
       String parsedRequest) throws IOException {
+    log.debug2("repo = {}, collectionid = {}, parsedRequest = {}", repo,
+	collectionid, parsedRequest);
+
+    log.trace("repo.getCollectionIds().iterator().hasNext() = {}",
+	repo.getCollectionIds().iterator().hasNext());
+
+    for (String collectionInRepository : repo.getCollectionIds()) {
+      log.trace("collectionInRepository = {}", collectionInRepository);
+    }
+
     if (!StreamSupport.stream(repo.getCollectionIds().spliterator(), false)
 	.anyMatch(name -> collectionid.equals(name))) {
       String errorMessage = "The collection does not exist";
       log.warn(errorMessage);
-      log.warn("Parsed request: " + parsedRequest);
+      log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage, 
 	  parsedRequest);
     }
 
-    log.debug("collectionid '" + collectionid + "' is valid.");
+    log.debug2("collectionid '{}' is valid.", collectionid);
   }
 
   /**
@@ -203,7 +218,7 @@ public class ServiceImplUtil {
   private static int getArchiveFilenameSeparator(String fileName,
       String parsedRequest) {
     int separatorLocation = fileName.lastIndexOf(archiveFileSeparator);
-    log.trace("separatorLocation =  " + separatorLocation);
+    log.trace("separatorLocation = {}", separatorLocation);
 
     if (separatorLocation < 1) {
       String errorMessage = "Missing separator '" + archiveFileSeparator

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-Copyright (c) 2000-2019, Board of Trustees of Leland Stanford Jr. University
+Copyright (c) 2000-2020, Board of Trustees of Leland Stanford Jr. University
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -39,13 +39,13 @@ POSSIBILITY OF SUCH DAMAGE.
   <parent>
     <groupId>org.lockss</groupId>
     <artifactId>lockss-parent-pom</artifactId>
-    <version>1.10.0</version>
+    <version>1.11.0</version>
     <relativePath />
   </parent>
 
   <groupId>org.lockss.laaws</groupId>
   <artifactId>laaws-repository-service</artifactId>
-  <version>2.0.8.0</version>
+  <version>2.0.9.0</version>
   <packaging>jar</packaging>
   
   <name>laaws-repository-service</name>
@@ -55,7 +55,7 @@ POSSIBILITY OF SUCH DAMAGE.
     <!-- Is a Spring project -->
     <build.java.spring.skip>false</build.java.spring.skip>
     <build.java.package>org.lockss.laaws.rs</build.java.package>
-    <build.java.mainClass>${build.java.package}.Swagger2SpringBoot</build.java.mainClass>
+    <build.java.mainClass>${build.java.package}.RepositoryApplication</build.java.mainClass>
 
     <!-- Is a Docker project -->
     <build.docker.skip>false</build.docker.skip>
@@ -77,18 +77,14 @@ POSSIBILITY OF SUCH DAMAGE.
       <groupId>org.lockss</groupId>
       <artifactId>lockss-spring-bundle</artifactId>
       <version>${version.lockss.lockss-spring-bundle}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.lockss.laaws</groupId>
-          <artifactId>lockss-core</artifactId>  
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpcore</artifactId>
-      <version>${version.dependency.httpcore}</version>
+      <groupId>org.lockss</groupId>
+      <artifactId>lockss-core-tests-bundle</artifactId>
+      <version>${version.lockss.lockss-core-bundle}</version>
+      <type>pom</type>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
@@ -118,12 +114,6 @@ POSSIBILITY OF SUCH DAMAGE.
           <artifactId>servlet-api</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-simple</artifactId>
-      <version>${version.group.slf4j}</version>    
     </dependency>
 
     <dependency>
