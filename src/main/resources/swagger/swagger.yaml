@@ -1,4 +1,4 @@
-# Copyright (c) 2000-2019, Board of Trustees of Leland Stanford Jr. University
+# Copyright (c) 2000-2020, Board of Trustees of Leland Stanford Jr. University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -539,6 +539,84 @@ paths:
           description: The Range header
           required: false
           type: string
+  '/repositories':
+    get:
+      tags:
+        - repo
+      summary: Query the properties of repositories
+      description: Query the system for selected repository properties
+      operationId: getRepositories
+      produces:
+        - application/json
+      parameters:
+        - name: 'repositoryQuery'
+          in: query
+          description: The query that specifies the repository properties to be returned
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Information about the requested TDB AUs
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/repositoryWsResult'
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  '/repositoryspaces':
+    get:
+      tags:
+        - repo
+      summary: Query the properties of repository spaces
+      description: Query the system for selected repository space properties
+      operationId: getRepositorySpaces
+      produces:
+        - application/json
+      parameters:
+        - name: 'repositorySpaceQuery'
+          in: query
+          description: The query that specifies the repository space properties to be returned
+          required: true
+          type: string
+      responses:
+        '200':
+          description: Information about the requested TDB AUs
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/repositorySpaceWsResult'
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  '/checksumalgorithms':
+    get:
+      tags:
+        - import
+      summary: Get the supported checksum algorithms
+      description: Get a list of the names of the supported checksum algorithms
+      operationId: getSupportedChecksumAlgorithms
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: The names of the supported checksum algorithms
+          schema:
+            type: array
+            items:
+              type: "string"
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
 definitions:
   artifactPageInfo:
     type: "object"
@@ -646,4 +724,21 @@ definitions:
         type: "string"
         description: "The link of the next request"
     description: "The information related to pagination of content"
-    
+  repositoryWsResult:
+    type: "object"
+    required:
+      - "repositorySpaceId"
+    properties:
+      repositorySpaceId:
+        type: "string"
+        description: "The Repository Space identifier"
+    description: "Information about the requested repositories"
+  repositorySpaceWsResult:
+    type: "object"
+    required:
+      - "repositorySpaceId"
+    properties:
+      repositorySpaceId:
+        type: "string"
+        description: "The Repository Space identifier"
+    description: "Information about the requested repository spaces"
