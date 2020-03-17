@@ -85,7 +85,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
      */
     @Before
     public void makeLockssRepository() throws Exception {
-      RestTemplate restTemplate = RestUtil.getSimpleFactoryRestTemplate(true);
+      RestTemplate restTemplate = RestUtil.getRestTemplate();
       mockServer = MockRestServiceServer.createServer(restTemplate);
 
       // The authentication credentials.
