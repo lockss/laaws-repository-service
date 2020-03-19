@@ -76,8 +76,7 @@ public class RepoinfoApiServiceImpl extends BaseSpringApiServiceImpl
   }
 
   /**
-   * GET /repositories?query={repositoryQuery}: Provides the selected properties
-   * of selected repositories in the system.
+   * GET /repoinfo: Provides the properties of the repository in the system.
    *
    * @return a {@code ResponseEntity<RepositoryInfo>} with the results.
    */
@@ -88,7 +87,7 @@ public class RepoinfoApiServiceImpl extends BaseSpringApiServiceImpl
     ServiceImplUtil.checkRepositoryReady(repo, null);
 
     try {
-      RepositoryInfo result = repo.getRepositoryInfo(null);
+      RepositoryInfo result = repo.getRepositoryInfo();
       log.debug2("result = {}", result);
       return new ResponseEntity<>(result, HttpStatus.OK);
     } catch (Exception e) {
