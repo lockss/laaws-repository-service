@@ -34,4 +34,6 @@ src/generated/java/org/lockss/laaws/*/model/AuidPageInfo.java
 src/generated/java/org/lockss/laaws/*/model/RepositorySpaceWsResult.java
 src/generated/java/org/lockss/laaws/*/model/RepositoryWsResult.java
 src/generated/java/org/lockss/laaws/*/model/PageInfo.java
+src/generated/java/org/lockss/laaws/*/model/RepositoryInfo.java
+src/generated/java/org/lockss/laaws/*/model/StorageInfo.java
 src/generated/java/org/lockss/laaws/*/model/StreamingResponseBody.java
