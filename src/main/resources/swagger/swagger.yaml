@@ -791,19 +791,19 @@ definitions:
         description: "Name of the storage area"
         type: "string"
       size:
-        description: "Size of the storage area"
+        description: "Size in bytes of the storage area"
         type: "integer"
         format: "int64"
       used:
-        description: "Used size of storage area"
+        description: "Used size in bytes of the torage area"
         type: "integer"
         format: "int64"
       avail:
-        description: "Available size of storage area"
+        description: "Available size in bytes of the storage area"
         type: "integer"
         format: "int64"
       percentUsedString:
-        description: "Percentage of size used as a string"
+        description: "Percentage of size used, formatted as a string"
         type: "string"
       percentUsed:
         description: "Percentage of size used"
