@@ -42,19 +42,3 @@ sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import o
 # Edit CollectionsApi.java.
 COLLECTIONS_API=src/generated/java/org/lockss/laaws/rs/api/CollectionsApi.java
 sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody/" $COLLECTIONS_API && rm $COLLECTIONS_API.backup
-
-# Edit RepositoriesApiDelegate.java.
-REPOSITORIES_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/RepositoriesApiDelegate.java
-sed -i.backup "s/import org.lockss.laaws.rs.model.RepositoryWsResult/import org.lockss.ws.entities.RepositoryWsResult/" $REPOSITORIES_API_DELEGATE && rm $REPOSITORIES_API_DELEGATE.backup
-
-# Edit RepositoriesApi.java.
-REPOSITORIES_API=src/generated/java/org/lockss/laaws/rs/api/RepositoriesApi.java
-sed -i.backup "s/import org.lockss.laaws.rs.model.RepositoryWsResult/import org.lockss.ws.entities.RepositoryWsResult/" $REPOSITORIES_API && rm $REPOSITORIES_API.backup
-
-# Edit RepositoryspacesApiDelegate.java.
-REPOSITORY_SPACES_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/RepositoryspacesApiDelegate.java
-sed -i.backup "s/import org.lockss.laaws.rs.model.RepositorySpaceWsResult/import org.lockss.ws.entities.RepositorySpaceWsResult/" $REPOSITORY_SPACES_API_DELEGATE && rm $REPOSITORY_SPACES_API_DELEGATE.backup
-
-# Edit RepositoryspacesApi.java.
-REPOSITORY_SPACES_API=src/generated/java/org/lockss/laaws/rs/api/RepositoryspacesApi.java
-sed -i.backup "s/import org.lockss.laaws.rs.model.RepositorySpaceWsResult/import org.lockss.ws.entities.RepositorySpaceWsResult/" $REPOSITORY_SPACES_API && rm $REPOSITORY_SPACES_API.backup
