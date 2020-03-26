@@ -135,7 +135,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
         }
     }
 
-    protected LockssRepository repository;
+    protected RestLockssRepository repository;
 
   // ArtifactSpec for each Artifact that has been added to the repository
   List<ArtifactSpec> addedSpecs = new ArrayList<ArtifactSpec>();
@@ -153,7 +153,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
    * @return a LockssRepository with the newly built LOCKSS repository.
    * @throws Exception if there are problems.
    */
-    public LockssRepository makeLockssRepository() throws Exception {
+    public RestLockssRepository makeLockssRepository() throws Exception {
       log.info("port = " + port);
       return new RestLockssRepository(
 	  new URL(String.format("http://localhost:%d", port)), null, null);
@@ -222,7 +222,30 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       .setContentGenerator(() -> new ZeroInputStream((byte)27, len))
       .setCollectionDate(0);
     Artifact newArt = addUncommitted(spec);
-    Artifact commArt = commit(spec, newArt);
+    String storeUrl = newArt.getStorageUrl();
+    log.info("uncommArt.getStorageUrl(): " + storeUrl);
+    Artifact commArt = repository.commitArtifact(spec.getCollection(),
+						 newArt.getId());
+    spec.setCommitted(true);
+    log.info("commArt.getStorageUrl(): " + commArt.getStorageUrl());
+    if (!commArt.getStorageUrl().equals(storeUrl)) {
+      // The storage URL should not change until the background copy has
+      // completely, which should take significant time.  If it has changed
+      // already that might be an indication that the copy happened
+      // synchronously
+      log.warn("Storage URL of huge Artifact changed immediately after commit: "
+	       + commArt.getStorageUrl());
+    }
+    // Ensure that the artifact eventually moves from temp to perm WARC and
+    // that it's still correct after that happens.
+    // Might not see change in storageUrl due to Artifact cache, so disable it
+    repository.enableArtifactCache(false, null);
+    while (commArt.getStorageUrl().equals(storeUrl)) {
+      commArt = repository.getArtifact(spec.getCollection(),
+				       spec.getAuid(),
+				       spec.getUrl());
+      log.info("commArt.getStorageUrl(): " + commArt.getStorageUrl());
+    }
     spec.assertArtifact(repository, commArt);
   }
 
