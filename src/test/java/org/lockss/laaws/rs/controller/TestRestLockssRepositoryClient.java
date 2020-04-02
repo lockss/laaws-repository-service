@@ -1,44 +1,34 @@
 /*
-
-Copyright (c) 2019 Board of Trustees of Leland Stanford Jr. University,
-all rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation and/or
-other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors
-may be used to endorse or promote products derived from this software without
-specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+ * Copyright (c) 2019, Board of Trustees of Leland Stanford Jr. University,
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.controller;
 
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.net.URL;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
@@ -54,10 +44,11 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
-import org.lockss.util.LockssUncheckedException;
-import org.lockss.util.rest.exception.*;
-import org.lockss.util.test.LockssTestCase5;
 import org.lockss.log.L4JLogger;
+import org.lockss.util.LockssUncheckedException;
+import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
+import org.lockss.util.test.LockssTestCase5;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -66,6 +57,15 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
+
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 /**
  * Test of the REST repository client.
@@ -317,12 +317,23 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
     @Test
     public void testAddArtifact_success() throws Exception {
         mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts", BASEURL)))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("{\"id\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON));
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("{\"id\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON));
 
-        byte buf[] = new byte[] {};
+        byte buf[] = new byte[]{};
 
-        Artifact result = repository.addArtifact(new ArtifactData(new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2), new HttpHeaders(), new ByteArrayInputStream(buf), new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null), "storageUrl1", new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")));
+        Artifact result = repository.addArtifact(
+            new ArtifactData(
+                new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2),
+                new HttpHeaders(),
+                new ByteArrayInputStream(buf),
+                new BasicStatusLine(
+                    new ProtocolVersion("protocol1", 4, 5), 3, null),
+                new URI("storageUrl1"),
+                new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+            )
+        );
+
         mockServer.verify();
 
         assertNotNull(result);
@@ -337,7 +348,17 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
                 .andRespond(withServerError());
 
         try {
-            repository.addArtifact(new ArtifactData(new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2), new HttpHeaders(), new ByteArrayInputStream(new byte[] {}), new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null), "storageUrl1", new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")));
+            repository.addArtifact(
+                new ArtifactData(
+                    new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2),
+                    new HttpHeaders(),
+                    new ByteArrayInputStream(new byte[]{}),
+                    new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null),
+                    new URI("storageUrl1"),
+                    new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+                )
+            );
+
             fail("Should have thrown IOException");
         } catch (IOException ioe) {}
     }
@@ -363,12 +384,12 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
-                new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
-                referenceHeaders,
-                new ByteArrayInputStream("hello world".getBytes()),
-                new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-                "storageUrl1",
-                new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream("hello world".getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
         );
 
         // Convenience variables
