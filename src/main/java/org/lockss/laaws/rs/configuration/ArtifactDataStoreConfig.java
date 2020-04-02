@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -44,6 +44,8 @@ import org.springframework.data.hadoop.config.annotation.builders.HadoopConfigBu
 
 import javax.annotation.Resource;
 import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal artifact data store.
@@ -77,7 +79,7 @@ public class ArtifactDataStoreConfig {
             switch (datastoreSpec.trim().toLowerCase()) {
                 case "hdfs":
                     String hdfsServer = env.getProperty(HDFS_SERVER_KEY);
-                    String hdfsBaseDir = env.getProperty(HDFS_BASEDIR_KEY);
+                    Path hdfsBaseDir = Paths.get(env.getProperty(HDFS_BASEDIR_KEY));
 
                     log.info(String.format(
                             "Configuring HDFS artifact data store [%s, %s]",
@@ -87,12 +89,13 @@ public class ArtifactDataStoreConfig {
 
                     HadoopConfigBuilder config = new HadoopConfigBuilder();
                     config.fileSystemUri(hdfsServer);
+
                     return new HdfsWarcArtifactDataStore(index, config.build(), hdfsBaseDir);
 
                 case "local":
-                    String baseDir = env.getProperty(LOCAL_BASEDIR_KEY);
+                    File baseDir = new File(env.getProperty(LOCAL_BASEDIR_KEY));
                     log.info(String.format("Configuring local filesystem artifact data store [%s]", baseDir));
-                    return new LocalWarcArtifactDataStore(index, new File(baseDir));
+                    return new LocalWarcArtifactDataStore(index, baseDir);
 
                 case "volatile":
                     log.info("Configuring volatile artifact data store");
