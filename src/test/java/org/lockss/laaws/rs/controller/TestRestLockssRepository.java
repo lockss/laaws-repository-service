@@ -125,14 +125,23 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     @Autowired
     ApplicationContext appCtx;
 
+    static List<File> tmpDirs = new ArrayList<>();;
+
     @TestConfiguration
     static class TestLockssRepositoryConfig {
         @Bean
         public LockssRepository createInitializedRepository() throws IOException {
-            LockssRepository repository = new VolatileLockssRepository();
+            LockssRepository repository =
+              LockssRepositoryFactory.createLocalRepository(LockssTestCase5.getTempDir(tmpDirs),
+                                                            "coll1");
             repository.initRepository();
             return repository;
         }
+    }
+
+    @AfterClass
+    public static void deleteTempDirs() throws Exception {
+      LockssTestCase5.deleteTempFiles(tmpDirs);
     }
 
     protected RestLockssRepository repository;
