@@ -1295,12 +1295,18 @@ public class CollectionsApiServiceImpl
 
   private void validateAuId(String collectionid, String auid,
       String parsedRequest) throws IOException {
+
+    // XXX Disabled.  It's normal for clients to ask about AUs that haven't
+    // had any content stored in them.  Also, this is likely to trigger
+    // CMEs in VolatileArtifactIndex's iterators in tests and dev env.
+    if (true) return;
+
     log.debug2("collectionid = '{}'", collectionid);
     log.debug2("auid = '{}'", auid);
     log.debug2("parsedRequest = '{}'", parsedRequest);
     if (!StreamSupport.stream(repo.getAuIds(collectionid).spliterator(), false)
 	.anyMatch(name -> auid.equals(name))) {
-      String errorMessage = "The archival unit does not exist";
+      String errorMessage = "The archival unit has no artifacts (possibly because it hasn't been collected yet)";
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
@@ -1492,6 +1498,8 @@ public class CollectionsApiServiceImpl
 	    sendPingResponse(key);
 	    break;
 	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE:
+	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_ECHO_RESP:
+	  case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_FLUSH:
 	    // expected, ignore
 	    break;
 	  default:

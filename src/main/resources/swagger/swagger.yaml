@@ -1,4 +1,4 @@
-# Copyright (c) 2000-2019, Board of Trustees of Leland Stanford Jr. University
+# Copyright (c) 2000-2020, Board of Trustees of Leland Stanford Jr. University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -539,6 +539,46 @@ paths:
           description: The Range header
           required: false
           type: string
+  '/checksumalgorithms':
+    get:
+      tags:
+        - import
+      summary: Get the supported checksum algorithms
+      description: Get a list of the names of the supported checksum algorithms
+      operationId: getSupportedChecksumAlgorithms
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: The names of the supported checksum algorithms
+          schema:
+            type: array
+            items:
+              type: "string"
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  '/repoinfo':
+    get:
+      tags:
+        - repo
+      summary: Get repository information
+      description: Get properties of the repository
+      operationId: getRepositoryInformation
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: The repository information
+          schema:
+            $ref: "#/definitions/repositoryInfo"
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
 definitions:
   artifactPageInfo:
     type: "object"
@@ -646,4 +686,53 @@ definitions:
         type: "string"
         description: "The link of the next request"
     description: "The information related to pagination of content"
-    
+  repositoryInfo:
+    type: "object"
+    required:
+      - "storeInfo"
+      - "indexInfo"
+    properties:
+      storeInfo:
+        description: "Information about the repository store"
+        $ref: "#/definitions/storageInfo"
+      indexInfo:
+        description: "Information about the repository index"
+        $ref: "#/definitions/storageInfo"
+    description: "Information about the repository"
+  storageInfo:
+    type: "object"
+    required:
+      - "type"
+      - "name"
+      - "size"
+      - "used"
+      - "avail"
+      - "percentUsedString"
+      - "percentUsed"
+    properties:
+      type:
+        description: "Type of the storage area"
+        type: "string"
+      name:
+        description: "Name of the storage area"
+        type: "string"
+      size:
+        description: "Size in bytes of the storage area"
+        type: "integer"
+        format: "int64"
+      used:
+        description: "Used size in bytes of the torage area"
+        type: "integer"
+        format: "int64"
+      avail:
+        description: "Available size in bytes of the storage area"
+        type: "integer"
+        format: "int64"
+      percentUsedString:
+        description: "Percentage of size used, formatted as a string"
+        type: "string"
+      percentUsed:
+        description: "Percentage of size used"
+        type: "number"
+        format: "double"
+    description: "Information about a repository storage area"

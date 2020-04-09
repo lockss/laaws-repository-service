@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2019-2020, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -46,6 +46,7 @@ import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.LockssUncheckedException;
+import org.lockss.util.rest.RestUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
 import org.lockss.util.test.LockssTestCase5;
@@ -84,7 +85,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
      */
     @Before
     public void makeLockssRepository() throws Exception {
-      RestTemplate restTemplate = new RestTemplate();
+      RestTemplate restTemplate = RestUtil.getRestTemplate();
       mockServer = MockRestServiceServer.createServer(restTemplate);
 
       // The authentication credentials.
