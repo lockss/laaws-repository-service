@@ -46,6 +46,7 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal artifact data store.
@@ -83,8 +84,8 @@ public class ArtifactDataStoreConfig {
 
                     log.info(String.format(
                             "Configuring HDFS artifact data store [%s, %s]",
-                            hdfsServer,
-                            hdfsBaseDir
+                        hdfsServer,
+                        hdfsBaseDir
                     ));
 
                     HadoopConfigBuilder config = new HadoopConfigBuilder();
@@ -93,9 +94,10 @@ public class ArtifactDataStoreConfig {
                     return new HdfsWarcArtifactDataStore(index, config.build(), hdfsBaseDir);
 
                 case "local":
-                    File baseDir = new File(env.getProperty(LOCAL_BASEDIR_KEY));
-                    log.info(String.format("Configuring local filesystem artifact data store [%s]", baseDir));
-                    return new LocalWarcArtifactDataStore(index, baseDir);
+                    String[] dirs = env.getProperty(LOCAL_BASEDIR_KEY).split(";");
+                    File[] baseDirs = Arrays.stream(dirs).map(File::new).toArray(File[]::new);
+                    log.info("Configuring local artifact data store [baseDirs: {}]", Arrays.asList(baseDirs));
+                    return new LocalWarcArtifactDataStore(index, baseDirs);
 
                 case "volatile":
                     log.info("Configuring volatile artifact data store");

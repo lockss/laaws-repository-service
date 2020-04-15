@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019, Board of Trustees of Leland Stanford Jr. University,
+ * Copyright (c) 2019, Board of Trustees of Leland Stanford Jr. University,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -30,15 +30,14 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import org.lockss.app.LockssDaemon;
+import org.lockss.jms.JMSManager;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.util.JmsFactorySource;
-import org.lockss.app.LockssDaemon;
-import org.lockss.util.*;
-import org.lockss.util.jms.*;
-import org.lockss.jms.*;
 import org.lockss.log.L4JLogger;
+import org.lockss.util.Deadline;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,6 +47,7 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -108,24 +108,23 @@ public class LockssRepositoryConfig {
 
 		    // Check whether a local implementation is configured.
 		    switch (repositoryType) {
-		    case "local": {
-			// Yes: Get the configured filesystem path.
-			String repositoryLocalPath = specParts[1];
+					case "local": {
+						// Yes: Get the configured filesystem paths.
+						String[] dirs = specParts[1].split(";");
+						File[] baseDirs = Arrays.stream(dirs).map(File::new).toArray(File[]::new);
+						log.trace("baseDirs = {}", Arrays.asList(baseDirs));
+						return new LocalLockssRepository(baseDirs, repositoryPersistIndexName);
+					}
 
-			log.debug("repositoryLocalPath = {}", repositoryLocalPath);
+					case "rest": {
+						String repositoryRestUrl = specParts[1];
+						log.debug("repositoryRestUrl = {}", repositoryRestUrl);
 
-			return new LocalLockssRepository(new File(repositoryLocalPath), repositoryPersistIndexName);
-		    }
-
-		    case "rest": {
-		      String repositoryRestUrl = specParts[1];
-		      log.debug("repositoryRestUrl = {}", repositoryRestUrl);
-
-		      // Get the REST client credentials.
-		      List<String> restClientCredentials = LockssDaemon
-			  .getLockssDaemon().getRestClientCredentials();
-		      log.trace("restClientCredentials = {}",
-			  restClientCredentials);
+						// Get the REST client credentials.
+						List<String> restClientCredentials = LockssDaemon
+								.getLockssDaemon().getRestClientCredentials();
+						log.trace("restClientCredentials = {}",
+								restClientCredentials);
 
 		      String userName = null;
 		      String password = null;
@@ -134,23 +133,23 @@ public class LockssRepositoryConfig {
 		      if (restClientCredentials != null
 			  && restClientCredentials.size() > 0) {
 			// Yes: Get the user name.
-			userName = restClientCredentials.get(0);
-			log.trace("userName = " + userName);
+						userName = restClientCredentials.get(0);
+						log.trace("userName = " + userName);
 
-			// Check whether there is a user password.
-			if (restClientCredentials.size() > 1) {
-			  // Yes: Get the user password.
-			  password = restClientCredentials.get(1);
-			}
+						// Check whether there is a user password.
+						if (restClientCredentials.size() > 1) {
+							// Yes: Get the user password.
+							password = restClientCredentials.get(1);
+						}
 
-			// Check whether no configured user was found.
-			if (userName == null || password == null) {	
-			  String errMsg =
-			      "No user has been configured for authentication";
-			  log.error(errMsg);
-			  throw new IllegalArgumentException(errMsg);
-			}
-		      }
+						// Check whether no configured user was found.
+						if (userName == null || password == null) {
+							String errMsg =
+									"No user has been configured for authentication";
+							log.error(errMsg);
+							throw new IllegalArgumentException(errMsg);
+						}
+					}
 
 		      return new RestLockssRepository(
 			  new URL(repositoryRestUrl), userName, password);
