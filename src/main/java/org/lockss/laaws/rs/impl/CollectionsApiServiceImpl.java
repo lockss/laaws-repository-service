@@ -1161,7 +1161,7 @@ public class CollectionsApiServiceImpl
 
 	// Set up the iterator timeout.
         TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
-            auidIteratorTimeoutCallback, iterator);
+            auidIteratorTimeoutCallback, iterator.hashCode());
       } else {
 	// No: Get the iterator (if any) used to provide a previous page of
 	// results.
@@ -1178,7 +1178,7 @@ public class CollectionsApiServiceImpl
 
 	  // Set up the iterator timeout.
 	  TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
-	      auidIteratorTimeoutCallback, iterator);
+	      auidIteratorTimeoutCallback, iterator.hashCode());
 
 	  // Loop through the auids skipping those already returned through a
 	  // previous response.
