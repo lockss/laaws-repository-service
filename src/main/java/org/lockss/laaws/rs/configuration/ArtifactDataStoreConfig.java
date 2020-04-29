@@ -58,7 +58,9 @@ public class ArtifactDataStoreConfig {
     private final static String DATASTORE_SPEC_KEY = "repo.datastore.spec";
     private final static String HDFS_SERVER_KEY = "repo.datastore.hdfs.server";
     private final static String HDFS_BASEDIR_KEY = "repo.datastore.hdfs.basedir";
-    private final static String LOCAL_BASEDIR_KEY = "repo.datastore.local.basedir";
+
+    private final static String LOCAL_BASEDIRS_KEY = "repo.datastore.local.basedirs";
+    private final static String LOCAL_BASEDIRS_FALLBACK_KEY = "repo.datastore.local.basedir";
 
     @Resource
     private Environment env;
@@ -94,7 +96,17 @@ public class ArtifactDataStoreConfig {
                     return new HdfsWarcArtifactDataStore(index, config.build(), hdfsBaseDir);
 
                 case "local":
-                    String[] dirs = env.getProperty(LOCAL_BASEDIR_KEY).split(";");
+                    String baseDirsProp = env.getProperty(LOCAL_BASEDIRS_KEY);
+
+                    if (baseDirsProp == null) {
+                        baseDirsProp = env.getProperty(LOCAL_BASEDIRS_FALLBACK_KEY);
+                        if (baseDirsProp == null) {
+                            log.error("No local base directories specified");
+                            throw new IllegalArgumentException("No local base dirs");
+                        }
+                    }
+
+                    String[] dirs = baseDirsProp.split(";");
                     File[] baseDirs = Arrays.stream(dirs).map(File::new).toArray(File[]::new);
                     log.info("Configuring local artifact data store [baseDirs: {}]", Arrays.asList(baseDirs));
                     return new LocalWarcArtifactDataStore(index, baseDirs);
