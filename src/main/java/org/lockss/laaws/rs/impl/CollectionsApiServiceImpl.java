@@ -58,7 +58,7 @@ import org.lockss.laaws.rs.model.PageInfo;
 import org.lockss.laaws.rs.util.ArtifactComparators;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataFactory;
-import org.lockss.laaws.rs.util.ArtifactDataUtil;
+import org.lockss.laaws.rs.util.NamedInputStreamResource;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.*;
 import org.lockss.util.TimerQueue;
@@ -68,13 +68,12 @@ import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
  * Service for accessing the repository artifacts.
@@ -327,7 +326,9 @@ public class CollectionsApiServiceImpl
    * @return a {@code ResponseEntity<StreamingResponseBody>}.
    */
   @Override
-  public ResponseEntity<StreamingResponseBody> getArtifact(String collectionid, String artifactid, String accept) {
+  public ResponseEntity getArtifact(
+      String collectionid, String artifactid, String accept, Boolean includeContent
+  ) {
 
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, accept: %s, requestUrl: %s",
@@ -355,11 +356,6 @@ public class CollectionsApiServiceImpl
       // Setup HTTP response headers
       HttpHeaders headers = new HttpHeaders();
 
-      headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
-
-      // TODO: Set to content length of the HTTP response entity body (i.e., the HTTP response encoding the artifact)
-//      headers.setContentLength(artifactData.getContentLength());
-
       // Include LOCKSS repository headers in the HTTP response
       ArtifactIdentifier id = artifactData.getIdentifier();
       headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
@@ -381,12 +377,36 @@ public class CollectionsApiServiceImpl
       headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(artifactData.getContentLength()));
       headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, artifactData.getContentDigest());
 
-      return new ResponseEntity<>(
-          outputStream -> ArtifactDataUtil.writeHttpResponse(
-              ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData),
-              outputStream
-          ),
-          headers,
+//      return new ResponseEntity<>(
+//          outputStream -> ArtifactDataUtil.writeHttpResponse(
+//              ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData),
+//              outputStream
+//          ),
+//          headers,
+//          HttpStatus.OK
+//      );
+
+      MultiValueMap<String, HttpEntity<?>> parts = new LinkedMultiValueMap<>();
+
+      // Artifact header part
+      Map<String, Object> resultProperties = new HashMap<>();
+      resultProperties.put("test", "ok");
+      parts.add("artifact-header", new HttpEntity<>(resultProperties, new HttpHeaders()));
+
+      // Artifact content part
+      if (includeContent) {
+//        HttpHeaders partHeaders = new HttpHeaders();
+        headers.setContentLength(artifactData.getContentLength());
+        Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
+        parts.add("artifact-content", new HttpEntity<>(resource, headers));
+      }
+
+      HttpHeaders responseHeaders = new HttpHeaders();
+      responseHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+      return new ResponseEntity<MultiValueMap<String, HttpEntity<?>>>(
+          parts,
+          responseHeaders,
           HttpStatus.OK
       );
 
