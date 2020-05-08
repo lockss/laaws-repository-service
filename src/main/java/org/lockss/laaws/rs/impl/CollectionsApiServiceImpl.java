@@ -327,35 +327,35 @@ public class CollectionsApiServiceImpl
    * @return a {@code ResponseEntity<StreamingResponseBody>}.
    */
   @Override
-  public ResponseEntity<StreamingResponseBody> getArtifact(String collectionid,
-                                                           String artifactid, String accept) {
+  public ResponseEntity<StreamingResponseBody> getArtifact(String collectionid, String artifactid, String accept) {
+
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, accept: %s, requestUrl: %s",
-        collectionid, artifactid, accept,
-        ServiceImplUtil.getFullRequestUrl(request));
+        collectionid, artifactid, accept, ServiceImplUtil.getFullRequestUrl(request)
+    );
+
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      log.debug2(String.format("Retrieving artifact: %s from collection %s",
-          artifactid, collectionid));
+      log.debug2("Retrieving artifact [artifactId: {}, collectionId: {}]", artifactid, collectionid);
 
       // Check that the collection exists.
 //      validateCollectionId(collectionid, parsedRequest);
 
       // Check that the artifact exists
-      validateArtifactExists(collectionid, artifactid,
-          "The artifact to be retrieved does not exist", parsedRequest);
+      validateArtifactExists(
+          collectionid, artifactid, "The artifact to be retrieved does not exist", parsedRequest
+      );
 
       // Retrieve the ArtifactData from the artifact store
-      ArtifactData artifactData =
-          repo.getArtifactData(collectionid, artifactid);
+      ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
 
       // Setup HTTP response headers
       HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(
-          MediaType.parseMediaType("application/http; msgtype=response"));
+
+      headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
 
       // TODO: Set to content length of the HTTP response entity body (i.e., the HTTP response encoding the artifact)
 //      headers.setContentLength(artifactData.getContentLength());
@@ -363,12 +363,10 @@ public class CollectionsApiServiceImpl
       // Include LOCKSS repository headers in the HTTP response
       ArtifactIdentifier id = artifactData.getIdentifier();
       headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
-      headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY,
-          id.getCollection());
+      headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getCollection());
       headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
       headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
-      headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY,
-          String.valueOf(id.getVersion()));
+      headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
 
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_COMMITTED,
@@ -391,19 +389,21 @@ public class CollectionsApiServiceImpl
           headers,
           HttpStatus.OK
       );
-    } catch (LockssRestServiceException lre) {
+
+    } catch (LockssRestServiceException e) {
       // Let it cascade to the controller advice exception handler.
-      throw lre;
+      throw e;
+
     } catch (IOException e) {
       String errorMessage = String.format(
           "IOException occurred while attempting to retrieve artifact from repository (artifactId: %s)",
-          artifactid);
+          artifactid
+      );
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
-          errorMessage, e, parsedRequest);
+      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, errorMessage, e, parsedRequest);
     }
   }
 
