@@ -32,12 +32,14 @@ package org.lockss.laaws.rs.configuration;
 
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
+import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.log.L4JLogger;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
+import java.io.File;
 import javax.annotation.Resource;
 
 /**
@@ -71,6 +73,19 @@ public class ArtifactIndexConfig {
 
                 case "volatile":
                     return new VolatileArtifactIndex();
+
+                case "local":
+		  String baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_KEY);
+		  if (baseDirsProp == null) {
+		    baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_FALLBACK_KEY);
+		    if (baseDirsProp == null) {
+		      log.error("No local base directories specified");
+		      throw new IllegalArgumentException("No local base dirs");
+		    }
+		  }
+		  String[] baseDirs = baseDirsProp.split(";");
+		  return new LocalArtifactIndex(new File(baseDirs[0]),
+						env.getProperty(LockssRepositoryConfig.REPO_PERSISTINDEXNAME_KEY));
 
                 default:
                     String errMsg = String.format("Unknown index specification '%s'", indexSpec);
