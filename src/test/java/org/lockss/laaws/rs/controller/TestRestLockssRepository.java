@@ -308,6 +308,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
   public void testAllNoSideEffect() throws IOException {
     testGetArtifact();
     testGetArtifactData();
+    testGetArtifactHeaders();
     testGetArtifactVersion();
     testArtifactExists();
     testAuSize();
@@ -395,6 +396,34 @@ public class TestRestLockssRepository extends LockssTestCase5 {
       ArtifactData ad = repository.getArtifactData(uspec.getCollection(),
 						   uspec.getArtifactId());
       uspec.assertArtifactData(ad);
+    }
+  }
+
+  /**
+   * Test for {@link RestLockssRepository#getArtifactHeaders(String, String)}.
+   *
+   * @throws IOException
+   */
+  public void testGetArtifactHeaders() throws IOException {
+    // Artifact ID not found
+    assertThrowsMatch(
+        LockssNoSuchArtifactIdException.class,
+        "artifact ID",
+        () -> repository.getArtifactData(COLL1, NO_ARTID)
+    );
+
+    ArtifactSpec cspec = anyCommittedSpec();
+
+    if (cspec != null) {
+      // Get expected headers from artifact spec
+      HttpHeaders expectedHeaders = new HttpHeaders();
+      expectedHeaders.setAll(cspec.getHeaders());
+
+      // Get headers from repository service
+      HttpHeaders actualHeaders = repository.getArtifactHeaders(cspec.getCollection(), cspec.getArtifactId());
+
+      // Assert the headers returned by the service match those from the spec
+      assertEquals(expectedHeaders, actualHeaders);
     }
   }
 

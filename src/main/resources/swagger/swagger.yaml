@@ -206,6 +206,41 @@ paths:
       required: true
       type: "string"
       description: "Identifier of the artifact"
+  /collections/{collectionId}/artifacts/{artifactId}/headers:
+    get:
+      tags:
+        - collections
+      summary: "Get the headers of the artifact"
+      description: "Gets a map of the artifact's headers"
+      operationId: getArtifactHeaders
+      responses:
+        200:
+          description: "A map of the artifact's headers"
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Artifact not found"
+        502:
+          description: "Could not read from external resource"
+      parameters:
+        - name: "collectionId"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Identifier of the collection containing this artifact"
+        - name: "artifactId"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Artifact ID"
   /collections/{collectionid}/aus:
     get:
       tags:

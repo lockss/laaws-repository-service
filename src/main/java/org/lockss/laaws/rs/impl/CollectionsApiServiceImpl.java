@@ -398,6 +398,34 @@ public class CollectionsApiServiceImpl
     }
   }
 
+  @Override
+  public ResponseEntity<Map<String, List<String>>> getArtifactHeaders(String collectionId, String artifactId) {
+    // Debugging
+    String parsedRequest = String.format("collectionId: %s, artifactId: %s", collectionId, artifactId);
+    log.debug2("Parsed request: {}", parsedRequest);
+
+    try {
+      // Verify artifact exists
+      validateArtifactExists(collectionId, artifactId, "Artifact does not exist", parsedRequest);
+
+      // Return artifact headers
+      return new ResponseEntity<>(
+          repo.getArtifactHeaders(collectionId, artifactId),
+          null,
+          HttpStatus.OK
+      );
+
+    } catch (IOException e) {
+      String errorMessage = "Caught IOException while attempt to retrieve artifact headers";
+      log.error(errorMessage);
+      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, errorMessage, e, parsedRequest);
+
+    } catch (LockssRestServiceException e) {
+      // Let it cascade to the controller advice exception handler.
+      throw e;
+    }
+  }
+
   /**
    * PUT /collections/{collectionid}/artifacts/{artifactid}:
    * Updates an artifact's properties
