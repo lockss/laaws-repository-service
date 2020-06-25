@@ -48,6 +48,7 @@ import org.junit.*;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.model.*;
+import org.lockss.log.L4JLogger;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.rest.exception.*;
 import org.lockss.util.time.TimeBase;
@@ -65,8 +66,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class TestRestLockssRepository extends LockssTestCase5 {
-  private final static Log log =
-    LogFactory.getLog(TestRestLockssRepository.class);
+  private final static L4JLogger log = L4JLogger.getLogger();
 
   protected static int MAX_RANDOM_FILE = 50000;
   protected static int MAX_INCR_FILE = 20000;
