@@ -137,20 +137,11 @@ paths:
         - "application/http"
         - "application/warc"
         - "multipart/related"
-      - name: "includeContent"
-        in: "query"
-        required: false
-        type: "boolean"
-        description: "New commit status of artifact"
-        default: true
-      produces:
-        - multipart/form-data
       responses:
         200:
           description: "Artifact created"
           schema:
-            type: file
-#            $ref: "#/definitions/streamingResponseBody"
+            $ref: "#/definitions/streamingResponseBody"
         401:
           description: "Unauthorized request"
         403:

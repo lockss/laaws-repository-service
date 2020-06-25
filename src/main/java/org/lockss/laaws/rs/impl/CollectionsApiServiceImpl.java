@@ -33,12 +33,7 @@ package org.lockss.laaws.rs.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
@@ -55,10 +50,7 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.laaws.rs.model.PageInfo;
-import org.lockss.laaws.rs.util.ArtifactComparators;
-import org.lockss.laaws.rs.util.ArtifactConstants;
-import org.lockss.laaws.rs.util.ArtifactDataFactory;
-import org.lockss.laaws.rs.util.NamedInputStreamResource;
+import org.lockss.laaws.rs.util.*;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.*;
 import org.lockss.util.TimerQueue;
@@ -74,6 +66,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
  * Service for accessing the repository artifacts.
@@ -326,9 +319,7 @@ public class CollectionsApiServiceImpl
    * @return a {@code ResponseEntity<StreamingResponseBody>}.
    */
   @Override
-  public ResponseEntity getArtifact(
-      String collectionid, String artifactid, String accept, Boolean includeContent
-  ) {
+  public ResponseEntity<StreamingResponseBody> getArtifact(String collectionid, String artifactid, String accept) {
 
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, accept: %s, requestUrl: %s",
@@ -355,6 +346,10 @@ public class CollectionsApiServiceImpl
 
       // Setup HTTP response headers
       HttpHeaders headers = new HttpHeaders();
+      headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
+
+      // TODO: Set to content length of the HTTP response entity body (i.e., the HTTP response encoding the artifact)
+//      headers.setContentLength(artifactData.getContentLength());
 
       // Include LOCKSS repository headers in the HTTP response
       ArtifactIdentifier id = artifactData.getIdentifier();
@@ -377,36 +372,12 @@ public class CollectionsApiServiceImpl
       headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(artifactData.getContentLength()));
       headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, artifactData.getContentDigest());
 
-//      return new ResponseEntity<>(
-//          outputStream -> ArtifactDataUtil.writeHttpResponse(
-//              ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData),
-//              outputStream
-//          ),
-//          headers,
-//          HttpStatus.OK
-//      );
-
-      MultiValueMap<String, HttpEntity<?>> parts = new LinkedMultiValueMap<>();
-
-      // Artifact header part
-      Map<String, Object> resultProperties = new HashMap<>();
-      resultProperties.put("test", "ok");
-      parts.add("artifact-header", new HttpEntity<>(resultProperties, new HttpHeaders()));
-
-      // Artifact content part
-      if (includeContent) {
-//        HttpHeaders partHeaders = new HttpHeaders();
-        headers.setContentLength(artifactData.getContentLength());
-        Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
-        parts.add("artifact-content", new HttpEntity<>(resource, headers));
-      }
-
-      HttpHeaders responseHeaders = new HttpHeaders();
-      responseHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-      return new ResponseEntity<MultiValueMap<String, HttpEntity<?>>>(
-          parts,
-          responseHeaders,
+      return new ResponseEntity<>(
+          outputStream -> ArtifactDataUtil.writeHttpResponse(
+              ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData),
+              outputStream
+          ),
+          headers,
           HttpStatus.OK
       );
 
