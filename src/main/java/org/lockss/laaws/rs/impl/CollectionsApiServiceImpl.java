@@ -316,14 +316,15 @@ public class CollectionsApiServiceImpl
    *
    * @param collectionid A String with the name of the collection containing the artifact.
    * @param artifactid   A String with the Identifier of the artifact.
-   * @return a {@code ResponseEntity<StreamingResponseBody>}.
+   * @param includeContent A {@link Boolean} indicating whether the artifact content part should be included in the
+   *                       multipart response.
+   * @return a {@link ResponseEntity} containing a {@link org.lockss.util.rest.multipart.MultipartResponse}.
    */
   @Override
-  public ResponseEntity<StreamingResponseBody> getArtifact(String collectionid, String artifactid, String accept) {
-
+  public ResponseEntity getArtifact(String collectionid, String artifactid, Boolean includeContent) {
     String parsedRequest = String.format(
-        "collectionid: %s, artifactid: %s, accept: %s, requestUrl: %s",
-        collectionid, artifactid, accept, ServiceImplUtil.getFullRequestUrl(request)
+        "collectionid: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
+        collectionid, artifactid, includeContent, ServiceImplUtil.getFullRequestUrl(request)
     );
 
     log.debug2("Parsed request: {}", parsedRequest);
@@ -337,47 +338,52 @@ public class CollectionsApiServiceImpl
 //      validateCollectionId(collectionid, parsedRequest);
 
       // Check that the artifact exists
-      validateArtifactExists(
-          collectionid, artifactid, "The artifact to be retrieved does not exist", parsedRequest
-      );
+//      validateArtifactExists(
+//          collectionid, artifactid, "The artifact to be retrieved does not exist", parsedRequest
+//      );
+
+      // Check whether the artifact exists
+      if (!repo.artifactExists(collectionid, artifactid)) {
+        return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
+      }
 
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
 
-      // Setup HTTP response headers
-      HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
+      // Holds multipart response parts
+      MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
 
-      // TODO: Set to content length of the HTTP response entity body (i.e., the HTTP response encoding the artifact)
-//      headers.setContentLength(artifactData.getContentLength());
+      //// Add artifact headers part
+      {
+        // Artifact headers part header
+        HttpHeaders headerPartHeaders = new HttpHeaders();
+        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-      // Include LOCKSS repository headers in the HTTP response
-      ArtifactIdentifier id = artifactData.getIdentifier();
-      headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
-      headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getCollection());
-      headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
-      headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
-      headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
+        // Add header part
+        parts.add("artifact-header", new HttpEntity<>(artifactData.getMetadata().toSingleValueMap(), headerPartHeaders));
+      }
 
-      headers.set(
-          ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-          String.valueOf(artifactData.getRepositoryMetadata().getCommitted())
-      );
+      //// Add artifact content part
+      if (includeContent) {
+        // Create content part headers
+        HttpHeaders contentPartHeaders = getArtifactRepositoryHeaders(artifactData);
+        contentPartHeaders.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
 
-      headers.set(
-          ArtifactConstants.ARTIFACT_STATE_DELETED,
-          String.valueOf(artifactData.getRepositoryMetadata().getDeleted())
-      );
+        // Artifact content
+        Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
 
-      headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(artifactData.getContentLength()));
-      headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, artifactData.getContentDigest());
+        // Assemble content part and add to multiparts map
+        parts.add("artifact-content", new HttpEntity<>(resource, contentPartHeaders));
+      }
 
-      return new ResponseEntity<>(
-          outputStream -> ArtifactDataUtil.writeHttpResponse(
-              ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData),
-              outputStream
-          ),
-          headers,
+      // Response headers
+      HttpHeaders responseHeaders = new HttpHeaders();
+      responseHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+      // Return response entity
+      return new ResponseEntity<MultiValueMap<String, Object>>(
+          parts,
+          responseHeaders,
           HttpStatus.OK
       );
 
@@ -398,6 +404,34 @@ public class CollectionsApiServiceImpl
     }
   }
 
+  private HttpHeaders getArtifactRepositoryHeaders(ArtifactData ad) {
+    ArtifactIdentifier id = ad.getIdentifier();
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
+    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getCollection());
+    headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
+    headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
+    headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
+
+    headers.set(
+        ArtifactConstants.ARTIFACT_STATE_COMMITTED,
+        String.valueOf(ad.getRepositoryMetadata().getCommitted())
+    );
+
+    headers.set(
+        ArtifactConstants.ARTIFACT_STATE_DELETED,
+        String.valueOf(ad.getRepositoryMetadata().getDeleted())
+    );
+
+    headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(ad.getContentLength()));
+    headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
+
+    headers.setContentLength(ad.getContentLength());
+
+    return headers;
+  }
+
   @Override
   public ResponseEntity<Map<String, List<String>>> getArtifactHeaders(String collectionId, String artifactId) {
     // Debugging
@@ -411,7 +445,7 @@ public class CollectionsApiServiceImpl
       // Return artifact headers
       return new ResponseEntity<>(
           repo.getArtifactHeaders(collectionId, artifactId),
-          null,
+          getArtifactRepositoryHeaders(repo.getArtifactData(collectionId, artifactId)),
           HttpStatus.OK
       );
 
