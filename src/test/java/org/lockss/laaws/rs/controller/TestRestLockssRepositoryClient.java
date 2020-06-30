@@ -154,7 +154,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testArtifactExists_false() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
+        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1/headers", BASEURL)))
                 .andExpect(method(HttpMethod.HEAD))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
@@ -167,7 +167,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testArtifactExists_true() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
+        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1/headers", BASEURL)))
                 .andExpect(method(HttpMethod.HEAD))
                 .andRespond(withSuccess());
 
@@ -180,7 +180,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testArtifactExists_failure() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
+        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1/headers", BASEURL)))
                 .andExpect(method(HttpMethod.HEAD))
                 .andRespond(withServerError());
 
@@ -206,7 +206,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_missingheader() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
+        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1/headers", BASEURL)))
                 .andExpect(method(HttpMethod.HEAD))
                 .andRespond(withSuccess().headers(new HttpHeaders()));
 
@@ -222,7 +222,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
         HttpHeaders mockHeaders = new HttpHeaders();
         mockHeaders.add(ArtifactConstants.ARTIFACT_STATE_COMMITTED, "true");
 
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
+        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1/headers", BASEURL)))
                 .andExpect(method(HttpMethod.HEAD))
                 .andRespond(withSuccess().headers(mockHeaders));
 
@@ -236,7 +236,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
         HttpHeaders mockHeaders = new HttpHeaders();
         mockHeaders.add(ArtifactConstants.ARTIFACT_STATE_COMMITTED, "false");
 
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
+        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1/headers", BASEURL)))
                 .andExpect(method(HttpMethod.HEAD))
                 .andRespond(withSuccess().headers(mockHeaders));
 
