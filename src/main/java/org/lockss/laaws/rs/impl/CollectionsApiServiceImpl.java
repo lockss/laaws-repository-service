@@ -31,31 +31,21 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.StreamSupport;
-import javax.servlet.http.HttpServletRequest;
-import javax.jms.*;
-
 import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
+import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.core.ArtifactCache;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactData;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.ArtifactPageInfo;
-import org.lockss.laaws.rs.model.AuidPageInfo;
-import org.lockss.laaws.rs.model.PageInfo;
-import org.lockss.laaws.rs.util.*;
+import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.util.ArtifactComparators;
+import org.lockss.laaws.rs.util.ArtifactConstants;
+import org.lockss.laaws.rs.util.ArtifactDataFactory;
+import org.lockss.laaws.rs.util.NamedInputStreamResource;
 import org.lockss.log.L4JLogger;
-import org.lockss.spring.base.*;
+import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
-import org.lockss.util.jms.*;
+import org.lockss.util.jms.JmsUtil;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,7 +56,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.MessageListener;
+import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.StreamSupport;
 
 /**
  * Service for accessing the repository artifacts.
@@ -360,7 +358,7 @@ public class CollectionsApiServiceImpl
         headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
 
         // Add header part
-        parts.add("artifact-header", new HttpEntity<>(artifactData.getMetadata().toSingleValueMap(), headerPartHeaders));
+        parts.add("artifact-header", new HttpEntity<>(artifactData.getMetadata(), headerPartHeaders));
       }
 
       //// Add artifact content part
