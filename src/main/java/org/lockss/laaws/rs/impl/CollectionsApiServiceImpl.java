@@ -354,7 +354,7 @@ public class CollectionsApiServiceImpl
       //// Add artifact headers part
       {
         // Artifact headers part header
-        HttpHeaders headerPartHeaders = new HttpHeaders();
+        HttpHeaders headerPartHeaders = getArtifactRepositoryHeaders(artifactData);
         headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
 
         // Add header part
