@@ -37,10 +37,7 @@ import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.model.*;
-import org.lockss.laaws.rs.util.ArtifactComparators;
-import org.lockss.laaws.rs.util.ArtifactConstants;
-import org.lockss.laaws.rs.util.ArtifactDataFactory;
-import org.lockss.laaws.rs.util.NamedInputStreamResource;
+import org.lockss.laaws.rs.util.*;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.util.TimerQueue;
@@ -368,7 +365,10 @@ public class CollectionsApiServiceImpl
         contentPartHeaders.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
 
         // Artifact content
-        Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
+        Resource resource = new NamedInputStreamResource(
+            artifactid,
+            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(artifactData)
+        );
 
         // Assemble content part and add to multiparts map
         parts.add("artifact-content", new HttpEntity<>(resource, contentPartHeaders));
