@@ -355,7 +355,10 @@ public class CollectionsApiServiceImpl
         headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
 
         // Add header part
-        parts.add("artifact-header", new HttpEntity<>(artifactData.getMetadata(), headerPartHeaders));
+        parts.add(
+            RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
+            new HttpEntity<>(artifactData.getMetadata(), headerPartHeaders)
+        );
       }
 
       //// Add artifact content part
@@ -371,7 +374,10 @@ public class CollectionsApiServiceImpl
         );
 
         // Assemble content part and add to multiparts map
-        parts.add("artifact-content", new HttpEntity<>(resource, contentPartHeaders));
+        parts.add(
+            RestLockssRepository.MULTIPART_ARTIFACT_CONTENT,
+            new HttpEntity<>(resource, contentPartHeaders)
+        );
       }
 
       // Response headers
