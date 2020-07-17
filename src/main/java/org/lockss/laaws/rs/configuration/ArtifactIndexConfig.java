@@ -35,6 +35,7 @@ import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.log.L4JLogger;
+import org.lockss.util.StringUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -49,9 +50,11 @@ import javax.annotation.Resource;
 public class ArtifactIndexConfig {
     private final static L4JLogger log =  L4JLogger.getLogger();
     private final static String INDEX_SPEC_KEY = "repo.index.spec";
-    private final static String SOLR_URL_KEY = "repo.index.solr.solrUrl";
 
-    @Resource
+    private final static String SOLR_BASEURL_KEY = "repo.index.solr.solrUrl";
+    private final static String SOLR_COLLECTION_KEY = "repo.index.solr.solrCollection";
+
+  @Resource
     private Environment env;
 
     @Bean
@@ -69,7 +72,14 @@ public class ArtifactIndexConfig {
         if (indexSpec != null) {
             switch (indexSpec.trim().toLowerCase()) {
                 case "solr":
-                    return new SolrArtifactIndex(env.getProperty(SOLR_URL_KEY));
+                    String solrCollection = env.getProperty(SOLR_COLLECTION_KEY);
+                    String solrBaseUrl = env.getProperty(SOLR_BASEURL_KEY);
+
+                    if (solrCollection != null || !solrCollection.isEmpty()) {
+                      return new SolrArtifactIndex(solrBaseUrl, solrCollection);
+                    }
+
+                    return new SolrArtifactIndex(solrBaseUrl);
 
                 case "volatile":
                     return new VolatileArtifactIndex();
