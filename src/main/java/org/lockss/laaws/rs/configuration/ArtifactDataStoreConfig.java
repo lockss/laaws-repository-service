@@ -154,7 +154,6 @@ public class ArtifactDataStoreConfig {
   // LockssDaemon is started
   @EventListener(ApplicationReadyEvent.class)
   public void registerConfigCallback() {
-    log.fatal("ApplicationReadyEvent triggered");
     if (twads != null) {
       LockssApp.getLockssApp().getConfigManager().registerConfigurationCallback(new TestingArtifactDataStoreConfigCallback(twads));
     }
