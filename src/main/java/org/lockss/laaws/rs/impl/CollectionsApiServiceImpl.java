@@ -31,6 +31,7 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.io.FileUtils;
 import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -70,6 +71,8 @@ import java.util.stream.StreamSupport;
 public class CollectionsApiServiceImpl
     extends BaseSpringApiServiceImpl
     implements CollectionsApiDelegate {
+
+  private static final long INCLUDE_CONTENT_THRESHOLD = 128L * FileUtils.ONE_KB;
 
   private static L4JLogger log = L4JLogger.getLogger();
   private static final String APPLICATION_HTTP_RESPONSE_VALUE =
@@ -362,7 +365,7 @@ public class CollectionsApiServiceImpl
       }
 
       //// Add artifact content part
-      if (includeContent) {
+      if (includeContent || artifactData.getContentLength() < INCLUDE_CONTENT_THRESHOLD) {
         // Create content part headers
         HttpHeaders contentPartHeaders = getArtifactRepositoryHeaders(artifactData);
         contentPartHeaders.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
