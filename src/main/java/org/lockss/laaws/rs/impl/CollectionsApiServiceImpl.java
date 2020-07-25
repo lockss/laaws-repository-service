@@ -31,7 +31,6 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.io.FileUtils;
 import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -72,8 +71,6 @@ public class CollectionsApiServiceImpl
     extends BaseSpringApiServiceImpl
     implements CollectionsApiDelegate {
 
-  private static final long INCLUDE_CONTENT_THRESHOLD = 128L * FileUtils.ONE_KB;
-
   private static L4JLogger log = L4JLogger.getLogger();
   private static final String APPLICATION_HTTP_RESPONSE_VALUE =
       "application/http;msgtype=response";
@@ -92,6 +89,10 @@ public class CollectionsApiServiceImpl
   private static final String AUID_PAGESIZE_DEFAULT_UNSET_VALUE = "10000";
   private static final String AUID_PAGESIZE_MAX_KEY = "repo.auid.pagesize.max";
   private static final String AUID_PAGESIZE_MAX_UNSET_VALUE = "20000";
+
+  // Constants for the configuration of the include-content-if-small policy
+  private static final String INCLUDE_CONTENT_MAXSIZE_KEY = "repo.includeContent.maxSize";
+  private static final String INCLUDE_CONTENT_MAXSIZE_UNSET_VALUE = "4096"; // bytes
 
   @Autowired
   LockssRepository repo;
@@ -148,6 +149,12 @@ public class CollectionsApiServiceImpl
   private String configMaxAuidPageSize;
   private int maxAuidPageSize;
 
+  // The maximum size (in bytes) threshold for include-content-if-small policy
+  @Value("${" + INCLUDE_CONTENT_MAXSIZE_KEY + ":"
+      + INCLUDE_CONTENT_MAXSIZE_UNSET_VALUE + "}")
+  private String configIncludeContentMaxSize;
+  private int includeContentMaxSize;
+
   /**
    * Constructor for autowiring.
    *
@@ -169,6 +176,7 @@ public class CollectionsApiServiceImpl
         new CacheInvalidateListener());
 
     parseConfiguredPageSizes();
+    parseIncludeContentMaxSize();
   }
 
   /**
@@ -176,27 +184,35 @@ public class CollectionsApiServiceImpl
    */
   private void parseConfiguredPageSizes() {
     defaultArtifactPageSize =
-        parseConfiguredPageSize(configDefaultArtifactPageSize);
+        parseConfigIntValue(configDefaultArtifactPageSize);
 
-    maxArtifactPageSize = parseConfiguredPageSize(configMaxArtifactPageSize);
-    defaultAuidPageSize = parseConfiguredPageSize(configDefaultAuidPageSize);
-    maxAuidPageSize = parseConfiguredPageSize(configMaxAuidPageSize);
+    maxArtifactPageSize = parseConfigIntValue(configMaxArtifactPageSize);
+    defaultAuidPageSize = parseConfigIntValue(configDefaultAuidPageSize);
+    maxAuidPageSize = parseConfigIntValue(configMaxAuidPageSize);
+    maxAuidPageSize = parseConfigIntValue(configMaxAuidPageSize);
   }
 
   /**
-   * Parses the configured value for one pagination size.
+   * Parses the configured value for the maximum size threshold for include-content-if-small policy.
+   */
+  private void parseIncludeContentMaxSize() {
+    includeContentMaxSize = parseConfigIntValue(configIncludeContentMaxSize);
+  }
+
+  /**
+   * Parses the configured value as a positive integer.
    *
-   * @param configPageSize A String with the value obtained from the Spring
+   * @param configIntVal A String with the value obtained from the Spring
    *                       configuration.
    * @return an int with the configured value.
    */
-  static int parseConfiguredPageSize(String configPageSize) {
-    log.debug2("configPageSize = {}", configPageSize);
+  static int parseConfigIntValue(String configIntVal) {
+    log.debug2("configIntVal = {}", configIntVal);
 
     int result = -1;
 
     try {
-      result = Integer.parseUnsignedInt(configPageSize);
+      result = Integer.parseUnsignedInt(configIntVal);
     } catch (NumberFormatException nfe) {
       // Do nothing.
     }
@@ -204,8 +220,8 @@ public class CollectionsApiServiceImpl
     // Check whether the parsed value is not a positive integer.
     if (result < 1) {
       // Yes: Report the problem.
-      String message = "Page size must be a positive integer; it was '"
-          + configPageSize + "'";
+      String message = "Configuration value must be a positive integer; it was '"
+          + configIntVal + "'";
       log.warn(message);
       throw new RuntimeException(message);
     }
@@ -366,7 +382,7 @@ public class CollectionsApiServiceImpl
 
       //// Add artifact content part
       if (LockssRepository.IncludeContent.valueOf(includeContent) == LockssRepository.IncludeContent.ALWAYS
-          || artifactData.getContentLength() < INCLUDE_CONTENT_THRESHOLD) {
+          || artifactData.getContentLength() <= includeContentMaxSize) {
 
         // Create content part headers
         HttpHeaders contentPartHeaders = getArtifactRepositoryHeaders(artifactData);

@@ -37,14 +37,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
-import org.junit.Before;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
@@ -818,11 +815,11 @@ public class TestReposApiController extends LockssTestCase5 {
     for (int i = 0; i < invalidValues.length; i++) {
       final String configPageSize = invalidValues[i];
       assertThrows(RuntimeException.class,() ->
-      {CollectionsApiServiceImpl.parseConfiguredPageSize(configPageSize);});
+      {CollectionsApiServiceImpl.parseConfigIntValue(configPageSize);});
     }
 
     assertEquals(1,
-	CollectionsApiServiceImpl.parseConfiguredPageSize("1"));
+	CollectionsApiServiceImpl.parseConfigIntValue("1"));
     log.debug2("Done");
   }
 
