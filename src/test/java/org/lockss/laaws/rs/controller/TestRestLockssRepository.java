@@ -372,7 +372,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
 		      "Null",
-		      () -> {repository.getArtifactData(null, null);});
+		      () -> {repository.getArtifactData((String)null, (String)null);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "Null",
 		      () -> {repository.getArtifactData(null, ARTID1);});

@@ -319,7 +319,7 @@ public class CollectionsApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link org.lockss.util.rest.multipart.MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifact(String collectionid, String artifactid, Boolean includeContent) {
+  public ResponseEntity getArtifact(String collectionid, String artifactid, String includeContent) {
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
         collectionid, artifactid, includeContent, ServiceImplUtil.getFullRequestUrl(request)
@@ -365,7 +365,9 @@ public class CollectionsApiServiceImpl
       }
 
       //// Add artifact content part
-      if (includeContent || artifactData.getContentLength() < INCLUDE_CONTENT_THRESHOLD) {
+      if (LockssRepository.IncludeContent.valueOf(includeContent) == LockssRepository.IncludeContent.ALWAYS
+          || artifactData.getContentLength() < INCLUDE_CONTENT_THRESHOLD) {
+
         // Create content part headers
         HttpHeaders contentPartHeaders = getArtifactRepositoryHeaders(artifactData);
         contentPartHeaders.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));

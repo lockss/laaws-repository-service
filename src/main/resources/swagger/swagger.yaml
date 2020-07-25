@@ -129,10 +129,11 @@ paths:
       parameters:
       - name: "includeContent"
         in: "query"
-        required: false
-        type: "boolean"
+        type: "string"
+        enum: ["NEVER", "IF_SMALL", "ALWAYS"]
         description: "Controls whether to include the artifact content part in multipart response"
-        default: true
+        required: false
+        default: "ALWAYS"
       produces:
         - "multipart/form-data"
       responses:
