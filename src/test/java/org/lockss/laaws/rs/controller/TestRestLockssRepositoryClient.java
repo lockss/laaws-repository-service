@@ -141,58 +141,6 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
     }
 
     @Test
-    public void testArtifactExists_iae() throws Exception {
-        try {
-            repository.artifactExists("collection1", null);
-            fail("Should have thrown IllegalArgumentException");
-        } catch (IllegalArgumentException iae) {}
-
-        try {
-            repository.artifactExists("collection1", "");
-            fail("Should have thrown IllegalArgumentException");
-      } catch (IllegalArgumentException iae) {}
-    }
-
-    @Test
-    public void testArtifactExists_false() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=false", BASEURL)))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withStatus(HttpStatus.NOT_FOUND));
-
-        Boolean artifactExists = repository.artifactExists("collection1", "artifact1");
-        mockServer.verify();
-
-        assertNotNull(artifactExists);
-        assertFalse(artifactExists);
-    }
-
-    @Test
-    public void testArtifactExists_true() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=false", BASEURL)))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess());
-
-        Boolean artifactExists = repository.artifactExists("collection1", "artifact1");
-        mockServer.verify();
-
-        assertNotNull(artifactExists);
-        assertTrue(artifactExists);
-    }
-
-    @Test
-    public void testArtifactExists_failure() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=false", BASEURL)))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withServerError());
-
-	assertThrowsMatch(LockssRestHttpException.class,
-		      "500",
-			  () -> {repository.artifactExists("collection1", "artifact1");});
-
-        mockServer.verify();
-    }
-
-    @Test
     public void testIsArtifactCommitted_iae() throws Exception {
         try {
             repository.isArtifactCommitted("collection1", null);

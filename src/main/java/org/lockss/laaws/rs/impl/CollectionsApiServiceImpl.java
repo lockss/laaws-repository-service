@@ -34,6 +34,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
+import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.model.*;
@@ -295,18 +296,15 @@ public class CollectionsApiServiceImpl
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      // Check that the collection exists.
-//      validateCollectionId(collectionid, parsedRequest);
-
-      // Check that the artifact exists
-      validateArtifactExists(collectionid, artifactid,
-          "The artifact to be deleted does not exist", parsedRequest);
-
       // Remove the artifact from the artifact store and index
       String key = artifactKey(collectionid, artifactid);
       repo.deleteArtifact(collectionid, artifactid);
       sendCacheInvalidate(ArtifactCache.InvalidateOp.Delete, key);
       return new ResponseEntity<>(HttpStatus.OK);
+
+    } catch (LockssNoSuchArtifactIdException e) {
+      return new ResponseEntity<Void>(HttpStatus.NOT_FOUND);
+
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
@@ -346,19 +344,6 @@ public class CollectionsApiServiceImpl
 
     try {
       log.debug2("Retrieving artifact [artifactId: {}, collectionId: {}]", artifactid, collectionid);
-
-      // Check that the collection exists.
-//      validateCollectionId(collectionid, parsedRequest);
-
-      // Check that the artifact exists
-//      validateArtifactExists(
-//          collectionid, artifactid, "The artifact to be retrieved does not exist", parsedRequest
-//      );
-
-      // Check whether the artifact exists
-      if (!repo.artifactExists(collectionid, artifactid)) {
-        return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
-      }
 
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
@@ -410,6 +395,9 @@ public class CollectionsApiServiceImpl
           responseHeaders,
           HttpStatus.OK
       );
+
+    } catch (LockssNoSuchArtifactIdException e) {
+      return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
 
     } catch (LockssRestServiceException e) {
       // Let it cascade to the controller advice exception handler.
@@ -468,7 +456,7 @@ public class CollectionsApiServiceImpl
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity<Artifact> updateArtifact(String collectionid,
+  public ResponseEntity updateArtifact(String collectionid,
                                                  String artifactid, Boolean committed) {
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, committed: %s, requestUrl: %s",
@@ -489,13 +477,6 @@ public class CollectionsApiServiceImpl
             errorMessage, parsedRequest);
       }
 
-      // Check that the collection exists.
-//      validateCollectionId(collectionid, parsedRequest);
-
-      // Check that the artifact exists
-      validateArtifactExists(collectionid, artifactid,
-          "The artifact to be updated does not exist", parsedRequest);
-
       log.debug2(String.format(
           "Updating commit status for %s (%s -> %s)",
           artifactid,
@@ -508,6 +489,10 @@ public class CollectionsApiServiceImpl
       sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit,
           artifactKey(collectionid, artifactid));
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
+
+    } catch (LockssNoSuchArtifactIdException e) {
+      return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
+
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
@@ -1362,22 +1347,6 @@ public class CollectionsApiServiceImpl
     }
 
     log.debug2("uri '{}' is valid.", uri);
-  }
-
-  private void validateArtifactExists(String collectionid, String artifactid, String errorMessage,
-                                      String parsedRequest) throws IOException {
-    log.debug2("collectionid = '{}'", collectionid);
-    log.debug2("artifactid = '{}'", artifactid);
-    log.debug2("parsedRequest = '{}'", parsedRequest);
-    if (!repo.artifactExists(collectionid, artifactid)) {
-      log.warn(errorMessage);
-      log.warn("Parsed request: {}", parsedRequest);
-
-      throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage,
-          parsedRequest);
-    }
-
-    log.debug2("artifactid '{}' exists.", artifactid);
   }
 
   @Override
