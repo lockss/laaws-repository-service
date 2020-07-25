@@ -189,7 +189,6 @@ public class CollectionsApiServiceImpl
     maxArtifactPageSize = parseConfigIntValue(configMaxArtifactPageSize);
     defaultAuidPageSize = parseConfigIntValue(configDefaultAuidPageSize);
     maxAuidPageSize = parseConfigIntValue(configMaxAuidPageSize);
-    maxAuidPageSize = parseConfigIntValue(configMaxAuidPageSize);
   }
 
   /**
