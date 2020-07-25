@@ -223,7 +223,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
         // Setup mocked server response
         mockServer
-            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=false", BASEURL)))
+            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
                 withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
@@ -259,7 +259,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
         // Setup mocked server response
         mockServer
-            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=false", BASEURL)))
+            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
                 withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
@@ -294,7 +294,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
         // Setup mocked server response
         mockServer
-            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=false", BASEURL)))
+            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
                 withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
