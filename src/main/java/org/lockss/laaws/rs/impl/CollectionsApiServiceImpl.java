@@ -48,12 +48,10 @@ import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
@@ -332,7 +330,7 @@ public class CollectionsApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link org.lockss.util.rest.multipart.MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifact(String collectionid, String artifactid, String includeContent) {
+  public ResponseEntity<StreamingResponseBody> getArtifact(String collectionid, String artifactid, String includeContent) {
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
         collectionid, artifactid, includeContent, ServiceImplUtil.getFullRequestUrl(request)
@@ -345,61 +343,44 @@ public class CollectionsApiServiceImpl
     try {
       log.debug2("Retrieving artifact [artifactId: {}, collectionId: {}]", artifactid, collectionid);
 
+      //// Response headers
+      HttpHeaders responseHeaders = new HttpHeaders();
+
+      // Response body will contain an HTTP response; set appropriate content type
+      responseHeaders.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
+
+      //// Response body
+
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
 
-      // Holds multipart response parts
-      MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+      // Return StreamingResponseBody that writes ArtifactData as an HTTP response to an OutputStream
+      return new ResponseEntity<StreamingResponseBody>(
+          outputStream -> {
 
-      //// Add artifact headers part
-      {
-        // Artifact headers part header
-        HttpHeaders headerPartHeaders = getArtifactRepositoryHeaders(artifactData);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
+            boolean includeContentDecision = false;
 
-        // Add header part
-        parts.add(
-            RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
-            new HttpEntity<>(artifactData.getMetadata(), headerPartHeaders)
-        );
-      }
+            // Determine whether to include the artifact content
+            if (LockssRepository.IncludeContent.valueOf(includeContent) == LockssRepository.IncludeContent.ALWAYS
+                || artifactData.getContentLength() <= includeContentMaxSize) {
+              includeContentDecision = true;
+            }
 
-      //// Add artifact content part
-      if (LockssRepository.IncludeContent.valueOf(includeContent) == LockssRepository.IncludeContent.ALWAYS
-          || artifactData.getContentLength() <= includeContentMaxSize) {
+            ArtifactDataUtil.writeHttpResponse(
+                ArtifactDataUtil.getHttpResponseFromArtifactData(artifactData, includeContentDecision),
+                outputStream
+            );
 
-        // Create content part headers
-        HttpHeaders contentPartHeaders = getArtifactRepositoryHeaders(artifactData);
-        contentPartHeaders.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
-
-        // Artifact content
-        Resource resource = new NamedInputStreamResource(
-            artifactid,
-            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(artifactData)
-        );
-
-        // Assemble content part and add to multiparts map
-        parts.add(
-            RestLockssRepository.MULTIPART_ARTIFACT_CONTENT,
-            new HttpEntity<>(resource, contentPartHeaders)
-        );
-      }
-
-      // Response headers
-      HttpHeaders responseHeaders = new HttpHeaders();
-      responseHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-      // Return response entity
-      return new ResponseEntity<MultiValueMap<String, Object>>(
-          parts,
+          },
           responseHeaders,
           HttpStatus.OK
       );
 
     } catch (LockssNoSuchArtifactIdException e) {
-      return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
+      throw new LockssRestServiceException(HttpStatus.NOT_FOUND, "Artifact not found", parsedRequest);
 
     } catch (LockssRestServiceException e) {
+      // TODO: What still throws this? Previously it was validateArtifactExists()
       // Let it cascade to the controller advice exception handler.
       throw e;
 
@@ -414,34 +395,6 @@ public class CollectionsApiServiceImpl
 
       throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, errorMessage, e, parsedRequest);
     }
-  }
-
-  private HttpHeaders getArtifactRepositoryHeaders(ArtifactData ad) {
-    ArtifactIdentifier id = ad.getIdentifier();
-
-    HttpHeaders headers = new HttpHeaders();
-    headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
-    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getCollection());
-    headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
-    headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
-    headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
-
-    headers.set(
-        ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-        String.valueOf(ad.getRepositoryMetadata().getCommitted())
-    );
-
-    headers.set(
-        ArtifactConstants.ARTIFACT_STATE_DELETED,
-        String.valueOf(ad.getRepositoryMetadata().getDeleted())
-    );
-
-    headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(ad.getContentLength()));
-    headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
-
-    headers.setContentLength(ad.getContentLength());
-
-    return headers;
   }
 
   /**
@@ -521,94 +474,73 @@ public class CollectionsApiServiceImpl
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity<Artifact> createArtifact(String collectionid,
-                                                 String auid, String uri, MultipartFile content, MultipartFile aspectParts) {
+  public ResponseEntity<Artifact> createArtifact(
+      String collectionid,
+      String auid,
+      String uri,
+      MultipartFile content,
+      MultipartFile aspectParts
+  ) {
+
     String parsedRequest = String.format(
         "collectionid: %s, auid: %s, uri: %s, requestUrl: %s",
-        collectionid, auid, uri, ServiceImplUtil.getFullRequestUrl(request));
+        collectionid, auid, uri, ServiceImplUtil.getFullRequestUrl(request)
+    );
+
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      log.debug(String.format("Adding artifact %s, %s, %s",
-          collectionid, auid, uri));
+      log.debug("Adding artifact [collection: {}, auid: {}, URI: {}]", collectionid, auid, uri);
 
-      log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
-          content.getContentType()));
+      log.trace("MultipartFile: Type: ArtifactData, Content-type: {}", content.getContentType());
 
       // Check URI.
       validateUri(uri, parsedRequest);
 
       // Only accept artifact encoded within an HTTP response
-      if (!isHttpResponseType(MediaType.parseMediaType(content
-          .getContentType()))) {
+      if (!isHttpResponseType(MediaType.parseMediaType(content.getContentType()))) {
+
         String errorMessage = String.format(
             "Failed to add artifact; expected %s but got %s",
             APPLICATION_HTTP_RESPONSE,
-            MediaType.parseMediaType(content.getContentType()));
+            MediaType.parseMediaType(content.getContentType())
+        );
 
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
+        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, errorMessage, parsedRequest);
       }
 
-      // Convert multipart stream to ArtifactData
-      ArtifactData artifactData =
-          ArtifactDataFactory.fromHttpResponseStream(content.getInputStream());
+      // Convert multipart stream (containing HTTP response serialization of an artifact) to ArtifactData object
+      ArtifactData artifactData = ArtifactDataFactory.fromHttpResponseStream(content.getInputStream());
 
       // Set ArtifactData properties from the POST request
-//TODO: FIX THIS CALL
-      ArtifactIdentifier id =
-          new ArtifactIdentifier(collectionid, auid, uri, 0);
-      artifactData.setIdentifier(id);
-      artifactData.setContentLength(content.getSize());
+      //TODO: FIX THIS CALL
+//      ArtifactIdentifier id = new ArtifactIdentifier(collectionid, auid, uri, 0);
+//      artifactData.setIdentifier(id);
+//      artifactData.setContentLength(content.getSize());
 
+      // Add artifact data to internal LockssRepository implementation
       Artifact artifact = repo.addArtifact(artifactData);
 
-      log.debug(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
-
-      // TODO: Process artifact's aspects
-//      for (MultipartFile aspectPart : aspectParts) {
-//	log.warn(String.format("Ignoring MultipartFile: Type: Aspect, Content-type: %s",
-//	    aspectPart.getContentType()));
-      //log.info(IOUtils.toString(aspectPart.getInputStream()));
-      //log.info(aspectPart.getName());
-
-	/*
-                // Augment custom metadata headers with headers from HTTP response
-                for (Header header : response.getAllHeaders()) {
-                    headers.add(header.getName(), header.getValue());
-                }
-
-                // Set content stream and its properties
-                artifactMetadata.setContentType(response.getEntity().getContentType().getValue());
-                artifactMetadata.setContentLength((int) response.getEntity().getContentLength());
-                artifactMetadata.setContentDate(0);
-                artifactMetadata.setLastModified(0);
-                artifactMetadata.setContentHash(null);
-
-                // Create an artifactIndex
-                SolrArtifactIndexData info = artifactStore.addArtifact(artifactMetadata, response.getEntity().getContent());
-                artifactIndexRepository.save(info);
-	 */
-//      }
+      log.debug("Wrote artifact to {}", artifact.getStorageUrl());
 
       return new ResponseEntity<>(artifact, HttpStatus.OK);
+
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
+
     } catch (IOException e) {
-      String errorMessage =
-          "Caught IOException while attempting to add an artifact to the repository";
+      String errorMessage = "Caught IOException while attempting to add an artifact to the repository";
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
-          errorMessage, e, parsedRequest);
+      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, errorMessage, e, parsedRequest);
     }
   }
 

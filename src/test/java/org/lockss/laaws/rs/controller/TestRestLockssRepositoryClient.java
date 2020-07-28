@@ -44,7 +44,7 @@ import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
 import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
-import org.lockss.laaws.rs.util.NamedByteArrayResource;
+import org.lockss.laaws.rs.util.NamedInputStreamResource;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.LockssUncheckedException;
 import org.lockss.util.rest.RestUtil;
@@ -52,6 +52,7 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.mock.http.MockHttpOutputMessage;
@@ -414,57 +415,32 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
         ArtifactIdentifier refId = reference.getIdentifier();
         RepositoryArtifactMetadata refRepoMd = reference.getRepositoryMetadata();
 
-        // Artifact's repository headers
-        HttpHeaders repositoryHeaders = reference.getMetadata();
+        // ***************************************
+        // Serialize ArtifactData to HTTP response
+        // ***************************************
 
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_ID_KEY, refId.getId());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, refId.getCollection());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_AUID_KEY, refId.getAuid());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_URI_KEY, refId.getUri());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(refId.getVersion()));
+        MediaType resourceType = MediaType.parseMediaType("application/http; msgtype=response");
 
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_COMMITTED, String.valueOf(refRepoMd.getCommitted()));
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_DELETED, String.valueOf(refRepoMd.getDeleted()));
-
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(reference.getContentLength()));
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, reference.getContentDigest());
-
-        // ******************************
-        // Setup multipart response parts
-        // ******************************
-
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
-
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.putAll(repositoryHeaders);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(repositoryHeaders, headerPartHeaders));
-
-        // Add artifact content part
-        parts.add("artifact-content", new HttpEntity<>(
-            new NamedByteArrayResource(refId.getId(), IOUtils.toByteArray(ArtifactDataUtil.getHttpResponseStreamFromArtifactData(reference))),
-            repositoryHeaders)
+        Resource resource = new NamedInputStreamResource(
+            refId.getId(),
+            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(reference, true)
         );
 
         // ****************************
         // Setup mocked server response
         // ****************************
 
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+        // Mocked response headers
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.setContentType(resourceType);
 
         // Setup mocked server response
         mockServer
             .expect(requestTo(String.format("%s/collections/%s/artifacts/%s", BASEURL, refId.getCollection(), refId.getId())))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
-                withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
-                    .headers(repositoryHeaders)
+                withSuccess(resource, resourceType)
+                    .headers(responseHeaders)
             );
 
         // Fetch artifact data through the code we wish to test

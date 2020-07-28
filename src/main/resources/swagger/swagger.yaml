@@ -134,17 +134,11 @@ paths:
         description: "Controls whether to include the artifact content part in multipart response"
         required: false
         default: "ALWAYS"
-      produces:
-        - "multipart/form-data"
       responses:
         200:
           description: "Artifact created"
           schema:
-            type: file
-#          schema:
-#            type: object
-#            additionalProperties:
-#              type: object
+            $ref: "#/definitions/streamingResponseBody"
         401:
           description: "Unauthorized request"
         403:
