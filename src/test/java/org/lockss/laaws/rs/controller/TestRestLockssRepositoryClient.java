@@ -29,7 +29,6 @@
  */
 package org.lockss.laaws.rs.controller;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
@@ -42,7 +41,6 @@ import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
-import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.laaws.rs.util.NamedInputStreamResource;
 import org.lockss.log.L4JLogger;
@@ -54,14 +52,12 @@ import org.lockss.util.test.LockssTestCase5;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
-import org.springframework.http.converter.FormHttpMessageConverter;
-import org.springframework.mock.http.MockHttpOutputMessage;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
@@ -156,26 +152,43 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_missingheader() throws Exception {
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
 
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(new HttpHeaders(), headerPartHeaders));
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
 
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream("hello world".getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK")
+        );
+
+        reference.setContentDigest("test");
+
+        // **********************************************************
+        // Convert reference ArtifactData to HTTP response byte array
+        // **********************************************************
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        ArtifactDataUtil.writeHttpResponse(
+            ArtifactDataUtil.getHttpResponseFromArtifactData(reference, false),
+            output
+        );
 
         // Setup mocked server response
         mockServer
             .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
-                withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
+                withSuccess(output.toByteArray(), MediaType.MULTIPART_FORM_DATA)
             );
 
 	assertThrowsMatch(LockssRestInvalidResponseException.class,
@@ -187,32 +200,49 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_true() throws Exception {
-        // Artifact's repository headers
-        HttpHeaders repositoryHeaders = new HttpHeaders();
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_COMMITTED, String.valueOf(true));
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
 
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
 
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.putAll(repositoryHeaders);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(repositoryHeaders, headerPartHeaders));
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream("hello world".getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+        );
 
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+        reference.setContentDigest("test");
+
+        // Convenience variables
+        ArtifactIdentifier refId = reference.getIdentifier();
+        RepositoryArtifactMetadata refRepoMd = reference.getRepositoryMetadata();
+
+        // **********************************************************
+        // Convert reference ArtifactData to HTTP response byte array
+        // **********************************************************
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        ArtifactDataUtil.writeHttpResponse(
+            ArtifactDataUtil.getHttpResponseFromArtifactData(reference, false),
+            output
+        );
 
         // Setup mocked server response
         mockServer
             .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
-                withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
-                    .headers(repositoryHeaders)
+                withSuccess(output.toByteArray(), MediaType.parseMediaType("application/http; msgtype=response"))
             );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
@@ -222,32 +252,46 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_false() throws Exception {
-        // Artifact's repository headers
-        HttpHeaders repositoryHeaders = new HttpHeaders();
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_COMMITTED, String.valueOf(false));
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
 
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
 
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.putAll(repositoryHeaders);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(repositoryHeaders, headerPartHeaders));
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream("hello world".getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"false\"," +
+                "\"deleted\":\"false\"}")
+        );
 
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+        reference.setContentDigest("test");
+
+        // **********************************************************
+        // Convert reference ArtifactData to HTTP response byte array
+        // **********************************************************
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        ArtifactDataUtil.writeHttpResponse(
+            ArtifactDataUtil.getHttpResponseFromArtifactData(reference, false),
+            output
+        );
 
         // Setup mocked server response
         mockServer
             .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
-                withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
-                    .headers(repositoryHeaders)
+                withSuccess(output.toByteArray(), MediaType.MULTIPART_FORM_DATA)
             );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
