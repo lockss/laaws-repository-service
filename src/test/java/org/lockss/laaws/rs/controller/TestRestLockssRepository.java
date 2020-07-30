@@ -30,37 +30,52 @@
 
 package org.lockss.laaws.rs.controller;
 
-import java.io.*;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.util.*;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.*;
-import org.apache.commons.collections4.*;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.*;
-import org.apache.commons.logging.*;
-import org.apache.http.*;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
-import org.junit.*;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.core.*;
-import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
+import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.core.LockssRepositoryFactory;
+import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.model.Artifact;
+import org.lockss.laaws.rs.model.ArtifactData;
+import org.lockss.laaws.rs.model.ArtifactSpec;
 import org.lockss.log.L4JLogger;
-import org.lockss.util.test.LockssTestCase5;
-import org.lockss.util.rest.exception.*;
-import org.lockss.util.time.TimeBase;
 import org.lockss.test.ZeroInputStream;
+import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.test.LockssTestCase5;
+import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
-import org.springframework.boot.test.context.*;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -992,10 +1007,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     // XXXAPI
     assertThrowsMatch(LockssNoSuchArtifactIdException.class,
-		      "Non-existent artifact id: " + NO_ARTID,
+		      "Artifact not found: " + NO_ARTID,
 		      () -> {repository.isArtifactCommitted(COLL1, NO_ARTID);});
     assertThrowsMatch(LockssNoSuchArtifactIdException.class,
-		      "Non-existent artifact id: " + ARTID1,
+		      "Artifact not found: " + ARTID1,
 		      () -> {repository.isArtifactCommitted(NO_COLL, ARTID1);});
 
 //     assertFalse(repository.isArtifactCommitted(COLL1, NO_ARTID));
