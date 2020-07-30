@@ -29,7 +29,6 @@
  */
 package org.lockss.laaws.rs.controller;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
@@ -38,13 +37,11 @@ import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
-import org.lockss.laaws.rs.util.ArtifactConstants;
-import org.lockss.laaws.rs.util.ArtifactDataUtil;
-import org.lockss.laaws.rs.util.NamedByteArrayResource;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.LockssUncheckedException;
 import org.lockss.util.rest.RestUtil;
@@ -52,12 +49,15 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
 import org.lockss.util.test.LockssTestCase5;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.FormHttpMessageConverter;
 import org.springframework.mock.http.MockHttpOutputMessage;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.ByteArrayInputStream;
@@ -155,13 +155,37 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_missingheader() throws Exception {
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
 
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(new HttpHeaders(), headerPartHeaders));
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
+
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
+
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream("hello world".getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            null
+        );
+
+        reference.setContentDigest("test");
+
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
+        );
+
+        // ****************************
+        // Setup mocked server response
+        // ****************************
 
         // Convert multipart response and its parts to a byte array
         FormHttpMessageConverter converter = new FormHttpMessageConverter();
@@ -178,7 +202,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
             );
 
 	assertThrowsMatch(LockssRestInvalidResponseException.class,
-			  "did not return X-LockssRepo-Artifact-Committed",
+			  "Missing artifact repository state",
 			  () -> {repository.isArtifactCommitted("collection1",
 								"artifact1");});
         mockServer.verify();
@@ -186,18 +210,37 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_true() throws Exception {
-        // Artifact's repository headers
-        HttpHeaders repositoryHeaders = new HttpHeaders();
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_COMMITTED, String.valueOf(true));
 
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
 
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.putAll(repositoryHeaders);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(repositoryHeaders, headerPartHeaders));
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
+
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream("hello world".getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+        );
+
+        reference.setContentDigest("test");
+
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
+        );
+
+        // ****************************
+        // Setup mocked server response
+        // ****************************
 
         // Convert multipart response and its parts to a byte array
         FormHttpMessageConverter converter = new FormHttpMessageConverter();
@@ -211,7 +254,6 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
             .andExpect(method(HttpMethod.GET))
             .andRespond(
                 withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
-                    .headers(repositoryHeaders)
             );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
@@ -221,18 +263,38 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_false() throws Exception {
-        // Artifact's repository headers
-        HttpHeaders repositoryHeaders = new HttpHeaders();
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_COMMITTED, String.valueOf(false));
 
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
 
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.putAll(repositoryHeaders);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(repositoryHeaders, headerPartHeaders));
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
+
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream("hello world".getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"false\"," +
+                "\"deleted\":\"false\"}")
+        );
+
+        reference.setContentDigest("test");
+
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
+        );
+
+        // ****************************
+        // Setup mocked server response
+        // ****************************
 
         // Convert multipart response and its parts to a byte array
         FormHttpMessageConverter converter = new FormHttpMessageConverter();
@@ -246,7 +308,6 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
             .andExpect(method(HttpMethod.GET))
             .andRespond(
                 withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
-                    .headers(repositoryHeaders)
             );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
@@ -414,38 +475,9 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
         ArtifactIdentifier refId = reference.getIdentifier();
         RepositoryArtifactMetadata refRepoMd = reference.getRepositoryMetadata();
 
-        // Artifact's repository headers
-        HttpHeaders repositoryHeaders = reference.getMetadata();
-
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_ID_KEY, refId.getId());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, refId.getCollection());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_AUID_KEY, refId.getAuid());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_URI_KEY, refId.getUri());
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(refId.getVersion()));
-
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_COMMITTED, String.valueOf(refRepoMd.getCommitted()));
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_STATE_DELETED, String.valueOf(refRepoMd.getDeleted()));
-
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(reference.getContentLength()));
-        repositoryHeaders.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, reference.getContentDigest());
-
-        // ******************************
-        // Setup multipart response parts
-        // ******************************
-
-        // Map of multipart response parts
-        LinkedMultiValueMap<String, Object> parts = new LinkedMultiValueMap();
-
-        // Add artifact header part
-        HttpHeaders headerPartHeaders = new HttpHeaders();
-        headerPartHeaders.putAll(repositoryHeaders);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
-        parts.add("artifact-header", new HttpEntity<>(repositoryHeaders, headerPartHeaders));
-
-        // Add artifact content part
-        parts.add("artifact-content", new HttpEntity<>(
-            new NamedByteArrayResource(refId.getId(), IOUtils.toByteArray(ArtifactDataUtil.getHttpResponseStreamFromArtifactData(reference))),
-            repositoryHeaders)
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, LockssRepository.IncludeContent.ALWAYS, 4096L
         );
 
         // ****************************
@@ -464,7 +496,6 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
             .andExpect(method(HttpMethod.GET))
             .andRespond(
                 withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
-                    .headers(repositoryHeaders)
             );
 
         // Fetch artifact data through the code we wish to test

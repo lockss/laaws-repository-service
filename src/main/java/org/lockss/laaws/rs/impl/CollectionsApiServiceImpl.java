@@ -348,73 +348,12 @@ public class CollectionsApiServiceImpl
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
 
-      // Holds multipart response parts
-      MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
-
-      //// Add artifact repository properties multipart
-      {
-        // Part's headers
-        HttpHeaders partHeaders = new HttpHeaders();
-        partHeaders.setContentType(MediaType.APPLICATION_JSON);
-
-        // Add repository properties multipart to multiparts list
-        parts.add(
-            RestLockssRepository.MULTIPART_ARTIFACT_REPO_PROPS,
-            // FIXME: This artifact's repository properties basically describes an Artifact - use that instead?
-            new HttpEntity<>(getArtifactRepositoryProperties(artifactData), partHeaders)
-        );
-      }
-
-      //// Add artifact headers multipart
-      {
-        // Part's headers
-        HttpHeaders partHeaders = new HttpHeaders();
-        partHeaders.setContentType(MediaType.APPLICATION_JSON);
-
-        // Add artifact headers multipart
-        parts.add(
-            RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
-            new HttpEntity<>(artifactData.getMetadata(), partHeaders)
-        );
-      }
-
-      //// Add artifact HTTP status multipart if present
-      if (artifactData.getHttpStatus() != null) {
-        // Part's headers
-        HttpHeaders partHeaders = new HttpHeaders();
-        partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-
-        // Create resource containing HTTP status byte array
-        Resource resource = new NamedByteArrayResource(
-            artifactid,
-            ArtifactDataUtil.getHttpStatusByteArray(artifactData.getHttpStatus())
-        );
-
-        // Add artifact headers multipart
-        parts.add(
-            RestLockssRepository.MULTIPART_ARTIFACT_HTTP_STATUS,
-            new HttpEntity<>(resource, partHeaders)
-        );
-      }
-
-      //// Add artifact content part if requested or if small enough
-      if (LockssRepository.IncludeContent.valueOf(includeContent) == LockssRepository.IncludeContent.ALWAYS
-          || artifactData.getContentLength() <= includeContentMaxSize) {
-
-        // Create content part headers
-        HttpHeaders partHeaders = new HttpHeaders();
-        partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        partHeaders.setContentLength(artifactData.getContentLength());
-
-        // Artifact content
-        Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
-
-        // Assemble content part and add to multiparts map
-        parts.add(
-            RestLockssRepository.MULTIPART_ARTIFACT_CONTENT,
-            new HttpEntity<>(resource, partHeaders)
-        );
-      }
+      // Break ArtifactData into multiparts
+      MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
+          artifactData,
+          LockssRepository.IncludeContent.valueOf(includeContent),
+          includeContentMaxSize
+      );
 
       //// Set Content-Type of server response to multipart/form-data
       // FIXME: Technically, multipart/related might be more appropriate here but FormHttpMessageConverter does not
@@ -450,8 +389,86 @@ public class CollectionsApiServiceImpl
     }
   }
 
+  public static MultiValueMap<String, Object> generateMultipartResponseFromArtifactData(
+      ArtifactData artifactData, LockssRepository.IncludeContent includeContent, long includeContentMaxSize
+  ) throws IOException {
+
+    // Get artifact ID
+    String artifactid = artifactData.getIdentifier().getId();
+
+    // Holds multipart response parts
+    MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+
+    //// Add artifact repository properties multipart
+    {
+      // Part's headers
+      HttpHeaders partHeaders = new HttpHeaders();
+      partHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+      // Add repository properties multipart to multiparts list
+      parts.add(
+          RestLockssRepository.MULTIPART_ARTIFACT_REPO_PROPS,
+          // FIXME: This artifact's repository properties basically describes an Artifact - use that instead?
+          new HttpEntity<>(getArtifactRepositoryProperties(artifactData), partHeaders)
+      );
+    }
+
+    //// Add artifact headers multipart
+    {
+      // Part's headers
+      HttpHeaders partHeaders = new HttpHeaders();
+      partHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+      // Add artifact headers multipart
+      parts.add(
+          RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
+          new HttpEntity<>(artifactData.getMetadata(), partHeaders)
+      );
+    }
+
+    //// Add artifact HTTP status multipart if present
+    if (artifactData.getHttpStatus() != null) {
+      // Part's headers
+      HttpHeaders partHeaders = new HttpHeaders();
+      partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+
+      // Create resource containing HTTP status byte array
+      Resource resource = new NamedByteArrayResource(
+          artifactid,
+          ArtifactDataUtil.getHttpStatusByteArray(artifactData.getHttpStatus())
+      );
+
+      // Add artifact headers multipart
+      parts.add(
+          RestLockssRepository.MULTIPART_ARTIFACT_HTTP_STATUS,
+          new HttpEntity<>(resource, partHeaders)
+      );
+    }
+
+    //// Add artifact content part if requested or if small enough
+    if (includeContent == LockssRepository.IncludeContent.ALWAYS
+        || artifactData.getContentLength() <= includeContentMaxSize) {
+
+      // Create content part headers
+      HttpHeaders partHeaders = new HttpHeaders();
+      partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+      partHeaders.setContentLength(artifactData.getContentLength());
+
+      // Artifact content
+      Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
+
+      // Assemble content part and add to multiparts map
+      parts.add(
+          RestLockssRepository.MULTIPART_ARTIFACT_CONTENT,
+          new HttpEntity<>(resource, partHeaders)
+      );
+    }
+
+    return parts;
+  }
+
   // FIXME: This is basically an Artifact - maybe use that instead?
-  private HttpHeaders getArtifactRepositoryProperties(ArtifactData ad) {
+  private static HttpHeaders getArtifactRepositoryProperties(ArtifactData ad) {
     HttpHeaders headers = new HttpHeaders();
 
     //// Artifact repository ID information headers
