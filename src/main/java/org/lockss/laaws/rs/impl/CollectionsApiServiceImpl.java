@@ -462,16 +462,18 @@ public class CollectionsApiServiceImpl
     headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
     headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
 
-    //// Artifact repository state information headers
-    headers.set(
-        ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-        String.valueOf(ad.getRepositoryMetadata().getCommitted())
-    );
+    //// Artifact repository state information headers if present
+    if (ad.getRepositoryMetadata() != null) {
+      headers.set(
+          ArtifactConstants.ARTIFACT_STATE_COMMITTED,
+          String.valueOf(ad.getRepositoryMetadata().getCommitted())
+      );
 
-    headers.set(
-        ArtifactConstants.ARTIFACT_STATE_DELETED,
-        String.valueOf(ad.getRepositoryMetadata().getDeleted())
-    );
+      headers.set(
+          ArtifactConstants.ARTIFACT_STATE_DELETED,
+          String.valueOf(ad.getRepositoryMetadata().getDeleted())
+      );
+    }
 
     //// Unclassified artifact repository headers
     headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(ad.getContentLength()));
