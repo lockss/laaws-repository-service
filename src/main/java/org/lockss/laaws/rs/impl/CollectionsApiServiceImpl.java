@@ -351,45 +351,79 @@ public class CollectionsApiServiceImpl
       // Holds multipart response parts
       MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
 
-      //// Add artifact headers part
+      //// Add artifact repository properties multipart
       {
-        // Artifact headers part header
-        HttpHeaders headerPartHeaders = getArtifactRepositoryHeaders(artifactData);
-        headerPartHeaders.setContentType(MediaType.APPLICATION_JSON);
+        // Part's headers
+        HttpHeaders partHeaders = new HttpHeaders();
+        partHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-        // Add header part
+        // Add repository properties multipart to multiparts list
         parts.add(
-            RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
-            new HttpEntity<>(artifactData.getMetadata(), headerPartHeaders)
+            RestLockssRepository.MULTIPART_ARTIFACT_REPO_PROPS,
+            // FIXME: This artifact's repository properties basically describes an Artifact - use that instead?
+            new HttpEntity<>(getArtifactRepositoryProperties(artifactData), partHeaders)
         );
       }
 
-      //// Add artifact content part
+      //// Add artifact headers multipart
+      {
+        // Part's headers
+        HttpHeaders partHeaders = new HttpHeaders();
+        partHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+        // Add artifact headers multipart
+        parts.add(
+            RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
+            new HttpEntity<>(artifactData.getMetadata(), partHeaders)
+        );
+      }
+
+      //// Add artifact HTTP status multipart if present
+      if (artifactData.getHttpStatus() != null) {
+        // Part's headers
+        HttpHeaders partHeaders = new HttpHeaders();
+        partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+
+        // Create resource containing HTTP status byte array
+        Resource resource = new NamedByteArrayResource(
+            artifactid,
+            ArtifactDataUtil.getHttpStatusByteArray(artifactData.getHttpStatus())
+        );
+
+        // Add artifact headers multipart
+        parts.add(
+            RestLockssRepository.MULTIPART_ARTIFACT_HTTP_STATUS,
+            new HttpEntity<>(resource, partHeaders)
+        );
+      }
+
+      //// Add artifact content part if requested or if small enough
       if (LockssRepository.IncludeContent.valueOf(includeContent) == LockssRepository.IncludeContent.ALWAYS
           || artifactData.getContentLength() <= includeContentMaxSize) {
 
         // Create content part headers
-        HttpHeaders contentPartHeaders = getArtifactRepositoryHeaders(artifactData);
-        contentPartHeaders.setContentType(MediaType.parseMediaType("application/http; msgtype=response"));
+        HttpHeaders partHeaders = new HttpHeaders();
+        partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        partHeaders.setContentLength(artifactData.getContentLength());
 
         // Artifact content
-        Resource resource = new NamedInputStreamResource(
-            artifactid,
-            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(artifactData)
-        );
+        Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
 
         // Assemble content part and add to multiparts map
         parts.add(
             RestLockssRepository.MULTIPART_ARTIFACT_CONTENT,
-            new HttpEntity<>(resource, contentPartHeaders)
+            new HttpEntity<>(resource, partHeaders)
         );
       }
 
-      // Response headers
+      //// Set Content-Type of server response to multipart/form-data
+      // FIXME: Technically, multipart/related might be more appropriate here but FormHttpMessageConverter does not
+      //        recognize it. It might be possible to use setSupportedMediaTypes() through a Spring configuration
+      //        bean but using multipart/form-data works for now.
       HttpHeaders responseHeaders = new HttpHeaders();
       responseHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
 
-      // Return response entity
+      //// Return multiparts response entity
       return new ResponseEntity<MultiValueMap<String, Object>>(
           parts,
           responseHeaders,
@@ -416,16 +450,19 @@ public class CollectionsApiServiceImpl
     }
   }
 
-  private HttpHeaders getArtifactRepositoryHeaders(ArtifactData ad) {
-    ArtifactIdentifier id = ad.getIdentifier();
-
+  // FIXME: This is basically an Artifact - maybe use that instead?
+  private HttpHeaders getArtifactRepositoryProperties(ArtifactData ad) {
     HttpHeaders headers = new HttpHeaders();
+
+    //// Artifact repository ID information headers
+    ArtifactIdentifier id = ad.getIdentifier();
     headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
     headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getCollection());
     headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
     headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
     headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
 
+    //// Artifact repository state information headers
     headers.set(
         ArtifactConstants.ARTIFACT_STATE_COMMITTED,
         String.valueOf(ad.getRepositoryMetadata().getCommitted())
@@ -436,10 +473,12 @@ public class CollectionsApiServiceImpl
         String.valueOf(ad.getRepositoryMetadata().getDeleted())
     );
 
+    //// Unclassified artifact repository headers
     headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(ad.getContentLength()));
     headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
 
-    headers.setContentLength(ad.getContentLength());
+//    headers.set(ArtifactConstants.ARTIFACT_ORIGIN_KEY, ???);
+//    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_DATE, ???);
 
     return headers;
   }
