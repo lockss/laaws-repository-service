@@ -460,16 +460,20 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
     @Test
     public void testGetArtifactData() throws Exception {
       // Artifact data
-      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, null);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, false);
       runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, false, true);
       runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, false, false);
-      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, false, null);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, false, false);
 
       // Artifact data contains a web crawl
-      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, true, null);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, true, false);
       runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, true, true);
       runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, true, false);
-      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, true, null);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, true, false);
     }
 
     public void runTestGetArtifactData(LockssRepository.IncludeContent includeContent,
