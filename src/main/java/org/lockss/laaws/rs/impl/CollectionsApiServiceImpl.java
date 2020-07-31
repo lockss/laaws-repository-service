@@ -446,8 +446,9 @@ public class CollectionsApiServiceImpl
     }
 
     //// Add artifact content part if requested or if small enough
-    if (includeContent == LockssRepository.IncludeContent.ALWAYS
-        || artifactData.getContentLength() <= includeContentMaxSize) {
+    if ((includeContent == LockssRepository.IncludeContent.ALWAYS) ||
+        (includeContent == LockssRepository.IncludeContent.IF_SMALL
+            && artifactData.getContentLength() <= includeContentMaxSize)) {
 
       // Create content part headers
       HttpHeaders partHeaders = new HttpHeaders();
