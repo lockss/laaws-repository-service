@@ -127,21 +127,24 @@ paths:
       summary: "Get artifact content and metadata"
       operationId: getArtifact
       parameters:
-      - name: "Accept"
-        in: "header"
-        required: false
+      - name: "includeContent"
+        in: "query"
         type: "string"
-        description: "Content type to return"
-        default: "multipart/related"
-        enum:
-        - "application/http"
-        - "application/warc"
-        - "multipart/related"
+        enum: ["NEVER", "IF_SMALL", "ALWAYS"]
+        description: "Controls whether to include the artifact content part in multipart response"
+        required: false
+        default: "ALWAYS"
+      produces:
+        - "multipart/form-data"
       responses:
         200:
           description: "Artifact created"
           schema:
-            $ref: "#/definitions/streamingResponseBody"
+            type: file
+#          schema:
+#            type: object
+#            additionalProperties:
+#              type: object
         401:
           description: "Unauthorized request"
         403:
