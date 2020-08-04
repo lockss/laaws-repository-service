@@ -48,7 +48,7 @@ import org.lockss.util.LockssUncheckedException;
 import org.lockss.util.rest.RestUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
-import org.lockss.util.test.LockssTestCase5;
+import org.lockss.test.SpringLockssTestCase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -77,7 +77,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class TestRestLockssRepositoryClient extends LockssTestCase5 {
+public class TestRestLockssRepositoryClient extends SpringLockssTestCase {
     private final static L4JLogger log = L4JLogger.getLogger();
     private final static String BASEURL = "http://localhost:24610";
     protected LockssRepository repository;

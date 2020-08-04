@@ -52,9 +52,10 @@ import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactSpec;
 import org.lockss.log.L4JLogger;
+import org.lockss.test.LockssTestCase4;
 import org.lockss.test.ZeroInputStream;
+import org.lockss.test.SpringLockssTestCase;
 import org.lockss.util.rest.exception.LockssRestHttpException;
-import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
@@ -80,7 +81,7 @@ import java.util.stream.Stream;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class TestRestLockssRepository extends LockssTestCase5 {
+public class TestRestLockssRepository extends SpringLockssTestCase {
   private final static L4JLogger log = L4JLogger.getLogger();
 
   protected static int MAX_RANDOM_FILE = 50000;
@@ -147,7 +148,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
         @Bean
         public LockssRepository createInitializedRepository() throws IOException {
             LockssRepository repository =
-              LockssRepositoryFactory.createLocalRepository(LockssTestCase5.getTempDir(tmpDirs),
+              LockssRepositoryFactory.createLocalRepository(LockssTestCase4.getTempDir(tmpDirs),
                                                             "coll1");
             repository.initRepository();
             return repository;
@@ -156,7 +157,7 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     @AfterClass
     public static void deleteTempDirs() throws Exception {
-      LockssTestCase5.deleteTempFiles(tmpDirs);
+      LockssTestCase4.deleteTempFiles(tmpDirs);
     }
 
     protected RestLockssRepository repository;
@@ -371,8 +372,8 @@ public class TestRestLockssRepository extends LockssTestCase5 {
     // Artifact not found
     for (ArtifactSpec spec : notFoundArtifactSpecs()) {
       log.info("s.b. notfound: " + spec);
-      assertNull(getArtifact(repository, spec, false),
-		 "Null or non-existent name shouldn't be found: " + spec);
+      assertNull("Null or non-existent name shouldn't be found: " + spec,
+		 getArtifact(repository, spec, false));
     }
 
     // Ensure that a no-version retrieval gets the expected highest version
@@ -492,14 +493,14 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     for (ArtifactSpec spec : neverFoundArtifactSpecs) {
       log.info("s.b. notfound: " + spec);
-      assertNull(getArtifactVersion(repository, spec, 1, false),
-		 "Null or non-existent name shouldn't be found: " + spec);
-      assertNull(getArtifactVersion(repository, spec, 1, true),
-		 "Null or non-existent name shouldn't be found: " + spec);
-      assertNull(getArtifactVersion(repository, spec, 2, false),
-		 "Null or non-existent name shouldn't be found: " + spec);
-      assertNull(getArtifactVersion(repository, spec, 2, true),
-		 "Null or non-existent name shouldn't be found: " + spec);
+      assertNull("Null or non-existent name shouldn't be found: " + spec,
+		 getArtifactVersion(repository, spec, 1, false));
+      assertNull("Null or non-existent name shouldn't be found: " + spec,
+		 getArtifactVersion(repository, spec, 1, true));
+      assertNull("Null or non-existent name shouldn't be found: " + spec,
+		 getArtifactVersion(repository, spec, 2, false));
+      assertNull("Null or non-existent name shouldn't be found: " + spec,
+		 getArtifactVersion(repository, spec, 2, true));
     }
 
     // Get all added artifacts, check correctness
@@ -511,8 +512,8 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 	spec.assertArtifact(repository, getArtifact(repository, spec, false));
       } else {
 	log.info("s.b. uncommitted: " + spec);
-	assertNull(getArtifact(repository, spec, false),
-		   "Uncommitted shouldn't be found: " + spec);
+	assertNull("Uncommitted shouldn't be found: " + spec,
+		   getArtifact(repository, spec, false));
       }
       // XXXAPI illegal version numbers
       assertNull(getArtifactVersion(repository, spec, 0, false));
@@ -641,10 +642,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 	assertNull(getArtifact(repository, spec, false));
 	assertNull(getArtifact(repository, spec, true));
 	delFromAll(spec);
-	assertEquals(totsize,
+	assertEquals("AU size changed after deleting non-highest version",
+		     totsize,
 		     (long)repository.auSize(spec.getCollection(),
-					     spec.getAuid()),
-		     "AU size changed after deleting non-highest version");
+					     spec.getAuid()));
       }
     }
     {
@@ -674,10 +675,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 	if (newHigh != null) {
 	  exp += newHigh.getContentLength();
 	}
-	assertEquals(exp,
+	assertEquals("AU size wrong after deleting highest version",
+		     exp,
 		     (long)repository.auSize(spec.getCollection(),
-					     spec.getAuid()),
-		     "AU size wrong after deleting highest version");
+					     spec.getAuid()));
 	log.info("AU size right after deleting highest version was: "
 		 + totsize + " now " + exp);
       }
@@ -703,10 +704,10 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 	assertNull(getArtifact(repository, uspec, false));
 	assertNull(getArtifact(repository, uspec, true));
 	delFromAll(uspec);
-	assertEquals(totsize,
+	assertEquals("AU size changed after deleting uncommitted",
+		     totsize,
 		     (long)repository.auSize(uspec.getCollection(),
-					     uspec.getAuid()),
-		     "AU size changed after deleting uncommitted");
+					     uspec.getAuid()));
       }
     }
   }
@@ -1375,8 +1376,8 @@ public class TestRestLockssRepository extends LockssTestCase5 {
 
     spec.assertArtifact(repository, newArt);
     long expVers = expectedVersions(spec);
-    assertEquals(expVers + 1, (int)newArt.getVersion(),
-		 "version of " + newArt);
+    assertEquals("version of " + newArt,
+		 expVers + 1, (int)newArt.getVersion());
     if (spec.getExpVer() >= 0) {
       throw new IllegalStateException("addUncommitted() must be called with unused ArtifactSpec");
     }

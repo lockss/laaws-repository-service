@@ -48,8 +48,8 @@ import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.log.L4JLogger;
+import org.lockss.test.SpringLockssTestCase;
 import org.lockss.util.UrlUtil;
-import org.lockss.util.test.LockssTestCase5;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -64,7 +64,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @AutoConfigureMockMvc(secure = false)
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
-public class TestReposApiController extends LockssTestCase5 {
+public class TestReposApiController extends SpringLockssTestCase {
     private final static L4JLogger log = L4JLogger.getLogger();
 
     @Autowired
