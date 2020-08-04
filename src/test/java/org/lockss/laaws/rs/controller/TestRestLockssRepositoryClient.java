@@ -705,7 +705,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase {
             repository.deleteArtifact("collection1", "artifact1");
             fail("Should have thrown IOException");
         } catch (IOException ioe) {
-	  log.fatal("XXXXXXXXXXXXXXXXX", ioe);
+	  log.debug("Logging trace of IOException", ioe);
 	}
         mockServer.verify();
     }
