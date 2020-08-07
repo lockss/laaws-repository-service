@@ -41,6 +41,8 @@ import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.*;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
+import org.lockss.spring.base.LockssConfigurableService;
+import org.lockss.config.Configuration;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
@@ -70,7 +72,7 @@ import java.util.stream.StreamSupport;
 @Service
 public class CollectionsApiServiceImpl
     extends BaseSpringApiServiceImpl
-    implements CollectionsApiDelegate {
+    implements CollectionsApiDelegate, LockssConfigurableService {
 
   private static L4JLogger log = L4JLogger.getLogger();
   private static final String APPLICATION_HTTP_RESPONSE_VALUE =
@@ -78,22 +80,40 @@ public class CollectionsApiServiceImpl
   private static final MediaType APPLICATION_HTTP_RESPONSE =
       MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
 
-  // Constants for the configuartion of response pagination sizes.
-  private static final String ARTIFACT_PAGESIZE_DEFAULT_KEY =
-      "repo.artifact.pagesize.default";
-  private static final String ARTIFACT_PAGESIZE_DEFAULT_UNSET_VALUE = "1000";
-  private static final String ARTIFACT_PAGESIZE_MAX_KEY =
-      "repo.artifact.pagesize.max";
-  private static final String ARTIFACT_PAGESIZE_MAX_UNSET_VALUE = "2000";
-  private static final String AUID_PAGESIZE_DEFAULT_KEY =
-      "repo.auid.pagesize.default";
-  private static final String AUID_PAGESIZE_DEFAULT_UNSET_VALUE = "10000";
-  private static final String AUID_PAGESIZE_MAX_KEY = "repo.auid.pagesize.max";
-  private static final String AUID_PAGESIZE_MAX_UNSET_VALUE = "20000";
+  public static final String PREFIX = "org.lockss.repository.";
 
-  // Constants for the configuration of the include-content-if-small policy
-  private static final String INCLUDE_CONTENT_MAXSIZE_KEY = "repo.includeContent.maxSize";
-  private static final String INCLUDE_CONTENT_MAXSIZE_UNSET_VALUE = "4096"; // bytes
+  // Config params for response pagination sizes.
+
+  /** Default number of Artifacts that will be returned in a single (paged)
+   * response */
+  public static final String PARAM_DEFAULT_ARTIFACT_PAGESIZE =
+    PREFIX + "artifact.pagesize.default";
+  public static final int DEFAULT_DEFAULT_ARTIFACT_PAGESIZE = 1000;
+
+  /** Max number of Artifacts that will be returned in a single (paged)
+   * response */
+  public static final String PARAM_MAX_ARTIFACT_PAGESIZE =
+    PREFIX + "artifact.pagesize.max";
+  public static final int DEFAULT_MAX_ARTIFACT_PAGESIZE = 2000;
+
+  /** Default number of AUIDs that will be returned in a single (paged)
+   * response */
+  public static final String PARAM_DEFAULT_AUID_PAGESIZE =
+    PREFIX + "auid.pagesize.default";
+  public static final int DEFAULT_DEFAULT_AUID_PAGESIZE = 1000;
+
+  /** Max number of AUIDs that will be returned in a single (paged)
+   * response */
+  public static final String PARAM_MAX_AUID_PAGESIZE =
+    PREFIX + "auid.pagesize.max";
+  public static final int DEFAULT_MAX_AUID_PAGESIZE = 2000;
+
+  /** Largest Artifact content that will be included in a response to a
+   * getArtifactData call with includeContent == IF_SMALL */
+  public static final String PARAM_SMALL_CONTENT_THRESHOLD =
+    PREFIX + "smallContentThreshold";
+  public static final long DEFAULT_SMALL_CONTENT_THRESHOLD = 4096;
+
 
   @Autowired
   LockssRepository repo;
@@ -126,35 +146,11 @@ public class CollectionsApiServiceImpl
         }
       };
 
-  // The default artifact response pagination size.
-  @Value("${" + ARTIFACT_PAGESIZE_DEFAULT_KEY + ":"
-      + ARTIFACT_PAGESIZE_DEFAULT_UNSET_VALUE + "}")
-  private String configDefaultArtifactPageSize;
-  private int defaultArtifactPageSize;
-
-  // The maximum artifact response pagination size.
-  @Value("${" + ARTIFACT_PAGESIZE_MAX_KEY + ":"
-      + ARTIFACT_PAGESIZE_MAX_UNSET_VALUE + "}")
-  private String configMaxArtifactPageSize;
-  private int maxArtifactPageSize;
-
-  // The default auid response pagination size.
-  @Value("${" + AUID_PAGESIZE_DEFAULT_KEY + ":"
-      + AUID_PAGESIZE_DEFAULT_UNSET_VALUE + "}")
-  private String configDefaultAuidPageSize;
-  private int defaultAuidPageSize;
-
-  // The maximum auid response pagination size.
-  @Value("${" + AUID_PAGESIZE_MAX_KEY + ":"
-      + AUID_PAGESIZE_MAX_UNSET_VALUE + "}")
-  private String configMaxAuidPageSize;
-  private int maxAuidPageSize;
-
-  // The maximum size (in bytes) threshold for include-content-if-small policy
-  @Value("${" + INCLUDE_CONTENT_MAXSIZE_KEY + ":"
-      + INCLUDE_CONTENT_MAXSIZE_UNSET_VALUE + "}")
-  private String configIncludeContentMaxSize;
-  private int includeContentMaxSize;
+  private int maxArtifactPageSize = DEFAULT_MAX_ARTIFACT_PAGESIZE;
+  private int defaultArtifactPageSize = DEFAULT_DEFAULT_ARTIFACT_PAGESIZE;
+  private int maxAuidPageSize = DEFAULT_MAX_AUID_PAGESIZE;
+  private int defaultAuidPageSize = DEFAULT_DEFAULT_AUID_PAGESIZE;
+  private long smallContentThreshold = DEFAULT_SMALL_CONTENT_THRESHOLD;
 
   /**
    * Constructor for autowiring.
@@ -175,59 +171,26 @@ public class CollectionsApiServiceImpl
         RestLockssRepository.REST_ARTIFACT_CACHE_ID,
         RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC,
         new CacheInvalidateListener());
-
-    parseConfiguredPageSizes();
-    parseIncludeContentMaxSize();
   }
 
-  /**
-   * Parses the configured values for pagination sizes.
-   */
-  private void parseConfiguredPageSizes() {
-    defaultArtifactPageSize =
-        parseConfigIntValue(configDefaultArtifactPageSize);
-
-    maxArtifactPageSize = parseConfigIntValue(configMaxArtifactPageSize);
-    defaultAuidPageSize = parseConfigIntValue(configDefaultAuidPageSize);
-    maxAuidPageSize = parseConfigIntValue(configMaxAuidPageSize);
-  }
-
-  /**
-   * Parses the configured value for the maximum size threshold for include-content-if-small policy.
-   */
-  private void parseIncludeContentMaxSize() {
-    includeContentMaxSize = parseConfigIntValue(configIncludeContentMaxSize);
-  }
-
-  /**
-   * Parses the configured value as a positive integer.
-   *
-   * @param configIntVal A String with the value obtained from the Spring
-   *                       configuration.
-   * @return an int with the configured value.
-   */
-  static int parseConfigIntValue(String configIntVal) {
-    log.debug2("configIntVal = {}", configIntVal);
-
-    int result = -1;
-
-    try {
-      result = Integer.parseUnsignedInt(configIntVal);
-    } catch (NumberFormatException nfe) {
-      // Do nothing.
+  @Override
+  public void setConfig(Configuration newConfig,
+			Configuration prevConfig,
+			Configuration.Differences changedKeys) {
+    if (changedKeys.contains(PREFIX)) {
+      defaultArtifactPageSize =
+	newConfig.getInt(PARAM_DEFAULT_ARTIFACT_PAGESIZE,
+			 DEFAULT_DEFAULT_ARTIFACT_PAGESIZE);
+      maxArtifactPageSize = newConfig.getInt(PARAM_MAX_ARTIFACT_PAGESIZE,
+					     DEFAULT_MAX_ARTIFACT_PAGESIZE);
+      defaultAuidPageSize = newConfig.getInt(PARAM_DEFAULT_AUID_PAGESIZE,
+					     DEFAULT_DEFAULT_AUID_PAGESIZE);
+      maxAuidPageSize = newConfig.getInt(PARAM_MAX_AUID_PAGESIZE,
+					 DEFAULT_MAX_AUID_PAGESIZE);
+      smallContentThreshold =
+	newConfig.getLong(PARAM_SMALL_CONTENT_THRESHOLD,
+			  DEFAULT_SMALL_CONTENT_THRESHOLD);
     }
-
-    // Check whether the parsed value is not a positive integer.
-    if (result < 1) {
-      // Yes: Report the problem.
-      String message = "Configuration value must be a positive integer; it was '"
-          + configIntVal + "'";
-      log.warn(message);
-      throw new RuntimeException(message);
-    }
-
-    log.debug2("result = {}", result);
-    return result;
   }
 
   /**
@@ -352,7 +315,7 @@ public class CollectionsApiServiceImpl
       MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
           artifactData,
           LockssRepository.IncludeContent.valueOf(includeContent),
-          includeContentMaxSize
+          smallContentThreshold
       );
 
       //// Set Content-Type of server response to multipart/form-data
@@ -390,7 +353,7 @@ public class CollectionsApiServiceImpl
   }
 
   public static MultiValueMap<String, Object> generateMultipartResponseFromArtifactData(
-      ArtifactData artifactData, LockssRepository.IncludeContent includeContent, long includeContentMaxSize
+      ArtifactData artifactData, LockssRepository.IncludeContent includeContent, long smallContentThreshold
   ) throws IOException {
 
     // Get artifact ID
@@ -448,7 +411,7 @@ public class CollectionsApiServiceImpl
     //// Add artifact content part if requested or if small enough
     if ((includeContent == LockssRepository.IncludeContent.ALWAYS) ||
         (includeContent == LockssRepository.IncludeContent.IF_SMALL
-            && artifactData.getContentLength() <= includeContentMaxSize)) {
+            && artifactData.getContentLength() <= smallContentThreshold)) {
 
       // Create content part headers
       HttpHeaders partHeaders = new HttpHeaders();

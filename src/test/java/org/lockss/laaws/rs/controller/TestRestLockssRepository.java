@@ -46,15 +46,16 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.core.LockssRepository.IncludeContent;
 import org.lockss.laaws.rs.core.LockssRepositoryFactory;
 import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactSpec;
+import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.log.L4JLogger;
-import org.lockss.test.LockssTestCase4;
-import org.lockss.test.ZeroInputStream;
-import org.lockss.test.SpringLockssTestCase;
+import org.lockss.test.*;
+import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,7 +82,7 @@ import java.util.stream.Stream;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class TestRestLockssRepository extends SpringLockssTestCase {
+public class TestRestLockssRepository extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 
   protected static int MAX_RANDOM_FILE = 50000;
@@ -352,6 +353,86 @@ public class TestRestLockssRepository extends SpringLockssTestCase {
     testDeleteArtifact();
     testAllNoSideEffect();
     testDeleteAllArtifacts();
+  }
+
+  @Test
+  public void testConditionalContent() throws IOException {
+    String url_small = "https://art/small/";
+    String url_large = "https://art/large/";
+    String url_larger = "https://art/larger/";
+    long def_small = CollectionsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD;
+    long len_small = def_small / 2;
+    long len_large = def_small * 5;
+    long len_larger = def_small * 10;
+    ArtifactSpec spec_small =
+      new ArtifactSpec()
+      .setUrl(url_small)
+      .setContentGenerator(() -> new ZeroInputStream((byte)27, len_small))
+      .setCollectionDate(0);
+    ArtifactSpec spec_large =
+      new ArtifactSpec()
+      .setUrl(url_large)
+      .setContentGenerator(() -> new ZeroInputStream((byte)27, len_large))
+      .setCollectionDate(0);
+    ArtifactSpec spec_larger =
+      new ArtifactSpec()
+      .setUrl(url_larger)
+      .setContentGenerator(() -> new ZeroInputStream((byte)27, len_larger))
+      .setCollectionDate(0);
+    Artifact art_small = addUncommitted(spec_small);
+    Artifact art_large = addUncommitted(spec_large);
+    Artifact art_larger = addUncommitted(spec_larger);
+    Artifact art_small_c =
+      repository.commitArtifact(spec_small.getCollection(), art_small.getId());
+    Artifact art_large_c =
+    repository.commitArtifact(spec_large.getCollection(), art_large.getId());
+    Artifact art_larger_c =
+    repository.commitArtifact(spec_larger.getCollection(), art_larger.getId());
+    spec_small.setCommitted(true);
+    spec_large.setCommitted(true);
+    spec_larger.setCommitted(true);
+
+    assertReceivesNoContent(art_small_c, IncludeContent.NEVER);
+    assertReceivesContent(art_small_c, IncludeContent.IF_SMALL);
+    assertReceivesContent(art_small_c, IncludeContent.ALWAYS);
+
+    assertReceivesNoContent(art_large_c, IncludeContent.NEVER);
+    assertReceivesNoContent(art_large_c, IncludeContent.IF_SMALL);
+    assertReceivesContent(art_large_c, IncludeContent.ALWAYS);
+
+    assertReceivesNoContent(art_larger_c, IncludeContent.NEVER);
+    assertReceivesNoContent(art_larger_c, IncludeContent.IF_SMALL);
+    assertReceivesContent(art_larger_c, IncludeContent.ALWAYS);
+
+    ConfigurationUtil.addFromArgs(CollectionsApiServiceImpl.PARAM_SMALL_CONTENT_THRESHOLD,
+				  "" + (len_large + len_larger) / 2);
+
+    assertReceivesNoContent(art_small_c, IncludeContent.NEVER);
+    assertReceivesContent(art_small_c, IncludeContent.IF_SMALL);
+    assertReceivesContent(art_small_c, IncludeContent.ALWAYS);
+
+    assertReceivesNoContent(art_large_c, IncludeContent.NEVER);
+    assertReceivesContent(art_large_c, IncludeContent.IF_SMALL);
+    assertReceivesContent(art_large_c, IncludeContent.ALWAYS);
+
+    assertReceivesNoContent(art_larger_c, IncludeContent.NEVER);
+    assertReceivesNoContent(art_larger_c, IncludeContent.IF_SMALL);
+    assertReceivesContent(art_larger_c, IncludeContent.ALWAYS);
+
+  }
+
+  /** Assert that the repo supplies content with the ArtifactData */
+  void assertReceivesContent(Artifact art, IncludeContent ic)
+      throws IOException {
+    ArtifactData ad = repository.getArtifactData(art, ic);
+    assertTrue(ad.hasContentInputStream());
+  }
+
+  /** Assert that the repo does not supply content with the ArtifactData */
+  void assertReceivesNoContent(Artifact art, IncludeContent ic)
+      throws IOException {
+    ArtifactData ad = repository.getArtifactData(art, ic);
+    assertFalse(ad.hasContentInputStream());
   }
 
   public void testGetArtifact() throws IOException {

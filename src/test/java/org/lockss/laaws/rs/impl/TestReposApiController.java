@@ -48,8 +48,9 @@ import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.log.L4JLogger;
-import org.lockss.test.SpringLockssTestCase;
+import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.UrlUtil;
+import org.lockss.test.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -64,7 +65,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @AutoConfigureMockMvc(secure = false)
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
-public class TestReposApiController extends SpringLockssTestCase {
+public class TestReposApiController extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
 
     @Autowired
@@ -803,25 +804,6 @@ public class TestReposApiController extends SpringLockssTestCase {
         */
 
     }
-
-  /**
-   * Tests the parsing of configured page sizes.
-   */
-  @Test
-  public void testParseConfiguredPageSize() {
-    log.debug2("Invoked");
-    String [] invalidValues = {null, "", " ", "A", "0", "-1"};
-
-    for (int i = 0; i < invalidValues.length; i++) {
-      final String configPageSize = invalidValues[i];
-      assertThrows(RuntimeException.class,() ->
-      {CollectionsApiServiceImpl.parseConfigIntValue(configPageSize);});
-    }
-
-    assertEquals(1,
-	CollectionsApiServiceImpl.parseConfigIntValue("1"));
-    log.debug2("Done");
-  }
 
   /**
    * Tests the validation of request limits.

@@ -88,6 +88,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
 	.setArgs(args)
 	.addAppConfig(PARAM_START_PLUGINS, "false")
 	.addAppDefault(PluginManager.PARAM_START_ALL_AUS, "false")
+	.setSpringApplicatonContext(getApplicationContext())
 	.setAppManagers(myManagerDescs);
       LockssApp.startStatic(LockssDaemon.class, spec);
     } else {
