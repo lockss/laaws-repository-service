@@ -49,14 +49,14 @@ import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
-import org.lockss.test.SpringLockssTestCase;
+import org.lockss.spring.test.SpringLockssTestCase4;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
 /**
  * Test class for org.lockss.laaws.rs.impl.CdxApiServiceImpl.
  */
-public class TestCdxApiServiceImpl extends SpringLockssTestCase {
+public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
   private LockssRepository repository;
 
   /**

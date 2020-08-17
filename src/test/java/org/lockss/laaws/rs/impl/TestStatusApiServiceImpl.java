@@ -41,7 +41,7 @@ import org.junit.runner.RunWith;
 import org.lockss.app.*;
 import org.lockss.util.rest.status.ApiStatus;
 import org.lockss.log.L4JLogger;
-import org.lockss.test.SpringLockssTestCase;
+import org.lockss.spring.test.SpringLockssTestCase4;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -60,7 +60,7 @@ import org.springframework.test.context.junit4.SpringRunner;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class TestStatusApiServiceImpl extends SpringLockssTestCase {
+public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
   private static L4JLogger log = L4JLogger.getLogger();
 
   // The port that Tomcat is using during this test.
