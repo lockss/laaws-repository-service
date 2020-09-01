@@ -90,14 +90,18 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     @Before
     public void makeLockssRepository() throws Exception {
       RestTemplate restTemplate = RestUtil.getRestTemplate();
-      mockServer = MockRestServiceServer.createServer(restTemplate);
 
       // The authentication credentials.
       String userName = null;
       String password = null;
 
+      // Must create the RestLockssRepository before the
+      // MockRestServiceServer, as the latter replaces the RequestFactory
+      // in the RestTemplate with its own mock RequestFactory
       repository = new RestLockssRepository(new URL(BASEURL), restTemplate,
 	  userName, password);
+
+      mockServer = MockRestServiceServer.createServer(restTemplate);
     }
 
     @Test
