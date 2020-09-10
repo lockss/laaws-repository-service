@@ -32,6 +32,7 @@ package org.lockss.laaws.rs.controller;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.IteratorUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -43,19 +44,22 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.LockssRepository.IncludeContent;
 import org.lockss.laaws.rs.core.LockssRepositoryFactory;
 import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactSpec;
-import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.log.L4JLogger;
-import org.lockss.test.*;
 import org.lockss.spring.test.SpringLockssTestCase4;
+import org.lockss.test.ConfigurationUtil;
+import org.lockss.test.LockssTestCase4;
+import org.lockss.test.ZeroInputStream;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -239,39 +243,78 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 	() -> {addUncommitted(new ArtifactSpec().setUrl(null));});
   }
 
+  private static final long LARGE_ARTIFACT_SIZE = (2L * FileUtils.ONE_GB) + (1L * FileUtils.ONE_MB); // 2049 MiB
+
+  /**
+   * Exercises storing and retrieving a large artifact to then from a remote Repository Service via a
+   * {@link RestLockssRepository} client.
+   *
+   * @throws Exception
+   */
+  @Disabled
+  @Test
+  public void testLargeArtifactStorageAndRetrieval() throws Exception {
+    // Large artifact spec
+    ArtifactSpec spec =
+        new ArtifactSpec()
+            .setContentGenerator(() -> new ZeroInputStream((byte) 46, LARGE_ARTIFACT_SIZE))
+            .setContentLength(LARGE_ARTIFACT_SIZE)
+            // SHA-256 hash of LARGE_ARTIFACT_SIZE * decimal 46 precalculated to speed-up test:
+            .setContentDigest("SHA-256:3b3b50f71c9cc1647819e090594cf191977413f79a8bfa0b473f468cf74dcb3e")
+            // FIXME: Provide defaults for these in ArtifactSpec:
+            .setAuid("auid")
+            .setUrl("dots")
+            .setCollectionDate(0);
+
+    // Add large artifact to remote Repository service
+    Artifact artifact = repository.addArtifact(spec.getArtifactData());
+
+    // Retrieve the large artifact from the remote Repository service
+    ArtifactData ad = repository.getArtifactData(artifact);
+
+    // Assert artifact data against spec
+    spec.assertArtifactData(ad);
+  }
+
   @Test
   public void testAddLargeArtifact() throws IOException {
     long len = 100*1024*1024;
     ArtifactSpec spec =
-      new ArtifactSpec().
-      setUrl("https://mr/ed/")
+        new ArtifactSpec().
+            setUrl("https://mr/ed/")
       .setContentGenerator(() -> new ZeroInputStream((byte)27, len))
-      .setCollectionDate(0);
+            .setCollectionDate(0);
+
     Artifact newArt = addUncommitted(spec);
     String storeUrl = newArt.getStorageUrl();
+
     log.info("uncommArt.getStorageUrl(): " + storeUrl);
-    Artifact commArt = repository.commitArtifact(spec.getCollection(),
-						 newArt.getId());
+
+    Artifact commArt = repository.commitArtifact(spec.getCollection(), newArt.getId());
     spec.setCommitted(true);
+
     log.info("commArt.getStorageUrl(): " + commArt.getStorageUrl());
+
     if (!commArt.getStorageUrl().equals(storeUrl)) {
       // The storage URL should not change until the background copy has
       // completely, which should take significant time.  If it has changed
       // already that might be an indication that the copy happened
       // synchronously
       log.warn("Storage URL of huge Artifact changed immediately after commit: "
-	       + commArt.getStorageUrl());
+          + commArt.getStorageUrl());
     }
+
     // Ensure that the artifact eventually moves from temp to perm WARC and
     // that it's still correct after that happens.
+
     // Might not see change in storageUrl due to Artifact cache, so disable it
     repository.enableArtifactCache(false, null);
+
     while (commArt.getStorageUrl().equals(storeUrl)) {
-      commArt = repository.getArtifact(spec.getCollection(),
-				       spec.getAuid(),
-				       spec.getUrl());
+      commArt = repository.getArtifact(spec.getCollection(), spec.getAuid(), spec.getUrl());
       log.info("commArt.getStorageUrl(): " + commArt.getStorageUrl());
     }
+
     spec.assertArtifact(repository, commArt);
   }
 
