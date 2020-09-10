@@ -205,7 +205,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
-                withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
+                withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType())
             );
 
 	assertThrowsMatch(LockssRestInvalidResponseException.class,
@@ -260,7 +260,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
-                withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
+                withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType())
             );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
@@ -314,7 +314,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
             .andExpect(method(HttpMethod.GET))
             .andRespond(
-                withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA)
+                withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType())
             );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
@@ -545,7 +545,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             // FIXME: Why doesn't this work?
 //             .andExpect(queryParam("includeContent", String.valueOf(includeContent)))
             .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), MediaType.MULTIPART_FORM_DATA));
+            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
 
         // ************************************
         // Verify result from getArtifactData()
