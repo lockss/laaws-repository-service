@@ -44,7 +44,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.Disabled;
+import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -251,7 +251,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
    *
    * @throws Exception
    */
-  @Disabled
+  @Ignore
   @Test
   public void testLargeArtifactStorageAndRetrieval() throws Exception {
     // Large artifact spec
