@@ -30,6 +30,7 @@
 
 package org.lockss.laaws.error;
 
+import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.log.L4JLogger;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +57,12 @@ public class SpringControllerAdvice {
 	lrse.getHttpStatus());
   }
 
+  @ExceptionHandler(LockssNoSuchArtifactIdException.class)
+  public ResponseEntity<RestResponseErrorBody> artifactNotFound(LockssNoSuchArtifactIdException e) {
+          return new ResponseEntity<>(new RestResponseErrorBody("Artifact not found", e.getShortMessage()),
+              HttpStatus.NOT_FOUND);
+  }
+
   /**
    * Handles any other unhandled exception as a last resort.
    *
@@ -71,4 +78,6 @@ public class SpringControllerAdvice {
     return new ResponseEntity<>(new RestResponseErrorBody(e.getMessage(),
 	e.getClass().getSimpleName()), HttpStatus.INTERNAL_SERVER_ERROR);
   }
+
+
 }
