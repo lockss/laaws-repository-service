@@ -173,17 +173,20 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         referenceHeaders.add("key1", "value2");
         referenceHeaders.add("key2", "value3");
 
+	String testData = "hello world";
+
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
             new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
             referenceHeaders,
-            new ByteArrayInputStream("hello world".getBytes()),
+            new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
             null
         );
 
         reference.setContentDigest("test");
+        reference.setContentLength(testData.length());
 
         // Multipart response parts
         MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
@@ -228,17 +231,20 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         referenceHeaders.add("key1", "value2");
         referenceHeaders.add("key2", "value3");
 
+	String testData = "hello world";
+
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
             new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
             referenceHeaders,
-            new ByteArrayInputStream("hello world".getBytes()),
+            new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
             new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
         );
 
         reference.setContentDigest("test");
+        reference.setContentLength(testData.length());
 
         // Multipart response parts
         MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
@@ -281,11 +287,13 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         referenceHeaders.add("key1", "value2");
         referenceHeaders.add("key2", "value3");
 
+	String testData = "hello world";
+
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
             new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
             referenceHeaders,
-            new ByteArrayInputStream("hello world".getBytes()),
+            new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
             new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"false\"," +
@@ -293,6 +301,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         );
 
         reference.setContentDigest("test");
+        reference.setContentLength(testData.length());
 
         // Multipart response parts
         MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
