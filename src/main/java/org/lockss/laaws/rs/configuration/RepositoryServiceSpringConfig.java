@@ -26,7 +26,7 @@ public class RepositoryServiceSpringConfig extends WebMvcConfigurationSupport {
 
   /**
    * Emits a {@link CommonsMultipartResolver} bean for use in Spring's {@link DispatcherServlet}.
-   *
+   * <p>
    * See the javadocs of {@link MultipartResolver} and {@link DispatcherServlet} for details.
    *
    * @return A {@link CommonsMultipartResolver} for the Spring-implementation of the LOCKSS Repository Service.
@@ -39,17 +39,12 @@ public class RepositoryServiceSpringConfig extends WebMvcConfigurationSupport {
   }
 
   /**
-   * Adds the {@link LockssHttpEntityMethodProcessor} to the list of return-value handlers used by
-   * {@link WebMvcConfigurationSupport}.
+   * Emits a {@link LockssHttpEntityMethodProcessor} bean configured for use in the Repository service.
    *
-   * Note: The order in which this is invoked is sensitive! {@link LockssHttpEntityMethodProcessor} must come earlier
-   * in the list than (or replace) {@link HttpEntityMethodProcessor}.
-   *
-   * @param returnValueHandlers The {@link List<HandlerMethodReturnValueHandler>} to add an instance of
-   * {@link LockssHttpEntityMethodProcessor} to.
+   * @return An instance of {@link LockssHttpEntityMethodProcessor}.
    */
-  @Override
-  public void addReturnValueHandlers(final List<HandlerMethodReturnValueHandler> returnValueHandlers) {
+  @Bean
+  public LockssHttpEntityMethodProcessor createLockssHttpEntityMethodProcessor() {
     // Converters for HTTP entity types to be supported by LockssHttpEntityMethodProcessor
     List<HttpMessageConverter<?>> messageConverters = new ArrayList<>();
     messageConverters.add(new MappingJackson2HttpMessageConverter());
@@ -57,32 +52,68 @@ public class RepositoryServiceSpringConfig extends WebMvcConfigurationSupport {
     messageConverters.add(new MultipartMessageHttpMessageConverter());
 
     // Add new LockssHttpEntityMethodProcessor to list from WebMvcConfigurationSupport
-    returnValueHandlers.add(new LockssHttpEntityMethodProcessor(messageConverters, mvcContentNegotiationManager()));
+    return new LockssHttpEntityMethodProcessor(messageConverters, mvcContentNegotiationManager());
   }
 
   /**
-   * Taken from {@link WebMvcConfigurationSupport#requestMappingHandlerAdapter()}.
+   * Creates an {@link ReplacingRequestMappingHandlerAdapter} that replaces {@link HttpEntityMethodProcessor} with
+   * {@link LockssHttpEntityMethodProcessor}.
    *
-   * The purpose for this override is to use setReturnValueHandlers instead of setCustomReturnValueHandlers. The latter
-   * appends custom handlers to the end of a default list, which doesn't work for custom handlers that are supposed
-   * to replace (or come earlier in the list than) a handler provided by default.
-   *
-   * @return
+   * @return An instance of {@link ReplacingRequestMappingHandlerAdapter} having the an updated set of return value
+   * handlers.
    */
   @Override
-  @Bean
-  public RequestMappingHandlerAdapter requestMappingHandlerAdapter() {
-    RequestMappingHandlerAdapter adapter = createRequestMappingHandlerAdapter();
+  public RequestMappingHandlerAdapter createRequestMappingHandlerAdapter() {
+    return new ReplacingRequestMappingHandlerAdapter(createLockssHttpEntityMethodProcessor());
+  }
 
-    adapter.setContentNegotiationManager(mvcContentNegotiationManager());
-    adapter.setMessageConverters(getMessageConverters());
-    adapter.setWebBindingInitializer(getConfigurableWebBindingInitializer());
-    adapter.setCustomArgumentResolvers(getArgumentResolvers());
+  /**
+   * Replaces {@link HttpEntityMethodProcessor} in the default list of return value handlers from
+   * {@link RequestMappingHandlerAdapter#getDefaultReturnValueHandlers()} with the provided
+   * {@link HandlerMethodReturnValueHandler}.
+   *
+   * FIXME: Could be generalized
+   */
+  private static class ReplacingRequestMappingHandlerAdapter extends RequestMappingHandlerAdapter {
 
-    adapter.setReturnValueHandlers(getReturnValueHandlers());
+    // Handle to replacing instance
+    private HandlerMethodReturnValueHandler replacingHandler;
 
-    // FIXME: Incomplete - see super method implementation
+    /**
+     * Constructor.
+     *
+     * @param handler The instance of {@link HandlerMethodReturnValueHandler} to replace
+     * {@link HttpEntityMethodProcessor} with.
+     */
+    public ReplacingRequestMappingHandlerAdapter(HandlerMethodReturnValueHandler handler) {
+      this.replacingHandler = handler;
+    }
 
-    return adapter;
+    /**
+     * Calls {@code super.afterPropertiesSet()} then replaces {@link HttpEntityMethodProcessor} with the provided
+     * {@link HandlerMethodReturnValueHandler}.
+     */
+    @Override
+    public void afterPropertiesSet() {
+      // Allow default return value handlers to be added
+      super.afterPropertiesSet();
+
+      // List to contain new set of handlers
+      List<HandlerMethodReturnValueHandler> handlers = new ArrayList<>();
+
+      for (HandlerMethodReturnValueHandler handler : getReturnValueHandlers()) {
+        if (handler instanceof HttpEntityMethodProcessor) {
+          // Replace HttpEntityMethodProcessor with LockssHttpEntityMethodProcessor
+          handlers.add(replacingHandler);
+        } else {
+          // Pass-through handler
+          handlers.add(handler);
+        }
+      }
+
+      // Set return value handlers
+      setReturnValueHandlers(handlers);
+    }
+
   }
 }
