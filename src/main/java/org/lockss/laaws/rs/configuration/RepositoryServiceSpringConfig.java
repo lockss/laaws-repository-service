@@ -7,11 +7,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.converter.support.AllEncompassingFormHttpMessageConverter;
+import org.springframework.web.accept.ContentNegotiationManager;
 import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.multipart.MultipartResolver;
 import org.springframework.web.multipart.commons.CommonsMultipartResolver;
 import org.springframework.web.servlet.DispatcherServlet;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurationSupport;
 import org.springframework.web.servlet.mvc.method.annotation.HttpEntityMethodProcessor;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter;
 
@@ -22,7 +22,7 @@ import java.util.List;
  * Spring configuration beans for the Spring-implementation of the LOCKSS Repository Service.
  */
 @Configuration
-public class RepositoryServiceSpringConfig extends WebMvcConfigurationSupport {
+public class RepositoryServiceSpringConfig {
 
   /**
    * Emits a {@link CommonsMultipartResolver} bean for use in Spring's {@link DispatcherServlet}.
@@ -43,7 +43,6 @@ public class RepositoryServiceSpringConfig extends WebMvcConfigurationSupport {
    *
    * @return An instance of {@link LockssHttpEntityMethodProcessor}.
    */
-  @Bean
   public LockssHttpEntityMethodProcessor createLockssHttpEntityMethodProcessor() {
     // Converters for HTTP entity types to be supported by LockssHttpEntityMethodProcessor
     List<HttpMessageConverter<?>> messageConverters = new ArrayList<>();
@@ -52,7 +51,7 @@ public class RepositoryServiceSpringConfig extends WebMvcConfigurationSupport {
     messageConverters.add(new MultipartMessageHttpMessageConverter());
 
     // Add new LockssHttpEntityMethodProcessor to list from WebMvcConfigurationSupport
-    return new LockssHttpEntityMethodProcessor(messageConverters, mvcContentNegotiationManager());
+    return new LockssHttpEntityMethodProcessor(messageConverters, new ContentNegotiationManager());
   }
 
   /**
@@ -62,7 +61,7 @@ public class RepositoryServiceSpringConfig extends WebMvcConfigurationSupport {
    * @return An instance of {@link ReplacingRequestMappingHandlerAdapter} having the an updated set of return value
    * handlers.
    */
-  @Override
+  @Bean
   public RequestMappingHandlerAdapter createRequestMappingHandlerAdapter() {
     return new ReplacingRequestMappingHandlerAdapter(createLockssHttpEntityMethodProcessor());
   }
