@@ -31,8 +31,6 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.lockss.laaws.error.LockssRestServiceException;
-import org.lockss.laaws.error.RestResponseErrorBody;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
@@ -44,6 +42,8 @@ import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.config.Configuration;
+import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.spring.error.RestResponseErrorBody;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
