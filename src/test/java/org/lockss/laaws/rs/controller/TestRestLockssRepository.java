@@ -239,7 +239,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     // Try adding an artifact with no URL.
     assertThrowsMatch(LockssRestHttpException.class,
-	"500 Internal Server Error.*addArtifact",
+	"400 Bad Request: addArtifact",
 	() -> {addUncommitted(new ArtifactSpec().setUrl(null));});
   }
 
