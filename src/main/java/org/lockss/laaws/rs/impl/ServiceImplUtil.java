@@ -35,9 +35,9 @@ import java.io.IOException;
 import java.util.stream.StreamSupport;
 import javax.servlet.http.HttpServletRequest;
 import org.json.JSONObject;
-import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.error.LockssRestServiceException;
 import org.springframework.http.HttpStatus;
 
 /**

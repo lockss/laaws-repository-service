@@ -31,7 +31,6 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
@@ -43,6 +42,8 @@ import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.config.Configuration;
+import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.spring.error.RestResponseErrorBody;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
@@ -333,7 +334,13 @@ public class CollectionsApiServiceImpl
       );
 
     } catch (LockssNoSuchArtifactIdException e) {
-      return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
+      // FIXME: Handling of this exception should be moved into SpringControllerAdvice
+
+      HttpHeaders responseHeaders = new HttpHeaders();
+      responseHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+      return new ResponseEntity<>(new RestResponseErrorBody(e.getMessage(),
+          e.getClass().getSimpleName()), responseHeaders, HttpStatus.NOT_FOUND);
 
     } catch (LockssRestServiceException e) {
       // Let it cascade to the controller advice exception handler.

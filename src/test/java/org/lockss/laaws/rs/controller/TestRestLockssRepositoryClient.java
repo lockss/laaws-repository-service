@@ -80,7 +80,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
     private final static String BASEURL = "http://localhost:24610";
-    protected LockssRepository repository;
+    protected RestLockssRepository repository;
     protected MockRestServiceServer mockServer;
 
     /**
@@ -89,8 +89,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
      */
     @Before
     public void makeLockssRepository() throws Exception {
-      RestTemplate restTemplate = RestUtil.getRestTemplate();
-
       // The authentication credentials.
       String userName = null;
       String password = null;
@@ -98,10 +96,9 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
       // Must create the RestLockssRepository before the
       // MockRestServiceServer, as the latter replaces the RequestFactory
       // in the RestTemplate with its own mock RequestFactory
-      repository = new RestLockssRepository(new URL(BASEURL), restTemplate,
-	  userName, password);
+      repository = new RestLockssRepository(new URL(BASEURL), userName, password);
 
-      mockServer = MockRestServiceServer.createServer(restTemplate);
+      mockServer = MockRestServiceServer.createServer(repository.getRestTemplate());
     }
 
     @Test
