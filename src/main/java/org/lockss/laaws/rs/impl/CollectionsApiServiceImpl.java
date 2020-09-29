@@ -451,15 +451,15 @@ public class CollectionsApiServiceImpl
     headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
 
     //// Artifact repository state information headers if present
-    if (ad.getRepositoryMetadata() != null) {
+    if (ad.getArtifactRepositoryState() != null) {
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-          String.valueOf(ad.getRepositoryMetadata().getCommitted())
+          String.valueOf(ad.getArtifactRepositoryState().getCommitted())
       );
 
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_DELETED,
-          String.valueOf(ad.getRepositoryMetadata().getDeleted())
+          String.valueOf(ad.getArtifactRepositoryState().getDeleted())
       );
     }
 
