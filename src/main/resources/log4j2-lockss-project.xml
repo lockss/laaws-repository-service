@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Default logging config for repository service. -->
+
+<Configuration>
+
+  <Loggers>
+    <!-- This logs prodigiously at debug level -->
+    <Logger name="org.lockss.spring.converter.LockssHttpEntityMethodProcessor"
+	    level="INFO"/>
+  </Loggers>
+
+</Configuration>
