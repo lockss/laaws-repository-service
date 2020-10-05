@@ -237,8 +237,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
-            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"true\"," +
-                "\"deleted\":\"false\"}")
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
         );
 
         reference.setContentDigest("test");
@@ -294,7 +293,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
-            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"false\"," +
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"committed\":\"false\"," +
                 "\"deleted\":\"false\"}")
         );
 
@@ -415,8 +414,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 new BasicStatusLine(
                     new ProtocolVersion("protocol1", 4, 5), 3, null),
                 new URI("storageUrl1"),
-                new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
-                    "\"deleted\":\"false\"}")
+                new ArtifactRepositoryState("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")
             )
         );
 
@@ -441,8 +439,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     new ByteArrayInputStream(new byte[]{}),
                     new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null),
                     new URI("storageUrl1"),
-                    new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
-                        "\"deleted\":\"false\"}")
+                    new ArtifactRepositoryState("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")
                 )
             );
 
@@ -515,7 +512,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(content.getBytes()),
             httpStatus,
             new URI("storageUrl1"),
-            new ArtifactRepositoryState("{\"artifactId\":\"artifact\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}")
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact\",\"committed\":\"true\",\"deleted\":\"false\"}")
         );
 
         reference.setContentLength(content.length());

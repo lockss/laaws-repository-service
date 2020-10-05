@@ -75,21 +75,26 @@ paths:
       consumes:
       - "multipart/form-data"
       parameters:
-      - name: "properties"
+      - name: "auid"
         in: "formData"
         required: true
         type: "string"
-        description: "Artifact properties (JSON)"
-      - name: "artifactHeaders"
+        description: "Archival Unit ID (AUID) of new artifact"
+      - name: "uri"
         in: "formData"
         required: true
         type: "string"
-        description: "Artifact headers (JSON)"
+        description: "URI represented by this artifact"
       - name: "content"
         in: "formData"
         required: true
         type: "file"
         description: "Content byte stream"
+      - name: "aspectParts"
+        in: "formData"
+        required: false
+        type: "file"
+        description: "URI aspects represented by this artifact"
       responses:
         201:
           description: "Artifact created"
@@ -610,9 +615,6 @@ definitions:
       storageUrl:
         type: "string"
       originDate:
-        type: "integer"
-        format: "int64"
-      collectionDate:
         type: "integer"
         format: "int64"
   streamingResponseBody:
