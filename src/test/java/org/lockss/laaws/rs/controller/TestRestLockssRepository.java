@@ -40,11 +40,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.Ignore;
+import org.junit.*;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -77,6 +73,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -278,14 +275,18 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   @Test
   public void testAddLargeArtifact() throws IOException {
-    long len = 100*1024*1024;
-    ArtifactSpec spec =
-        new ArtifactSpec().
-            setUrl("https://mr/ed/")
-      .setContentGenerator(() -> new ZeroInputStream((byte)27, len))
-            .setCollectionDate(0);
+//    long len = 100*1024*1024;
+    long len = 1024;
+
+    long collectionDate = Instant.now().toEpochMilli();
+
+    ArtifactSpec spec = new ArtifactSpec()
+        .setUrl("https://mr/ed/")
+        .setContentGenerator(() -> new ZeroInputStream((byte) 27, len))
+        .setCollectionDate(collectionDate);
 
     Artifact newArt = addUncommitted(spec);
+
     String storeUrl = newArt.getStorageUrl();
 
     log.info("uncommArt.getStorageUrl(): " + storeUrl);
@@ -1499,6 +1500,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertNotNull(newArt);
 
     spec.assertArtifact(repository, newArt);
+
     long expVers = expectedVersions(spec);
     assertEquals("version of " + newArt,
 		 expVers + 1, (int)newArt.getVersion());

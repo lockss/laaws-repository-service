@@ -32,10 +32,7 @@ package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
-import org.lockss.laaws.rs.core.ArtifactCache;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.*;
 import org.lockss.log.L4JLogger;
@@ -468,7 +465,7 @@ public class CollectionsApiServiceImpl
     headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
 
 //    headers.set(ArtifactConstants.ARTIFACT_ORIGIN_KEY, ???);
-//    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_DATE, ???);
+    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_DATE_KEY, String.valueOf(ad.getCollectionDate()));
 
     return headers;
   }
@@ -515,9 +512,14 @@ public class CollectionsApiServiceImpl
 
       // Record the commit status in storage and return the new representation in the response entity body
       Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
+
       sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit,
           artifactKey(collectionid, artifactid));
+
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
+
+    } catch (LockssArtifactExpiredException e) {
+      return new ResponseEntity<String>("Artifact is expired", HttpStatus.BAD_REQUEST);
 
     } catch (LockssNoSuchArtifactIdException e) {
       return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
@@ -525,9 +527,10 @@ public class CollectionsApiServiceImpl
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
+
     } catch (IOException e) {
       String errorMessage = String.format(
-          "IOException occurred while attempting to update artifact metadata (artifactId: %s)",
+          "IOException occurred while attempting to update artifact state (artifactId: %s)",
           artifactid);
 
       log.warn(errorMessage, e);
@@ -542,36 +545,59 @@ public class CollectionsApiServiceImpl
    * POST /collections/{collectionid}/artifacts:
    * Adds artifacts to the repository
    *
-   * @param collectionid A String with the name of the collection containing the artifact.
-   * @param auid         A String with the Archival Unit ID (AUID) of new artifact.
-   * @param uri          A String with the URI represented by this artifact.
-   * @param content      A MultipartFile with the artifact content.
-   * @param aspectParts  A MultipartFile... with the artifact aspects.
-   * @return a {@code ResponseEntity<Artifact>}.
+   * @param collectionid A {@link String} containing the name of the collection ID.
+   * @param properties   A {@link String} containing the artifact repository properties.
+   * @param artifactHeaders A {@link String} containing JSON structured artifact headers.
+   * @param content      A {@link MultipartFile} containing the artifact content bytes.
+   * @return A {@link ResponseEntity<Artifact>}.
    */
   @Override
   public ResponseEntity<Artifact> createArtifact(String collectionid,
-                                                 String auid, String uri, MultipartFile content, MultipartFile aspectParts) {
+                                                 String properties,
+                                                 String artifactHeaders,
+                                                 MultipartFile content) {
+
+
+    // Debugging
     String parsedRequest = String.format(
-        "collectionid: %s, auid: %s, uri: %s, requestUrl: %s",
-        collectionid, auid, uri, ServiceImplUtil.getFullRequestUrl(request));
+        "collectionid: %s, properties: %s, artifactHeaders: %s, requestUrl: %s",
+        collectionid, properties, artifactHeaders, ServiceImplUtil.getFullRequestUrl(request));
+
     log.debug2("Parsed request: {}", parsedRequest);
 
+    // Do not continue until internal repository is ready
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      log.debug(String.format("Adding artifact %s, %s, %s",
-          collectionid, auid, uri));
+      //// Parse Artifact and artifact headers
+      Artifact artifact;
+      HttpHeaders headers;
 
-      log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
-          content.getContentType()));
+      try {
+        // Debugging
+        log.debug("properties = {}", properties);
+        log.debug("artifactHeaders = {}", artifactHeaders);
 
-      // Check URI.
-      validateUri(uri, parsedRequest);
+        // Parse JSON inputs
+        artifact = objectMapper.readValue(properties, Artifact.class);
+        headers = objectMapper.readValue(artifactHeaders, HttpHeaders.class);
 
-      // Only accept artifact encoded within an HTTP response
-      if (!isHttpResponseType(MediaType.parseMediaType(content
-          .getContentType()))) {
+
+      } catch (IOException e) {
+        String errorMsg = "Error parsing JSON";
+        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, errorMsg, e, parsedRequest);
+      }
+
+      log.debug("Adding artifact [artifact: {}]", artifact);
+      log.trace("headers = {}", headers);
+      log.trace("content = {}", content);
+
+      // Check artifact URI
+      validateUri(artifact.getUri(), parsedRequest);
+
+      // Content multipart must be of the expected type (application/http;msgtype=response)
+      // Q: Do we still want this?
+      if (!isHttpResponseType(MediaType.parseMediaType(content.getContentType()))) {
         String errorMessage = String.format(
             "Failed to add artifact; expected %s but got %s",
             APPLICATION_HTTP_RESPONSE,
@@ -580,55 +606,31 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
+        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, errorMessage, parsedRequest);
       }
 
       // Convert multipart stream to ArtifactData
-      ArtifactData artifactData =
-          ArtifactDataFactory.fromHttpResponseStream(content.getInputStream());
+      ArtifactData artifactData = ArtifactDataFactory.fromHttpResponseStream(content.getInputStream());
 
-      // Set ArtifactData properties from the POST request
-//TODO: FIX THIS CALL
-      ArtifactIdentifier id =
-          new ArtifactIdentifier(collectionid, auid, uri, 0);
-      artifactData.setIdentifier(id);
+      // Set ArtifactData properties
+      artifactData.setIdentifier(artifact.getIdentifier());
       artifactData.setContentLength(content.getSize());
+      artifactData.setContentDigest(artifactData.getContentDigest()); // FIXME
+      artifactData.setCollectionDate(artifact.getCollectionDate());
 
-      Artifact artifact = repo.addArtifact(artifactData);
+      log.trace("artifactData = {}", artifactData);
 
-      log.debug(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
+      // Add the artifact
+      Artifact added = repo.addArtifact(artifactData);
 
-      // TODO: Process artifact's aspects
-//      for (MultipartFile aspectPart : aspectParts) {
-//	log.warn(String.format("Ignoring MultipartFile: Type: Aspect, Content-type: %s",
-//	    aspectPart.getContentType()));
-      //log.info(IOUtils.toString(aspectPart.getInputStream()));
-      //log.info(aspectPart.getName());
+      log.debug("Wrote artifact to %s", artifact.getStorageUrl());
 
-	/*
-                // Augment custom metadata headers with headers from HTTP response
-                for (Header header : response.getAllHeaders()) {
-                    headers.add(header.getName(), header.getValue());
-                }
+      return new ResponseEntity<>(added, HttpStatus.OK);
 
-                // Set content stream and its properties
-                artifactMetadata.setContentType(response.getEntity().getContentType().getValue());
-                artifactMetadata.setContentLength((int) response.getEntity().getContentLength());
-                artifactMetadata.setContentDate(0);
-                artifactMetadata.setLastModified(0);
-                artifactMetadata.setContentHash(null);
-
-                // Create an artifactIndex
-                SolrArtifactIndexData info = artifactStore.addArtifact(artifactMetadata, response.getEntity().getContent());
-                artifactIndexRepository.save(info);
-	 */
-//      }
-
-      return new ResponseEntity<>(artifact, HttpStatus.OK);
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
+
     } catch (IOException e) {
       String errorMessage =
           "Caught IOException while attempting to add an artifact to the repository";
