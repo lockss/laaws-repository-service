@@ -41,7 +41,7 @@ import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
+import org.lockss.laaws.rs.model.ArtifactRepositoryState;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.LockssUncheckedException;
@@ -237,7 +237,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
-            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"true\"," +
+                "\"deleted\":\"false\"}")
         );
 
         reference.setContentDigest("test");
@@ -293,7 +294,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
-            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"false\"," +
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"false\"," +
                 "\"deleted\":\"false\"}")
         );
 
@@ -414,7 +415,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 new BasicStatusLine(
                     new ProtocolVersion("protocol1", 4, 5), 3, null),
                 new URI("storageUrl1"),
-                new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+                new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
+                    "\"deleted\":\"false\"}")
             )
         );
 
@@ -439,7 +441,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     new ByteArrayInputStream(new byte[]{}),
                     new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null),
                     new URI("storageUrl1"),
-                    new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+                    new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
+                        "\"deleted\":\"false\"}")
                 )
             );
 
@@ -512,7 +515,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(content.getBytes()),
             httpStatus,
             new URI("storageUrl1"),
-            new RepositoryArtifactMetadata("{\"artifactId\":\"artifact\",\"committed\":\"true\",\"deleted\":\"false\"}")
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact\",\"entryDate\":0,\"committed\":\"true\"," +
+                "\"deleted\":\"false\"}")
         );
 
         reference.setContentLength(content.length());
@@ -520,7 +524,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         // Convenience variables
         ArtifactIdentifier refId = reference.getIdentifier();
-        RepositoryArtifactMetadata refRepoMd = reference.getRepositoryMetadata();
+        ArtifactRepositoryState refRepoMd = reference.getArtifactRepositoryState();
 
         // Artifact is small if its size is less than or equal to the threshold
         long includeContentMaxSize = (isSmall == null || isSmall == true) ? content.length() : content.length() - 1;
@@ -573,10 +577,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals(refId.getVersion(), result.getIdentifier().getVersion());
 
         // Verify artifact repository state
-        assertNotNull(result.getRepositoryMetadata());
-        assertEquals(refRepoMd.getArtifactId(), result.getRepositoryMetadata().getArtifactId());
-        assertEquals(refRepoMd.getCommitted(), result.getRepositoryMetadata().getCommitted());
-        assertEquals(refRepoMd.getDeleted(), result.getRepositoryMetadata().getDeleted());
+        assertNotNull(result.getArtifactRepositoryState());
+        assertEquals(refRepoMd.getArtifactId(), result.getArtifactRepositoryState().getArtifactId());
+        assertEquals(refRepoMd.getCommitted(), result.getArtifactRepositoryState().getCommitted());
+        assertEquals(refRepoMd.getDeleted(), result.getArtifactRepositoryState().getDeleted());
 
         // Verify misc. artifact properties
         assertEquals(reference.getContentLength(), result.getContentLength());
