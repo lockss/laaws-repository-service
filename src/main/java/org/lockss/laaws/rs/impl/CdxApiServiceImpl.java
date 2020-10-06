@@ -421,6 +421,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
   void getCdxRecords(String collectionid, String url, LockssRepository repo,
       boolean isPrefix, Integer count, Integer startPage, String closest,
       CdxRecords records) throws IOException {
+
     log.debug2("collectionid = {}", collectionid);
     log.debug2("url = {}", url);
     log.debug2("isPrefix = {}", isPrefix);
@@ -431,10 +432,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     Iterable<Artifact> iterable = null;
 
     if (isPrefix) {
-      // Yes: Get from the repository the artifacts for URLs with the passed
-      // prefix.
-      iterable =
-	  repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, url);
+      // Yes: Get from the repository the artifacts for URLs with the passed prefix.
+      iterable = repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, url);
     } else {
       // No: Get from the repository the artifacts for the passed URL.
       iterable = repo.getArtifactsAllVersionsAllAus(collectionid, url);
@@ -444,10 +443,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     Iterator<Artifact> artIterator = iterable.iterator();
 
     if (closest != null && !closest.trim().isEmpty()) {
-      // Yes: Return all the artifacts found sorted by temporal proximity to the
-      // target timestamp.
-      artIterator =
-	  getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
+      // Yes: Return all the artifacts found sorted by temporal proximity to the target timestamp.
+      artIterator = getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
     }
 
     // Get the CDX records for the selected artifacts.

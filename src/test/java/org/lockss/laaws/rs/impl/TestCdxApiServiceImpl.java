@@ -31,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.stream.XMLOutputFactory;
@@ -49,6 +50,7 @@ import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
+import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -57,6 +59,8 @@ import org.springframework.http.MediaType;
  * Test class for org.lockss.laaws.rs.impl.CdxApiServiceImpl.
  */
 public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
+  private static L4JLogger log = L4JLogger.getLogger();
+
   private LockssRepository repository;
 
   /**
@@ -431,39 +435,30 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Populate the repository.
     List<Artifact> artifacts = new ArrayList<>();
 
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url4.example.com", 1,
-	MediaType.TEXT_HTML, 312345));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url3.example.com", 1,
-	MediaType.TEXT_HTML, 212345));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 3,
-	MediaType.TEXT_HTML, 134567));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 2,
-	MediaType.TEXT_HTML, 123456));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 1,
-	MediaType.TEXT_HTML, 112345));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 4,
-	MediaType.TEXT_HTML, 45678));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 3,
-	MediaType.TEXT_HTML, 34567));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 2,
-	MediaType.TEXT_HTML, 23456));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 1,
-	MediaType.TEXT_HTML, 12345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url4.example.com", 1,
-	MediaType.TEXT_HTML, 312345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url3.example.com", 1,
-	MediaType.TEXT_HTML, 212345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url2.example.com", 1,
-	MediaType.TEXT_HTML, 112345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url1.example.com", 1,
-	MediaType.TEXT_HTML, 12345));
+    artifacts.add( makeArtifact("coll1", "auid1", "www.url4.example.com", 1, MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url3.example.com", 1, MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 3, MediaType.TEXT_HTML, 134567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 2, MediaType.TEXT_HTML, 123456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 1, MediaType.TEXT_HTML, 112345));
+
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 4, MediaType.TEXT_HTML, 45678));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 3, MediaType.TEXT_HTML, 34567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 2, MediaType.TEXT_HTML, 23456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 1, MediaType.TEXT_HTML, 12345));
+
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url4.example.com", 1, MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url3.example.com", 1, MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url2.example.com", 1, MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url1.example.com", 1, MediaType.TEXT_HTML, 12345));
 
     // Get exact CDX records for www.url1.example.com in the first collection.
     String collId = "coll1";
     String url = "www.url1.example.com";
+
     CdxRecords records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
-	null, null, null, records);
+
+    new CdxApiServiceImpl(null)
+        .getCdxRecords(collId, url, repository, false, null, null, null, records);
 
     // Validate count.
     assertEquals(4, records.getCdxRecordCount());
@@ -491,10 +486,15 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
       assertEquals(url, cdxRecord.getUrl());
 
       // Validate archive name.
-      assertEquals(ServiceImplUtil.getArtifactArchiveName(collId,
-	  artifact.getId()), cdxRecord.getArchiveName());
+      assertEquals(
+          ServiceImplUtil.getArtifactArchiveName(collId, artifact.getId()),
+          cdxRecord.getArchiveName()
+      );
 
       // Validate timestamp sorting in ascending order.
+      log.trace("previousCollectionDate = {}", previousCollectiondate);
+      log.trace("artifact.getCollectionDate = {}", artifact.getCollectionDate());
+
       assertTrue(previousCollectiondate < artifact.getCollectionDate());
       assertTrue(previousTimestamp < cdxRecord.getTimestamp());
       previousCollectiondate = artifact.getCollectionDate();
@@ -776,18 +776,25 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
    *          An Integer with the artifact version.
    * @param contentType
    *          A MediaType with the artifact content type.
-   * @param collectionDate
-   *          A long with the artifact collection date.
    * @return an Artifact with the newly created artifact.
    * @exception IOException
    *              if there are problems creating the artifact.
    */
-  private Artifact makeArtifact(String collection, String auid, String url,
-      Integer version, MediaType contentType, long collectionDate)
-	  throws IOException {
-    Artifact art = repository.addArtifact(makeArtifactData(null, collection,
-	auid, url, version, contentType, collectionDate));
+  private Artifact makeArtifact(String collection,
+                                String auid,
+                                String url,
+                                Integer version,
+                                MediaType contentType,
+                                long collectionDate) throws IOException {
 
+    // This is ignored by addArtifact() but created here for makeArtifactData()
+//    long collectionDate = Instant.now().toEpochMilli();
+
+    // Add artifact
+    Artifact art = repository
+        .addArtifact(makeArtifactData(null, collection, auid, url, version, contentType, collectionDate));
+
+    // Commit artifact
     return repository.commitArtifact("coll1", art.getId());
   }
 }
