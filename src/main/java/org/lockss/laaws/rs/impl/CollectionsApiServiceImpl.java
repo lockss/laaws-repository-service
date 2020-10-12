@@ -31,6 +31,7 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
@@ -41,7 +42,6 @@ import org.lockss.laaws.rs.util.*;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
-import org.lockss.config.Configuration;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.spring.error.RestResponseErrorBody;
 import org.lockss.util.TimerQueue;
@@ -50,7 +50,6 @@ import org.lockss.util.jms.JmsUtil;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -546,15 +545,19 @@ public class CollectionsApiServiceImpl
    * @param auid         A String with the Archival Unit ID (AUID) of new artifact.
    * @param uri          A String with the URI represented by this artifact.
    * @param content      A MultipartFile with the artifact content.
-   * @param aspectParts  A MultipartFile... with the artifact aspects.
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
   public ResponseEntity<Artifact> createArtifact(String collectionid,
-                                                 String auid, String uri, MultipartFile content, MultipartFile aspectParts) {
+                                                 String auid,
+                                                 String uri,
+                                                 MultipartFile content,
+                                                 Long collectionDate) {
+
     String parsedRequest = String.format(
-        "collectionid: %s, auid: %s, uri: %s, requestUrl: %s",
-        collectionid, auid, uri, ServiceImplUtil.getFullRequestUrl(request));
+        "collectionid: %s, auid: %s, uri: %s, collectionDate: %s, requestUrl: %s",
+        collectionid, auid, uri, collectionDate, ServiceImplUtil.getFullRequestUrl(request));
+
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
@@ -595,40 +598,22 @@ public class CollectionsApiServiceImpl
       artifactData.setIdentifier(id);
       artifactData.setContentLength(content.getSize());
 
+      // Set artifact collection date if provided
+      if (collectionDate != null) {
+        artifactData.setCollectionDate(collectionDate);
+      }
+
+      // Add artifact to internal repository
       Artifact artifact = repo.addArtifact(artifactData);
 
       log.debug(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
 
-      // TODO: Process artifact's aspects
-//      for (MultipartFile aspectPart : aspectParts) {
-//	log.warn(String.format("Ignoring MultipartFile: Type: Aspect, Content-type: %s",
-//	    aspectPart.getContentType()));
-      //log.info(IOUtils.toString(aspectPart.getInputStream()));
-      //log.info(aspectPart.getName());
-
-	/*
-                // Augment custom metadata headers with headers from HTTP response
-                for (Header header : response.getAllHeaders()) {
-                    headers.add(header.getName(), header.getValue());
-                }
-
-                // Set content stream and its properties
-                artifactMetadata.setContentType(response.getEntity().getContentType().getValue());
-                artifactMetadata.setContentLength((int) response.getEntity().getContentLength());
-                artifactMetadata.setContentDate(0);
-                artifactMetadata.setLastModified(0);
-                artifactMetadata.setContentHash(null);
-
-                // Create an artifactIndex
-                SolrArtifactIndexData info = artifactStore.addArtifact(artifactMetadata, response.getEntity().getContent());
-                artifactIndexRepository.save(info);
-	 */
-//      }
-
       return new ResponseEntity<>(artifact, HttpStatus.OK);
+
     } catch (LockssRestServiceException lre) {
       // Let it cascade to the controller advice exception handler.
       throw lre;
+
     } catch (IOException e) {
       String errorMessage =
           "Caught IOException while attempting to add an artifact to the repository";

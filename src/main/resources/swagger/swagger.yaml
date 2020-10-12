@@ -85,16 +85,17 @@ paths:
         required: true
         type: "string"
         description: "URI represented by this artifact"
+      - name: "collectionDate"
+        in: "formData"
+        required: false
+        type: "integer"
+        format: "int64"
+        description: "Artifact collection/crawl date (milliseconds since epoch; UTC)"
       - name: "content"
         in: "formData"
         required: true
         type: "file"
         description: "Content byte stream"
-      - name: "aspectParts"
-        in: "formData"
-        required: false
-        type: "file"
-        description: "URI aspects represented by this artifact"
       responses:
         201:
           description: "Artifact created"
@@ -615,6 +616,9 @@ definitions:
       storageUrl:
         type: "string"
       originDate:
+        type: "integer"
+        format: "int64"
+      collectionDate:
         type: "integer"
         format: "int64"
   streamingResponseBody:
