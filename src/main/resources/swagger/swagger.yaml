@@ -510,7 +510,7 @@ paths:
       description: Get the contents of a single WARC record as a WARC archive
       operationId: getWarcArchive
       produces:
-        - "application/octet-stream"
+        - "application/warc"
       responses:
         '200':
           description: The contents of the requested WARC archive
