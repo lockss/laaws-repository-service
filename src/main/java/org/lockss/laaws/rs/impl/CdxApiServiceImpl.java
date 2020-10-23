@@ -55,6 +55,7 @@ import org.lockss.log.L4JLogger;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -602,7 +603,10 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     record.setUrl(artifactUrl);
 
     // Set the artifact MIME type.
-    record.setMimeType(artifactData.getMetadata().getContentType().toString());
+    MediaType ctype = artifactData.getMetadata().getContentType();
+    if (ctype != null) {
+      record.setMimeType(ctype.toString());
+    }
 
     // Set the artifact HTTP status.
     record.setHttpStatus(artifactData.getHttpStatus().getStatusCode());
