@@ -1,4 +1,4 @@
-# Copyright (c) 2000-2019, Board of Trustees of Leland Stanford Jr. University
+# Copyright (c) 2000-2020, Board of Trustees of Leland Stanford Jr. University
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -85,16 +85,17 @@ paths:
         required: true
         type: "string"
         description: "URI represented by this artifact"
+      - name: "collectionDate"
+        in: "formData"
+        required: false
+        type: "integer"
+        format: "int64"
+        description: "Artifact collection/crawl date (milliseconds since epoch; UTC)"
       - name: "content"
         in: "formData"
         required: true
         type: "file"
         description: "Content byte stream"
-      - name: "aspectParts"
-        in: "formData"
-        required: false
-        type: "file"
-        description: "URI aspects represented by this artifact"
       responses:
         201:
           description: "Artifact created"
@@ -127,21 +128,24 @@ paths:
       summary: "Get artifact content and metadata"
       operationId: getArtifact
       parameters:
-      - name: "Accept"
-        in: "header"
-        required: false
+      - name: "includeContent"
+        in: "query"
         type: "string"
-        description: "Content type to return"
-        default: "multipart/related"
-        enum:
-        - "application/http"
-        - "application/warc"
-        - "multipart/related"
+        enum: ["NEVER", "IF_SMALL", "ALWAYS"]
+        description: "Controls whether to include the artifact content part in multipart response"
+        required: false
+        default: "ALWAYS"
+      produces:
+        - "multipart/form-data"
       responses:
         200:
           description: "Artifact created"
           schema:
-            $ref: "#/definitions/streamingResponseBody"
+            type: file
+#          schema:
+#            type: object
+#            additionalProperties:
+#              type: object
         401:
           description: "Unauthorized request"
         403:
@@ -506,7 +510,7 @@ paths:
       description: Get the contents of a single WARC record as a WARC archive
       operationId: getWarcArchive
       produces:
-        - "application/octet-stream"
+        - "application/warc"
       responses:
         '200':
           description: The contents of the requested WARC archive
@@ -539,6 +543,46 @@ paths:
           description: The Range header
           required: false
           type: string
+  '/checksumalgorithms':
+    get:
+      tags:
+        - import
+      summary: Get the supported checksum algorithms
+      description: Get a list of the names of the supported checksum algorithms
+      operationId: getSupportedChecksumAlgorithms
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: The names of the supported checksum algorithms
+          schema:
+            type: array
+            items:
+              type: "string"
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
+  '/repoinfo':
+    get:
+      tags:
+        - repo
+      summary: Get repository information
+      description: Get properties of the repository
+      operationId: getRepositoryInformation
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: The repository information
+          schema:
+            $ref: "#/definitions/repositoryInfo"
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
 definitions:
   artifactPageInfo:
     type: "object"
@@ -572,6 +616,9 @@ definitions:
       storageUrl:
         type: "string"
       originDate:
+        type: "integer"
+        format: "int64"
+      collectionDate:
         type: "integer"
         format: "int64"
   streamingResponseBody:
@@ -646,4 +693,53 @@ definitions:
         type: "string"
         description: "The link of the next request"
     description: "The information related to pagination of content"
-    
+  repositoryInfo:
+    type: "object"
+    required:
+      - "storeInfo"
+      - "indexInfo"
+    properties:
+      storeInfo:
+        description: "Information about the repository store"
+        $ref: "#/definitions/storageInfo"
+      indexInfo:
+        description: "Information about the repository index"
+        $ref: "#/definitions/storageInfo"
+    description: "Information about the repository"
+  storageInfo:
+    type: "object"
+    required:
+      - "type"
+      - "name"
+      - "size"
+      - "used"
+      - "avail"
+      - "percentUsedString"
+      - "percentUsed"
+    properties:
+      type:
+        description: "Type of the storage area"
+        type: "string"
+      name:
+        description: "Name of the storage area"
+        type: "string"
+      size:
+        description: "Size in bytes of the storage area"
+        type: "integer"
+        format: "int64"
+      used:
+        description: "Used size in bytes of the torage area"
+        type: "integer"
+        format: "int64"
+      avail:
+        description: "Available size in bytes of the storage area"
+        type: "integer"
+        format: "int64"
+      percentUsedString:
+        description: "Percentage of size used, formatted as a string"
+        type: "string"
+      percentUsed:
+        description: "Percentage of size used"
+        type: "number"
+        format: "double"
+    description: "Information about a repository storage area"

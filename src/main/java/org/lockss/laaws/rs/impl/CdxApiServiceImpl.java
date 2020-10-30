@@ -43,7 +43,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
-import org.lockss.laaws.error.LockssRestServiceException;
 import org.lockss.laaws.rs.api.CdxApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
@@ -53,8 +52,10 @@ import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
 import org.archive.wayback.surt.SURTTokenizer;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.error.LockssRestServiceException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -421,6 +422,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
   void getCdxRecords(String collectionid, String url, LockssRepository repo,
       boolean isPrefix, Integer count, Integer startPage, String closest,
       CdxRecords records) throws IOException {
+
     log.debug2("collectionid = {}", collectionid);
     log.debug2("url = {}", url);
     log.debug2("isPrefix = {}", isPrefix);
@@ -431,10 +433,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     Iterable<Artifact> iterable = null;
 
     if (isPrefix) {
-      // Yes: Get from the repository the artifacts for URLs with the passed
-      // prefix.
-      iterable =
-	  repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, url);
+      // Yes: Get from the repository the artifacts for URLs with the passed prefix.
+      iterable = repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, url);
     } else {
       // No: Get from the repository the artifacts for the passed URL.
       iterable = repo.getArtifactsAllVersionsAllAus(collectionid, url);
@@ -444,10 +444,8 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     Iterator<Artifact> artIterator = iterable.iterator();
 
     if (closest != null && !closest.trim().isEmpty()) {
-      // Yes: Return all the artifacts found sorted by temporal proximity to the
-      // target timestamp.
-      artIterator =
-	  getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
+      // Yes: Return all the artifacts found sorted by temporal proximity to the target timestamp.
+      artIterator = getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
     }
 
     // Get the CDX records for the selected artifacts.
@@ -605,7 +603,10 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     record.setUrl(artifactUrl);
 
     // Set the artifact MIME type.
-    record.setMimeType(artifactData.getMetadata().getContentType().toString());
+    MediaType ctype = artifactData.getMetadata().getContentType();
+    if (ctype != null) {
+      record.setMimeType(ctype.toString());
+    }
 
     // Set the artifact HTTP status.
     record.setHttpStatus(artifactData.getHttpStatus().getStatusCode());

@@ -1,45 +1,34 @@
 /*
-
-Copyright (c) 2019 Board of Trustees of Leland Stanford Jr. University,
-all rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-this list of conditions and the following disclaimer in the documentation and/or
-other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its contributors
-may be used to endorse or promote products derived from this software without
-specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+ * Copyright (c) 2019-2020, Board of Trustees of Leland Stanford Jr. University,
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ * list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.controller;
 
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.net.URL;
-import org.apache.commons.io.IOUtils;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
@@ -48,34 +37,50 @@ import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.RepositoryArtifactMetadata;
-import org.lockss.laaws.rs.util.ArtifactConstants;
+import org.lockss.laaws.rs.model.ArtifactRepositoryState;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
-import org.lockss.util.LockssUncheckedException;
-import org.lockss.util.rest.exception.*;
-import org.lockss.util.test.LockssTestCase5;
 import org.lockss.log.L4JLogger;
+import org.lockss.util.LockssUncheckedException;
+import org.lockss.util.rest.RestUtil;
+import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
+import org.lockss.spring.test.SpringLockssTestCase4;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.FormHttpMessageConverter;
+import org.springframework.mock.http.MockHttpOutputMessage;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URL;
+
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 /**
  * Test of the REST repository client.
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class TestRestLockssRepositoryClient extends LockssTestCase5 {
+public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
     private final static String BASEURL = "http://localhost:24610";
-    protected LockssRepository repository;
+    protected RestLockssRepository repository;
     protected MockRestServiceServer mockServer;
 
     /**
@@ -84,15 +89,16 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
      */
     @Before
     public void makeLockssRepository() throws Exception {
-      RestTemplate restTemplate = new RestTemplate();
-      mockServer = MockRestServiceServer.createServer(restTemplate);
-
       // The authentication credentials.
       String userName = null;
       String password = null;
 
-      repository = new RestLockssRepository(new URL(BASEURL), restTemplate,
-	  userName, password);
+      // Must create the RestLockssRepository before the
+      // MockRestServiceServer, as the latter replaces the RequestFactory
+      // in the RestTemplate with its own mock RequestFactory
+      repository = new RestLockssRepository(new URL(BASEURL), userName, password);
+
+      mockServer = MockRestServiceServer.createServer(repository.getRestTemplate());
     }
 
     @Test
@@ -139,58 +145,6 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
     }
 
     @Test
-    public void testArtifactExists_iae() throws Exception {
-        try {
-            repository.artifactExists("collection1", null);
-            fail("Should have thrown IllegalArgumentException");
-        } catch (IllegalArgumentException iae) {}
-
-        try {
-            repository.artifactExists("collection1", "");
-            fail("Should have thrown IllegalArgumentException");
-      } catch (IllegalArgumentException iae) {}
-    }
-
-    @Test
-    public void testArtifactExists_false() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
-                .andExpect(method(HttpMethod.HEAD))
-                .andRespond(withStatus(HttpStatus.NOT_FOUND));
-
-        Boolean artifactExists = repository.artifactExists("collection1", "artifact1");
-        mockServer.verify();
-
-        assertNotNull(artifactExists);
-        assertFalse(artifactExists);
-    }
-
-    @Test
-    public void testArtifactExists_true() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
-                .andExpect(method(HttpMethod.HEAD))
-                .andRespond(withSuccess());
-
-        Boolean artifactExists = repository.artifactExists("collection1", "artifact1");
-        mockServer.verify();
-
-        assertNotNull(artifactExists);
-        assertTrue(artifactExists);
-    }
-
-    @Test
-    public void testArtifactExists_failure() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
-                .andExpect(method(HttpMethod.HEAD))
-                .andRespond(withServerError());
-
-	assertThrowsMatch(LockssRestHttpException.class,
-		      "500",
-			  () -> {repository.artifactExists("collection1", "artifact1");});
-
-        mockServer.verify();
-    }
-
-    @Test
     public void testIsArtifactCommitted_iae() throws Exception {
         try {
             repository.isArtifactCommitted("collection1", null);
@@ -205,12 +159,57 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_missingheader() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
-                .andExpect(method(HttpMethod.HEAD))
-                .andRespond(withSuccess().headers(new HttpHeaders()));
+
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
+
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
+
+	String testData = "hello world";
+
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream(testData.getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            null
+        );
+
+        reference.setContentDigest("test");
+        reference.setContentLength(testData.length());
+
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
+        );
+
+        // ****************************
+        // Setup mocked server response
+        // ****************************
+
+        // Convert multipart response and its parts to a byte array
+        FormHttpMessageConverter converter = new FormHttpMessageConverter();
+        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
+        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
+        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+
+        // Setup mocked server response
+        mockServer
+            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType())
+            );
 
 	assertThrowsMatch(LockssRestInvalidResponseException.class,
-			  "did not return X-LockssRepo-Artifact-Committed",
+			  "Missing artifact repository state",
 			  () -> {repository.isArtifactCommitted("collection1",
 								"artifact1");});
         mockServer.verify();
@@ -218,12 +217,55 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_true() throws Exception {
-        HttpHeaders mockHeaders = new HttpHeaders();
-        mockHeaders.add(ArtifactConstants.ARTIFACT_STATE_COMMITTED, "true");
 
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
-                .andExpect(method(HttpMethod.HEAD))
-                .andRespond(withSuccess().headers(mockHeaders));
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
+
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
+
+	String testData = "hello world";
+
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream(testData.getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"true\"," +
+                "\"deleted\":\"false\"}")
+        );
+
+        reference.setContentDigest("test");
+        reference.setContentLength(testData.length());
+
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
+        );
+
+        // ****************************
+        // Setup mocked server response
+        // ****************************
+
+        // Convert multipart response and its parts to a byte array
+        FormHttpMessageConverter converter = new FormHttpMessageConverter();
+        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
+        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
+        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+
+        // Setup mocked server response
+        mockServer
+            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType())
+            );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
         mockServer.verify();
@@ -232,12 +274,55 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
 
     @Test
     public void testIsArtifactCommitted_false() throws Exception {
-        HttpHeaders mockHeaders = new HttpHeaders();
-        mockHeaders.add(ArtifactConstants.ARTIFACT_STATE_COMMITTED, "false");
 
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1", BASEURL)))
-                .andExpect(method(HttpMethod.HEAD))
-                .andRespond(withSuccess().headers(mockHeaders));
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
+
+        // Setup reference artifact data headers
+        HttpHeaders referenceHeaders = new HttpHeaders();
+        referenceHeaders.add("key1", "value1");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
+
+	String testData = "hello world";
+
+        // Setup reference artifact data
+        ArtifactData reference = new ArtifactData(
+            new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
+            referenceHeaders,
+            new ByteArrayInputStream(testData.getBytes()),
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
+            new URI("storageUrl1"),
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"false\"," +
+                "\"deleted\":\"false\"}")
+        );
+
+        reference.setContentDigest("test");
+        reference.setContentLength(testData.length());
+
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
+        );
+
+        // ****************************
+        // Setup mocked server response
+        // ****************************
+
+        // Convert multipart response and its parts to a byte array
+        FormHttpMessageConverter converter = new FormHttpMessageConverter();
+        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
+        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
+        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+
+        // Setup mocked server response
+        mockServer
+            .expect(requestTo(String.format("%s/collections/collection1/artifacts/artifact1?includeContent=IF_SMALL", BASEURL)))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType())
+            );
 
         Boolean result = repository.isArtifactCommitted("collection1", "artifact1");
         mockServer.verify();
@@ -317,12 +402,24 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
     @Test
     public void testAddArtifact_success() throws Exception {
         mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts", BASEURL)))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withSuccess("{\"id\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON));
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("{\"id\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON));
 
-        byte buf[] = new byte[] {};
+        byte buf[] = new byte[]{};
 
-        Artifact result = repository.addArtifact(new ArtifactData(new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2), new HttpHeaders(), new ByteArrayInputStream(buf), new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null), "storageUrl1", new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")));
+        Artifact result = repository.addArtifact(
+            new ArtifactData(
+                new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2),
+                new HttpHeaders(),
+                new ByteArrayInputStream(buf),
+                new BasicStatusLine(
+                    new ProtocolVersion("protocol1", 4, 5), 3, null),
+                new URI("storageUrl1"),
+                new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
+                    "\"deleted\":\"false\"}")
+            )
+        );
+
         mockServer.verify();
 
         assertNotNull(result);
@@ -337,16 +434,30 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
                 .andRespond(withServerError());
 
         try {
-            repository.addArtifact(new ArtifactData(new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2), new HttpHeaders(), new ByteArrayInputStream(new byte[] {}), new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null), "storageUrl1", new RepositoryArtifactMetadata("{\"artifactId\":\"1\",\"committed\":\"true\",\"deleted\":\"false\"}")));
+            repository.addArtifact(
+                new ArtifactData(
+                    new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2),
+                    new HttpHeaders(),
+                    new ByteArrayInputStream(new byte[]{}),
+                    new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null),
+                    new URI("storageUrl1"),
+                    new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
+                        "\"deleted\":\"false\"}")
+                )
+            );
+
             fail("Should have thrown IOException");
         } catch (IOException ioe) {}
     }
 
     @Test
     public void testGetArtifactData_failure() throws Exception {
-        mockServer.expect(requestTo(String.format("%s/collections/collection1/artifacts/artifactid1", BASEURL)))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withServerError());
+        mockServer
+            .expect(requestTo(
+                String.format("%s/collections/collection1/artifacts/artifactid1?includeContent=ALWAYS", BASEURL))
+            )
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withServerError());
 
         try {
             repository.getArtifactData("collection1", "artifactid1");
@@ -354,76 +465,160 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
         } catch (IOException ioe) {}
     }
 
+    /**
+     * Test for {@link RestLockssRepository#getArtifactData(String, String, LockssRepository.IncludeContent)}.
+     *
+     * @throws Exception
+     */
     @Test
-    public void testGetArtifactData_success() throws Exception {
+    public void testGetArtifactData() throws Exception {
+      // Artifact data
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, false, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, false, false);
+
+      // Artifact data contains a web crawl
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, true, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, true, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, true, false);
+    }
+
+    public void runTestGetArtifactData(LockssRepository.IncludeContent includeContent,
+                                       boolean isWebCrawl, Boolean isSmall) throws Exception {
+
+        // ******************************
+        // Reference artifact and headers
+        // ******************************
+
         // Setup reference artifact data headers
         HttpHeaders referenceHeaders = new HttpHeaders();
         referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key2", "value2");
+        referenceHeaders.add("key1", "value2");
+        referenceHeaders.add("key2", "value3");
+
+        String content = "\"Dog watched his human cry, concerned. Where was human's smile? Probably lost somewhere, " +
+            "dog thought. That was OK. Dog knew how to fetch.\"";
+
+        BasicStatusLine httpStatus = !isWebCrawl ?
+            null : new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
-                new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
-                referenceHeaders,
-                new ByteArrayInputStream("hello world".getBytes()),
-                new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-                "storageUrl1",
-                new RepositoryArtifactMetadata("{\"artifactId\":\"artifact1\",\"committed\":\"true\",\"deleted\":\"false\"}")
+            new ArtifactIdentifier("artifact", "collection", "auid", "url", 1),
+            referenceHeaders,
+            new ByteArrayInputStream(content.getBytes()),
+            httpStatus,
+            new URI("storageUrl1"),
+            new ArtifactRepositoryState("{\"artifactId\":\"artifact\",\"entryDate\":0,\"committed\":\"true\"," +
+                "\"deleted\":\"false\"}")
         );
+
+        reference.setContentLength(content.length());
+        reference.setContentDigest("some made-up hash");
 
         // Convenience variables
         ArtifactIdentifier refId = reference.getIdentifier();
-        RepositoryArtifactMetadata refRepoMd = reference.getRepositoryMetadata();
+        ArtifactRepositoryState refRepoMd = reference.getArtifactRepositoryState();
 
-        // Setup mocked artifact data headers
-        HttpHeaders transportHeaders = new HttpHeaders();
+        // Artifact is small if its size is less than or equal to the threshold
+        long includeContentMaxSize = (isSmall == null || isSmall == true) ? content.length() : content.length() - 1;
 
-        transportHeaders.set(ArtifactConstants.ARTIFACT_ID_KEY, refId.getId());
-        transportHeaders.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, refId.getCollection());
-        transportHeaders.set(ArtifactConstants.ARTIFACT_AUID_KEY, refId.getAuid());
-        transportHeaders.set(ArtifactConstants.ARTIFACT_URI_KEY, refId.getUri());
-        transportHeaders.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(refId.getVersion()));
+        // Multipart response parts
+        MultiValueMap<String, Object> parts = CollectionsApiServiceImpl.generateMultipartResponseFromArtifactData(
+            reference, includeContent, includeContentMaxSize
+        );
 
-        transportHeaders.set(ArtifactConstants.ARTIFACT_STATE_COMMITTED, String.valueOf(refRepoMd.getCommitted()));
-        transportHeaders.set(ArtifactConstants.ARTIFACT_STATE_DELETED, String.valueOf(refRepoMd.getDeleted()));
+        // ****************************
+        // Setup mocked server response
+        // ****************************
 
-        transportHeaders.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(reference.getContentLength()));
-        transportHeaders.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, reference.getContentDigest());
+        // Convert multipart response and its parts to a byte array
+        FormHttpMessageConverter converter = new FormHttpMessageConverter();
+        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
+        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
+        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
 
-        // Setup mocked artifact data response
-        mockServer.expect(requestTo(String.format("%s/collections/%s/artifacts/%s", BASEURL, refId.getCollection(), refId.getId())))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(
-                        withSuccess(
-                            IOUtils.toByteArray(ArtifactDataUtil.getHttpResponseStreamFromArtifactData(reference)),
-                            MediaType.parseMediaType("application/http; msgtype=response")
-                        ).headers(transportHeaders)
-                );
+        // Build expected endpoint
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASEURL);
+        builder.path(String.format("/collections/%s/artifacts/%s", refId.getCollection(), refId.getId()));
+        builder.queryParam("includeContent", includeContent);
 
-        // Fetch artifact data through the code we wish to test
-        ArtifactData result = repository.getArtifactData(refId.getCollection(), refId.getId());
-        mockServer.verify();
+        // Setup mocked server response
+        mockServer
+            .expect(requestTo(builder.toUriString()))
+            // FIXME: Why doesn't this work?
+//             .andExpect(queryParam("includeContent", String.valueOf(includeContent)))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
 
-        // Verify the artifact data we got matches the reference
+        // ************************************
+        // Verify result from getArtifactData()
+        // ************************************
+
+        // Fetch artifact data
+        ArtifactData result = repository.getArtifactData(refId.getCollection(), refId.getId(), includeContent);
         assertNotNull(result);
 
+        // Verify we made the expected REST API call
+        mockServer.verify();
+
+        // Verify artifact repository properties
+        assertNotNull(result.getIdentifier());
         assertEquals(refId.getId(), result.getIdentifier().getId());
         assertEquals(refId.getCollection(), result.getIdentifier().getCollection());
         assertEquals(refId.getAuid(), result.getIdentifier().getAuid());
         assertEquals(refId.getUri(), result.getIdentifier().getUri());
         assertEquals(refId.getVersion(), result.getIdentifier().getVersion());
 
-        assertEquals(refRepoMd.getArtifactId(), result.getRepositoryMetadata().getArtifactId());
-        assertEquals(refRepoMd.getCommitted(), result.getRepositoryMetadata().getCommitted());
-        assertEquals(refRepoMd.getDeleted(), result.getRepositoryMetadata().getDeleted());
+        // Verify artifact repository state
+        assertNotNull(result.getArtifactRepositoryState());
+        assertEquals(refRepoMd.getArtifactId(), result.getArtifactRepositoryState().getArtifactId());
+        assertEquals(refRepoMd.getCommitted(), result.getArtifactRepositoryState().getCommitted());
+        assertEquals(refRepoMd.getDeleted(), result.getArtifactRepositoryState().getDeleted());
 
+        // Verify misc. artifact properties
         assertEquals(reference.getContentLength(), result.getContentLength());
         assertEquals(reference.getContentDigest(), result.getContentDigest());
 
+        // Verify artifact header set equality
         assertTrue(referenceHeaders.entrySet().containsAll(result.getMetadata().entrySet())
-                && result.getMetadata().entrySet().containsAll(referenceHeaders.entrySet()));
+            && result.getMetadata().entrySet().containsAll(referenceHeaders.entrySet()));
 
-        assertEquals(200, result.getHttpStatus().getStatusCode());
+        // Verify artifact HTTP status is present if expected
+        if (isWebCrawl) {
+            // Assert artifact HTTP response status matches
+            assertArrayEquals(
+                ArtifactDataUtil.getHttpStatusByteArray(httpStatus),
+                ArtifactDataUtil.getHttpStatusByteArray(result.getHttpStatus())
+            );
+        } else {
+            // Assert artifact has no HTTP response status
+            assertNull(result.getHttpStatus());
+        }
+
+        // Verify artifact content is present if expected
+        if ((includeContent == LockssRepository.IncludeContent.IF_SMALL && isSmall) ||
+            (includeContent == LockssRepository.IncludeContent.ALWAYS)) {
+
+            // Assert artifact data has content and that its InputStream has the expected content
+            assertTrue(result.hasContentInputStream());
+            InputStream inputStream = result.getInputStream();
+            assertNotNull(inputStream);
+            assertInputStreamMatchesString(content, inputStream);
+
+        } else {
+            // Assert artifact has no content
+            assertFalse(result.hasContentInputStream());
+        }
+
+        // Clean-up after ourselves
+        mockServer.reset();
     }
 
     @Test
@@ -524,7 +719,7 @@ public class TestRestLockssRepositoryClient extends LockssTestCase5 {
             repository.deleteArtifact("collection1", "artifact1");
             fail("Should have thrown IOException");
         } catch (IOException ioe) {
-	  log.fatal("XXXXXXXXXXXXXXXXX", ioe);
+	  log.debug("Logging trace of IOException", ioe);
 	}
         mockServer.verify();
     }

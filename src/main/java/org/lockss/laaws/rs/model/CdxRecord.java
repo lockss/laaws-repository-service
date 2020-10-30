@@ -350,6 +350,10 @@ public class CdxRecord {
   static void writeXmlElement(XMLStreamWriter writer, String name, Object value)
       throws XMLStreamException {
     log.debug2("name = {}", name);
+    if (value == null) {
+      log.debug2("value = {} (not writing)", value);
+      return;
+    }
     log.debug2("value = {}", value);
 
     try {

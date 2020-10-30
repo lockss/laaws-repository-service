@@ -37,22 +37,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
-import org.junit.Before;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.api.CollectionsApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
 import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.UrlUtil;
-import org.lockss.util.test.LockssTestCase5;
+import org.lockss.test.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -67,7 +65,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @AutoConfigureMockMvc(secure = false)
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
-public class TestReposApiController extends LockssTestCase5 {
+public class TestReposApiController extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
 
     @Autowired
@@ -806,25 +804,6 @@ public class TestReposApiController extends LockssTestCase5 {
         */
 
     }
-
-  /**
-   * Tests the parsing of configured page sizes.
-   */
-  @Test
-  public void testParseConfiguredPageSize() {
-    log.debug2("Invoked");
-    String [] invalidValues = {null, "", " ", "A", "0", "-1"};
-
-    for (int i = 0; i < invalidValues.length; i++) {
-      final String configPageSize = invalidValues[i];
-      assertThrows(RuntimeException.class,() ->
-      {CollectionsApiServiceImpl.parseConfiguredPageSize(configPageSize);});
-    }
-
-    assertEquals(1,
-	CollectionsApiServiceImpl.parseConfiguredPageSize("1"));
-    log.debug2("Done");
-  }
 
   /**
    * Tests the validation of request limits.
