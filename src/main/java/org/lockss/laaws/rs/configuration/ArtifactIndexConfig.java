@@ -48,63 +48,114 @@ import javax.annotation.Resource;
  */
 @Configuration
 public class ArtifactIndexConfig {
-    private final static L4JLogger log =  L4JLogger.getLogger();
-    private final static String INDEX_SPEC_KEY = "repo.index.spec";
+  private final static L4JLogger log = L4JLogger.getLogger();
 
-    private final static String SOLR_BASEURL_KEY = "repo.index.solr.solrUrl";
-    private final static String SOLR_COLLECTION_KEY = "repo.index.solr.solrCollection";
+  public final static String INDEX_SPEC_KEY = "repo.index.spec";
+
+  public final static String LOCAL_PERSISTINDEXNAME_KEY = "repo.persistIndexName";
+
+  public final static String SOLR_BASEURL_KEY = "repo.index.solr.solrUrl";
+  public final static String SOLR_COLLECTION_KEY = "repo.index.solr.solrCollection";
 
   @Resource
-    private Environment env;
+  private Environment env;
 
-    @Bean
-    public ArtifactIndex setArtifactIndex() {
-        String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
-        String indexSpec = env.getProperty(INDEX_SPEC_KEY);
+  @Bean
+  public ArtifactIndex setArtifactIndex() {
+    // Get repo and index spec from prop
+    String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
+    String indexSpec = env.getProperty(INDEX_SPEC_KEY);
 
-        if (!repoSpec.equals("custom")) {
-            log.warn("Ignoring index specification because a predefined repository specification is being used");
-            return null;
-        }
+    return createArtifactIndex(parseIndexSpecs(repoSpec, indexSpec));
+  }
 
-        log.info(String.format("indexSpec = %s", indexSpec));
-
-        if (indexSpec != null) {
-            switch (indexSpec.trim().toLowerCase()) {
-                case "solr":
-                    String solrCollection = env.getProperty(SOLR_COLLECTION_KEY);
-                    String solrBaseUrl = env.getProperty(SOLR_BASEURL_KEY);
-
-                    if (solrCollection != null || !solrCollection.isEmpty()) {
-                      return new SolrArtifactIndex(solrBaseUrl, solrCollection);
-                    }
-
-                    return new SolrArtifactIndex(solrBaseUrl);
-
-                case "volatile":
-                    return new VolatileArtifactIndex();
-
-                case "local":
-		  String baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_KEY);
-		  if (baseDirsProp == null) {
-		    baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_FALLBACK_KEY);
-		    if (baseDirsProp == null) {
-		      log.error("No local base directories specified");
-		      throw new IllegalArgumentException("No local base dirs");
-		    }
-		  }
-		  String[] baseDirs = baseDirsProp.split(";");
-		  return new LocalArtifactIndex(new File(baseDirs[0]),
-						env.getProperty(LockssRepositoryConfig.REPO_PERSISTINDEXNAME_KEY));
-
-                default:
-                    String errMsg = String.format("Unknown index specification '%s'", indexSpec);
-                    log.error(errMsg);
-                    throw new IllegalArgumentException(errMsg);
-            }
-        }
-
-        log.warn("No artifact index specification set; setting ArtifactIndex bean to null");
-        return null;
+  private String parseIndexSpecs(String repoSpec, String indexSpec) {
+    if (StringUtil.isNullString(repoSpec)) {
+      log.error("Missing repository configuration");
+      throw new IllegalStateException("Repository not configured");
     }
+
+    // Parse repo spec for repo type
+    String[] repoSpecParts = repoSpec.split(":", 2);
+    String repoType = repoSpecParts[0].trim().toLowerCase();
+
+    switch (repoType) {
+      case "volatile":
+        // Disable creation of ArtifactIndex bean; allow LockssRepositoryConfig to
+        // create a VolatileLockssRepository
+        return null;
+
+      case "local":
+        // Support for legacy repo.spec=local:X;Y;Z
+        return "local";
+
+      case "custom":
+        // Support for repo.spec=custom and repo.index.spec=X
+        if (StringUtil.isNullString(indexSpec)) {
+          log.error("Missing artifact index configuration");
+          throw new IllegalStateException("Artifact index not configured");
+        }
+
+        return indexSpec.trim().toLowerCase();
+
+      default:
+        throw new IllegalArgumentException("Repository spec not supported: " + repoSpec);
+    }
+  }
+
+  private ArtifactIndex createArtifactIndex(String indexType) {
+    log.trace("indexType = {}", indexType);
+
+    if (StringUtil.isNullString(indexType)) {
+      return null;
+    }
+
+    switch (indexType) {
+      case "volatile":
+        return new VolatileArtifactIndex();
+
+      case "local":
+        // Get name of locally persisted index
+        String repositoryPersistIndexName = env.getProperty(LOCAL_PERSISTINDEXNAME_KEY);
+        log.trace("repositoryPersistIndexName = {}", repositoryPersistIndexName);
+
+        // Get base directory paths for the local index
+        String baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_KEY);
+
+        if (baseDirsProp == null) {
+          // Fallback to previous property key
+          baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_FALLBACK_KEY);
+
+          if (baseDirsProp == null) {
+            log.error("No local base directories specified");
+            throw new IllegalArgumentException("No local base dirs");
+          }
+        }
+
+        String[] baseDirs = baseDirsProp.split(";");
+
+        // Create a local artifact index persisting to the first local data store directory
+        return new LocalArtifactIndex(new File(baseDirs[0]), repositoryPersistIndexName);
+
+      case "solr":
+        String solrCollection = env.getProperty(SOLR_COLLECTION_KEY);
+        String solrBaseUrl = env.getProperty(SOLR_BASEURL_KEY);
+
+        if (StringUtil.isNullString(solrBaseUrl)) {
+          log.error("Missing Solr base URL endpoint");
+          throw new IllegalArgumentException("Missing Solr base URL endpoint");
+        }
+
+        if (!StringUtil.isNullString(solrCollection)) {
+          return new SolrArtifactIndex(solrBaseUrl, solrCollection);
+        }
+
+        return new SolrArtifactIndex(solrBaseUrl);
+
+      default:
+        String errMsg = String.format("Unknown artifact index '%s'", indexType);
+        log.error(errMsg);
+        throw new IllegalArgumentException(errMsg);
+    }
+  }
 }
