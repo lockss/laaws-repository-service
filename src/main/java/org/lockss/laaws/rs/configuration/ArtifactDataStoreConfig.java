@@ -109,7 +109,10 @@ public class ArtifactDataStoreConfig {
 
     // Create WARC artifact data store and set use WARC compression
     ds = createWarcArtifactDataStore(parseDataStoreSpecs(repoSpec, datastoreSpec));
-    ds.setUseWarcCompression(useWarcCompression);
+
+    if (ds != null) {
+      ds.setUseWarcCompression(useWarcCompression);
+    }
 
     // Return data store
     return ds;
