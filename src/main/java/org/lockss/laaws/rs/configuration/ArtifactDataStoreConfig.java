@@ -39,13 +39,13 @@ import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.log.L4JLogger;
 import org.lockss.app.LockssApp;
+import org.lockss.config.ConfigManager;
 import org.lockss.util.PatternIntMap;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.core.env.Environment;
 import org.springframework.data.hadoop.config.annotation.builders.HadoopConfigBuilder;
 
@@ -94,7 +94,7 @@ public class ArtifactDataStoreConfig {
   @Autowired
   ArtifactIndex index;
 
-  WarcArtifactDataStore ds;
+  volatile WarcArtifactDataStore ds;
 
   @Bean
   public ArtifactDataStore createArtifactDataStore() throws Exception {
@@ -154,7 +154,6 @@ public class ArtifactDataStoreConfig {
   }
 
   private WarcArtifactDataStore createWarcArtifactDataStore(String dsType) throws Exception {
-    log.trace("dsType = {}", dsType);
 
     if (StringUtil.isNullString(dsType)) {
       return null;
@@ -222,11 +221,12 @@ public class ArtifactDataStoreConfig {
     }
   }
 
-  // Register config callback for WarcArtifactDataStore after LockssDaemon is started
-  @EventListener(ApplicationReadyEvent.class)
-  public void registerConfigCallback() {
-    LockssApp.getLockssApp()
-        .getConfigManager()
+  // Register config callback for WarcArtifactDataStore once ConfigManager
+  // has been created.
+  @EventListener
+  public void configMgrCreated(ConfigManager.ConfigManagerCreatedEvent event) {
+    log.debug2("ConfigManagerCreatedEvent triggered");
+    ConfigManager.getConfigManager()
         .registerConfigurationCallback(new ArtifactDataStoreConfigCallback(ds));
   }
 
