@@ -154,6 +154,7 @@ public class ArtifactDataStoreConfig {
   }
 
   private WarcArtifactDataStore createWarcArtifactDataStore(String dsType) throws Exception {
+    log.trace("dsType = {}", dsType);
 
     if (StringUtil.isNullString(dsType)) {
       return null;
