@@ -18,7 +18,6 @@ public class RepositoryServiceProperties {
 
   // LOCKSS repository properties
   @Value("${repo.spec}") String repoSpec;
-  @Value("${repo.warc.useCompression:false}") String useWarcCompression;
 
   // Artifact data store properties
   @Value("${repo.datastore.spec:#{null}}") String datastoreSpec;
@@ -54,10 +53,6 @@ public class RepositoryServiceProperties {
     }
 
     return repoSpec.split(":", 2);
-  }
-
-  public boolean getUseWarcCompression() {
-    return Boolean.getBoolean(useWarcCompression);
   }
 
   public String getIndexSpec() {

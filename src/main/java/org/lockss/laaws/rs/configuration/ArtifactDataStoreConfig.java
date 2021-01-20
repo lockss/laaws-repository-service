@@ -67,7 +67,7 @@ public class ArtifactDataStoreConfig {
   /**
    * Default settings for use of GZIP compression for WARC files.
    */
-  public final static boolean DEFAULT_REPO_USE_WARC_COMPRESSION = false;
+  public final static boolean DEFAULT_REPO_USE_WARC_COMPRESSION = true;
 
   private RepositoryServiceProperties repoProps;
 
@@ -83,14 +83,7 @@ public class ArtifactDataStoreConfig {
   @Bean
   public ArtifactDataStore setArtifactDataStore() throws Exception {
     // Create WARC artifact data store and set use WARC compression
-    ds = createWarcArtifactDataStore(parseDataStoreSpecs());
-
-    if (ds != null) {
-      ds.setUseWarcCompression(repoProps.getUseWarcCompression());
-    }
-
-    // Return data store
-    return ds;
+    return createWarcArtifactDataStore(parseDataStoreSpecs());
   }
 
   private String parseDataStoreSpecs() {
