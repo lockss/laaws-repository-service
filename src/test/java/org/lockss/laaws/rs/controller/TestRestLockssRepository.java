@@ -40,11 +40,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.Ignore;
+import org.junit.*;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -52,6 +48,8 @@ import org.lockss.laaws.rs.core.LockssRepository.IncludeContent;
 import org.lockss.laaws.rs.core.LockssRepositoryFactory;
 import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactSpec;
@@ -68,8 +66,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.io.File;
@@ -86,6 +86,7 @@ import java.util.stream.Stream;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+@ActiveProfiles("test")
 public class TestRestLockssRepository extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 
@@ -149,6 +150,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     static List<File> tmpDirs = new ArrayList<>();;
 
     @TestConfiguration
+    @Profile("test")
     static class TestLockssRepositoryConfig {
         @Bean
         public LockssRepository createInitializedRepository() throws IOException {
@@ -158,9 +160,19 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             repository.initRepository();
             return repository;
         }
+
+        @Bean
+        public ArtifactIndex setArtifactIndex() {
+          return null;
+        }
+
+        @Bean
+        public ArtifactDataStore setArtifactDataStore() {
+          return null;
+        }
     }
 
-    @AfterClass
+  @AfterClass
     public static void deleteTempDirs() throws Exception {
       LockssTestCase4.deleteTempFiles(tmpDirs);
     }
