@@ -34,20 +34,16 @@ import org.lockss.app.LockssDaemon;
 import org.lockss.jms.JMSManager;
 import org.lockss.laaws.rs.core.BaseLockssRepository;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.LockssRepositoryFactory;
 import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.util.JmsFactorySource;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.Deadline;
-import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
 
-import javax.annotation.Resource;
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
@@ -59,22 +55,22 @@ import java.util.List;
 public class LockssRepositoryConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  public final static String REPO_SPEC_KEY = "repo.spec";
+  private final RepositoryServiceProperties repoProps;
+  private ArtifactDataStore store;
+  private ArtifactIndex index;
 
   @Autowired
-  ArtifactDataStore store;
-
-  @Autowired
-  ArtifactIndex index;
-
-  @Resource
-  Environment env;
+  public LockssRepositoryConfig(RepositoryServiceProperties repoProps, ArtifactIndex index, ArtifactDataStore store) {
+    this.repoProps = repoProps;
+    this.index = index;
+    this.store = store;
+  }
 
   /**
    * Creates and initializes the {@link LockssRepository} that will be made available via the
    * LOCKSS Repository Service's REST API.
    *
-   * @return
+   * @return An initialized {@link LockssRepository}.
    * @throws IOException
    */
   @Bean
@@ -97,24 +93,10 @@ public class LockssRepositoryConfig {
    * @throws IOException
    */
   public LockssRepository createLockssRepository() throws IOException {
-    // Get the repository specification from Spring
-    String repoSpec = env.getProperty(REPO_SPEC_KEY);
+    log.debug("Starting internal LOCKSS repository [repoSpec: {}]", repoProps.getRepositorySpec());
 
-    if (StringUtil.isNullString(repoSpec)) {
-      log.error("Missing repository configuration");
-      throw new IllegalStateException("Missing repository configuration");
-    }
-
-    // Parse repository spec for repository type
-    String[] repoSpecParts = repoSpec.split(":", 2);
-    String repoType = repoSpecParts[0].trim().toLowerCase();
-
-    log.debug("Starting internal LOCKSS repository [repoSpec: {}]", repoSpec);
-
-    switch (repoType) {
+    switch (repoProps.getRepositoryType()) {
       case "volatile":
-        return LockssRepositoryFactory.createVolatileRepository();
-
       case "local":
       case "custom":
         // Configure artifact index and data store individually using Spring beans (see their
@@ -123,12 +105,12 @@ public class LockssRepositoryConfig {
         return new BaseLockssRepository(index, store);
 
       case "rest":
-        if (repoSpecParts.length <= 1) {
+        if (repoProps.getRepoSpecParts().length <= 1) {
           log.error("No REST endpoint specified");
           throw new IllegalArgumentException("No REST endpoint specified");
         }
 
-        String repositoryRestUrl = repoSpecParts[1];
+        String repositoryRestUrl = repoProps.getRepoSpecParts()[1];
 
         log.debug("repositoryRestUrl = {}", repositoryRestUrl);
 
@@ -166,7 +148,7 @@ public class LockssRepositoryConfig {
 
       default:
         // Unknown repository specification
-        String errMsg = String.format("Unknown repository specification '%s'", repoSpec);
+        String errMsg = String.format("Unknown repository specification '%s'", repoProps.getRepositorySpec());
         log.error(errMsg);
         throw new IllegalArgumentException(errMsg);
     }

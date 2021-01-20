@@ -30,6 +30,7 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.hdfs.HdfsWarcArtifactDataStore;
@@ -38,22 +39,14 @@ import org.lockss.laaws.rs.io.storage.local.TestingWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.log.L4JLogger;
-import org.lockss.app.LockssApp;
-import org.lockss.config.ConfigManager;
 import org.lockss.util.PatternIntMap;
-import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.env.Environment;
 import org.springframework.data.hadoop.config.annotation.builders.HadoopConfigBuilder;
 
-import javax.annotation.Resource;
-import java.io.File;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -63,103 +56,62 @@ import java.util.List;
 public class ArtifactDataStoreConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  public final static String PARAM_FREE_SPACE_MAP =
-      "org.lockss.repo.testing.freeSpaceMap";
+  public final static String PARAM_FREE_SPACE_MAP = "org.lockss.repo.testing.freeSpaceMap";
 
   /**
    * Enables or disables the use of GZIP compression for WARC files in
    * WARC artifact data store implementations.
    */
-  public final static String PARAM_REPO_USE_WARC_COMPRESSION =
-      "org.lockss.repo.warc.useCompression";
+  public final static String PARAM_REPO_USE_WARC_COMPRESSION = "org.lockss.repo.warc.useCompression";
 
   /**
    * Default settings for use of GZIP compression for WARC files.
    */
   public final static boolean DEFAULT_REPO_USE_WARC_COMPRESSION = false;
 
-  public final static String DATASTORE_USE_WARC_COMPRESSION_KEY = "repo.datastore.warc.useCompression";
+  private RepositoryServiceProperties repoProps;
 
-  public final static String DATASTORE_SPEC_KEY = "repo.datastore.spec";
-
-  public final static String HDFS_SERVER_KEY = "repo.datastore.hdfs.server";
-  public final static String HDFS_BASEDIR_KEY = "repo.datastore.hdfs.basedir";
-
-  public final static String LOCAL_BASEDIRS_KEY = "repo.datastore.local.basedirs";
-  public final static String LOCAL_BASEDIRS_FALLBACK_KEY = "repo.datastore.local.basedir";
-
-  @Resource
-  private Environment env;
-
-  @Autowired
   ArtifactIndex index;
-
   volatile WarcArtifactDataStore ds;
 
+  @Autowired
+  public ArtifactDataStoreConfig(RepositoryServiceProperties repoProps, ArtifactIndex index) {
+    this.repoProps = repoProps;
+    this.index = index;
+  }
+
   @Bean
-  public ArtifactDataStore createArtifactDataStore() throws Exception {
-    // Get the repo and data store spec from Spring
-    String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
-    String datastoreSpec = env.getProperty(DATASTORE_SPEC_KEY);
-
-    // Get and parse useWarcCompression property
-    String useWarcCompressionProp = env.getProperty(DATASTORE_USE_WARC_COMPRESSION_KEY);
-    boolean useWarcCompression = StringUtil.isNullString(useWarcCompressionProp) ?
-        DEFAULT_REPO_USE_WARC_COMPRESSION : Boolean.parseBoolean(useWarcCompressionProp);
-
+  public ArtifactDataStore setArtifactDataStore() throws Exception {
     // Create WARC artifact data store and set use WARC compression
-    ds = createWarcArtifactDataStore(parseDataStoreSpecs(repoSpec, datastoreSpec));
+    ds = createWarcArtifactDataStore(parseDataStoreSpecs());
 
     if (ds != null) {
-      ds.setUseWarcCompression(useWarcCompression);
+      ds.setUseWarcCompression(repoProps.getUseWarcCompression());
     }
 
     // Return data store
     return ds;
   }
 
-  private String parseDataStoreSpecs(String repoSpec, String datastoreSpec) {
-    if (StringUtil.isNullString(repoSpec)) {
-      log.error("Missing repository configuration");
-      throw new IllegalStateException("Repository not configured");
-    }
-
-    // Parse repo spec for repo type
-    String[] repoSpecParts = repoSpec.split(":", 2);
-    String repoType = repoSpecParts[0].trim().toLowerCase();
-
-    switch (repoType) {
+  private String parseDataStoreSpecs() {
+    switch (repoProps.getRepositoryType()) {
       case "volatile":
-        // Disable creation of ArtifactDataStore bean; allow LockssRepositoryConfig to
-        // create a VolatileLockssRepository
-        return null;
+        // Allow a volatile data store to be created so that WARC compression can be configured
+        return "volatile";
 
       case "local":
         // Support for legacy repo.spec=local:X;Y;Z parameter
         return "local";
 
       case "custom":
-        // Support for repo.spec=custom and repo.datastore.spec=X
-        if (StringUtil.isNullString(datastoreSpec)) {
-          log.error("Missing artifact data store configuration");
-          throw new IllegalStateException("Artifact data store not configured");
-        }
-
-        // Parse the data store type from data store spec
-        return datastoreSpec.trim().toLowerCase();
+        return repoProps.getDatastoreSpec();
 
       default:
-        throw new IllegalArgumentException("Repository spec not supported: " + repoSpec);
+        throw new IllegalArgumentException("Repository spec not supported: " + repoProps.getRepositorySpec());
     }
   }
 
   private WarcArtifactDataStore createWarcArtifactDataStore(String dsType) throws Exception {
-    log.trace("dsType = {}", dsType);
-
-    if (StringUtil.isNullString(dsType)) {
-      return null;
-    }
-
     switch (dsType) {
       case "volatile":
         log.info("Configuring volatile artifact data store");
@@ -167,54 +119,29 @@ public class ArtifactDataStoreConfig {
 
       case "local":
       case "testing":
-        String baseDirsProp = env.getProperty(LOCAL_BASEDIRS_KEY);
-
-        if (baseDirsProp == null) {
-          // Fallback to legacy key
-          baseDirsProp = env.getProperty(LOCAL_BASEDIRS_FALLBACK_KEY);
-
-          if (baseDirsProp == null) {
-            log.error("No local base directories specified");
-            throw new IllegalArgumentException("No local base dirs");
-          }
-        }
-
-        // Multiple base directories may be provided separated by semicolons
-        String[] dirs = baseDirsProp.split(";");
-
-        // Convert String paths to File array
-        File[] baseDirs = Arrays.stream(dirs)
-            .map(File::new)
-            .toArray(File[]::new);
-
         switch (dsType) {
           case "local":
-            log.info("Configuring local artifact data store [baseDirs: {}]",
-                Arrays.asList(baseDirs));
-            return new LocalWarcArtifactDataStore(index, baseDirs);
+            log.info("Configuring local artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
+            return new LocalWarcArtifactDataStore(index, repoProps.getLocalBaseDirs());
 
           case "testing":
-            log.info("Configuring testing artifact data store [baseDirs: {}]",
-                Arrays.asList(baseDirs));
-            return new TestingWarcArtifactDataStore(index, baseDirs);
+            log.info("Configuring testing artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
+            return new TestingWarcArtifactDataStore(index, repoProps.getLocalBaseDirs());
 
           default:
             throw new RuntimeException("Shouldn't happen");
         }
 
       case "hdfs":
-        String hdfsServer = env.getProperty(HDFS_SERVER_KEY);
-        Path hdfsBaseDir = Paths.get(env.getProperty(HDFS_BASEDIR_KEY));
-
         log.info(
             "Configuring HDFS artifact data store [hdfsServer: {}, hdfsBaseDir: {}]",
-            hdfsServer, hdfsBaseDir
+            repoProps.getHdfsEndpoint(), repoProps.getHdfsBaseDir()
         );
 
-        HadoopConfigBuilder config = new HadoopConfigBuilder();
-        config.fileSystemUri(hdfsServer);
+        HadoopConfigBuilder hdfsConfigBuilder = new HadoopConfigBuilder();
+        hdfsConfigBuilder.fileSystemUri(repoProps.getHdfsEndpoint());
 
-        return new HdfsWarcArtifactDataStore(index, config.build(), hdfsBaseDir);
+        return new HdfsWarcArtifactDataStore(index, hdfsConfigBuilder.build(), Paths.get(repoProps.getHdfsBaseDir()));
 
       default:
         log.error("Unknown artifact data store: '{}'", dsType);

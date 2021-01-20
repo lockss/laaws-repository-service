@@ -31,17 +31,14 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
+import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.StringUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
-
-import java.io.File;
-import javax.annotation.Resource;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal artifact index.
@@ -50,110 +47,58 @@ import javax.annotation.Resource;
 public class ArtifactIndexConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  public final static String INDEX_SPEC_KEY = "repo.index.spec";
+  private RepositoryServiceProperties repoProps;
 
-  public final static String LOCAL_PERSISTINDEXNAME_KEY = "repo.persistIndexName";
-
-  public final static String SOLR_BASEURL_KEY = "repo.index.solr.solrUrl";
-  public final static String SOLR_COLLECTION_KEY = "repo.index.solr.solrCollection";
-
-  @Resource
-  private Environment env;
+  @Autowired
+  public ArtifactIndexConfig(RepositoryServiceProperties repoProps) {
+    this.repoProps = repoProps;
+  }
 
   @Bean
   public ArtifactIndex setArtifactIndex() {
-    // Get repo and index spec from prop
-    String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
-    String indexSpec = env.getProperty(INDEX_SPEC_KEY);
-
-    return createArtifactIndex(parseIndexSpecs(repoSpec, indexSpec));
+    return createArtifactIndex(parseIndexSpecs());
   }
 
-  private String parseIndexSpecs(String repoSpec, String indexSpec) {
-    if (StringUtil.isNullString(repoSpec)) {
-      log.error("Missing repository configuration");
-      throw new IllegalStateException("Repository not configured");
-    }
-
-    // Parse repo spec for repo type
-    String[] repoSpecParts = repoSpec.split(":", 2);
-    String repoType = repoSpecParts[0].trim().toLowerCase();
-
-    switch (repoType) {
+  private String parseIndexSpecs() {
+    switch (repoProps.getRepositoryType()) {
       case "volatile":
-        // Disable creation of ArtifactIndex bean; allow LockssRepositoryConfig to
-        // create a VolatileLockssRepository
-        return null;
+        // Allow a volatile index to be created so that WARC compression can be configured
+        // in the volatile artifact data store
+        return "volatile";
 
       case "local":
         // Support for legacy repo.spec=local:X;Y;Z
         return "local";
 
       case "custom":
-        // Support for repo.spec=custom and repo.index.spec=X
-        if (StringUtil.isNullString(indexSpec)) {
-          log.error("Missing artifact index configuration");
-          throw new IllegalStateException("Artifact index not configured");
-        }
-
-        return indexSpec.trim().toLowerCase();
+        return repoProps.getIndexSpec();
 
       default:
-        throw new IllegalArgumentException("Repository spec not supported: " + repoSpec);
+        throw new IllegalArgumentException("Repository spec not supported: " + repoProps.getRepositorySpec());
     }
   }
 
   private ArtifactIndex createArtifactIndex(String indexType) {
     log.trace("indexType = {}", indexType);
 
-    if (StringUtil.isNullString(indexType)) {
-      return null;
-    }
-
     switch (indexType) {
       case "volatile":
         return new VolatileArtifactIndex();
 
       case "local":
-        // Get name of locally persisted index
-        String repositoryPersistIndexName = env.getProperty(LOCAL_PERSISTINDEXNAME_KEY);
-        log.trace("repositoryPersistIndexName = {}", repositoryPersistIndexName);
-
-        // Get base directory paths for the local index
-        String baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_KEY);
-
-        if (baseDirsProp == null) {
-          // Fallback to previous property key
-          baseDirsProp = env.getProperty(ArtifactDataStoreConfig.LOCAL_BASEDIRS_FALLBACK_KEY);
-
-          if (baseDirsProp == null) {
-            log.error("No local base directories specified");
-            throw new IllegalArgumentException("No local base dirs");
-          }
-        }
-
-        String[] baseDirs = baseDirsProp.split(";");
-
-        // Create a local artifact index persisting to the first local data store directory
-        return new LocalArtifactIndex(new File(baseDirs[0]), repositoryPersistIndexName);
+        // Create a local artifact index *persisting to the first local data store directory*!
+        return new LocalArtifactIndex(repoProps.getLocalBaseDirs()[0], repoProps.getLocalPersistIndexName());
 
       case "solr":
-        String solrCollection = env.getProperty(SOLR_COLLECTION_KEY);
-        String solrBaseUrl = env.getProperty(SOLR_BASEURL_KEY);
-
-        if (StringUtil.isNullString(solrBaseUrl)) {
-          log.error("Missing Solr base URL endpoint");
-          throw new IllegalArgumentException("Missing Solr base URL endpoint");
+        if (!StringUtil.isNullString(repoProps.getSolrCollectionName())) {
+          // Use provided Solr collection name
+          return new SolrArtifactIndex(repoProps.getSolrEndpoint(), repoProps.getSolrCollectionName());
         }
 
-        if (!StringUtil.isNullString(solrCollection)) {
-          return new SolrArtifactIndex(solrBaseUrl, solrCollection);
-        }
-
-        return new SolrArtifactIndex(solrBaseUrl);
+        return new SolrArtifactIndex(repoProps.getSolrEndpoint());
 
       default:
-        String errMsg = String.format("Unknown artifact index '%s'", indexType);
+        String errMsg = String.format("Unknown artifact index: '%s'", indexType);
         log.error(errMsg);
         throw new IllegalArgumentException(errMsg);
     }
