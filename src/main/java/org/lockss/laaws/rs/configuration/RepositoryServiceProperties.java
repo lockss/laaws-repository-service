@@ -29,13 +29,13 @@ public class RepositoryServiceProperties {
   @Value("${repo.datastore.hdfs.basedir:#{null}}") String hdfsBaseDir;
 
   // Artifact index properties
-  @Value("repo.index.spec:#{null}") String indexSpec;
+  @Value("${repo.index.spec:#{null}}") String indexSpec;
 
-  @Value("repo.persistIndexName:#{null}") String repoPersistIndexName;
-  @Value("repo.index.local.persistIndexName:#{null}") String localPersistIndexName;
+  @Value("${repo.persistIndexName:#{null}}") String repoPersistIndexName;
+  @Value("${repo.index.local.persistIndexName:#{null}}") String localPersistIndexName;
 
-  @Value("repo.index.solr.solrUrl:#{null}") String solrEndpoint;
-  @Value("repo.index.solr.solrCollection:#{null}") String solrCollectionName;
+  @Value("${repo.index.solr.solrUrl:#{null}}") String solrEndpoint;
+  @Value("${repo.index.solr.solrCollection:#{null}}") String solrCollectionName;
 
   public String getRepositorySpec() {
     return repoSpec;
