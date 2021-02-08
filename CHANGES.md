@@ -1,6 +1,6 @@
-# Release Notes
+# `laaws-repository-service` Release Notes
 
-## Major Changes Since 2.0.10.1
+## Changes Since 2.0.10.1
 
 *   Switched to a 3-part version numbering scheme.
 
