@@ -91,11 +91,11 @@ paths:
         type: "integer"
         format: "int64"
         description: "Artifact collection/crawl date (milliseconds since epoch; UTC)"
-      - name: "content"
+      - name: "artifact"
         in: "formData"
         required: true
         type: "file"
-        description: "Content byte stream"
+        description: "Artifact data"
       responses:
         201:
           description: "Artifact created"
