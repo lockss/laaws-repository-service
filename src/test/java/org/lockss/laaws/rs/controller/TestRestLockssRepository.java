@@ -40,7 +40,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
-import org.junit.*;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.jupiter.api.function.Executable;
+import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -237,7 +242,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal ArtifactData (at least one null field)
     for (ArtifactData illAd : nullPointerArtData) {
       assertThrows(NullPointerException.class,
-		   () -> {repository.addArtifact(illAd);});
+		   (Executable) () -> {repository.addArtifact(illAd);});
     }
 
     // legal use of addArtifact is tested in the normal course of setting
@@ -367,7 +372,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     assertThrows(
         LockssNoSuchArtifactIdException.class,
-        () -> repository.getArtifactData(coll, ARTID1)
+        (Executable) () -> repository.getArtifactData(coll, ARTID1)
     );
 
     assertEmpty(repository.getArtifactsAllVersions(coll, AUID1, URL1));
@@ -707,11 +712,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testCommitArtifact() throws IOException {
     // Illegal args
     assertThrows(IllegalArgumentException.class,
-		 () -> {repository.commitArtifact(null, null);});
+		 (Executable) () -> {repository.commitArtifact(null, null);});
     assertThrows(IllegalArgumentException.class,
-		 () -> {repository.commitArtifact(null, ARTID1);});
+                 (Executable) () -> {repository.commitArtifact(null, ARTID1);});
     assertThrows(IllegalArgumentException.class,
-		 () -> {repository.commitArtifact(COLL1, null);});
+                 (Executable) () -> {repository.commitArtifact(COLL1, null);});
 
     // Commit already committed artifact
     ArtifactSpec commSpec = anyCommittedSpec();
@@ -772,7 +777,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   assertThrows(
       LockssNoSuchArtifactIdException.class,
-      () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
+      (Executable) () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
   );
 
 	assertNull(getArtifact(repository, spec, false));
@@ -800,7 +805,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   assertThrows(
       LockssNoSuchArtifactIdException.class,
-      () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
+      (Executable) () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
   );
 
 	assertNull(getArtifact(repository, spec, false));
@@ -834,7 +839,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   assertThrows(
       LockssNoSuchArtifactIdException.class,
-      () -> repository.getArtifactData(uspec.getCollection(), uspec.getArtifactId())
+      (Executable) () -> repository.getArtifactData(uspec.getCollection(), uspec.getArtifactId())
   );
 
 	assertNull(getArtifact(repository, uspec, false));
@@ -869,7 +874,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       assertThrows(
           LockssNoSuchArtifactIdException.class,
-          () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
+          (Executable) () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
       );
 
       // Delete it again.
@@ -880,7 +885,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       assertThrows(
           LockssNoSuchArtifactIdException.class,
-          () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
+          (Executable) () -> repository.getArtifactData(spec.getCollection(), spec.getArtifactId())
       );
     }
 
