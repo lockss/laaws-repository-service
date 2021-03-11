@@ -760,7 +760,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
         InputStream content = artifact.getInputStream();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream();
         IOUtils.copy(content, baos);
 
         log.info(baos.toString());
