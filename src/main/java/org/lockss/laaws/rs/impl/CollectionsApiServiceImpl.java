@@ -84,34 +84,44 @@ public class CollectionsApiServiceImpl
 
   // Config params for response pagination sizes.
 
-  /** Default number of Artifacts that will be returned in a single (paged)
-   * response */
+  /**
+   * Default number of Artifacts that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_DEFAULT_ARTIFACT_PAGESIZE =
-    PREFIX + "artifact.pagesize.default";
+      PREFIX + "artifact.pagesize.default";
   public static final int DEFAULT_DEFAULT_ARTIFACT_PAGESIZE = 1000;
 
-  /** Max number of Artifacts that will be returned in a single (paged)
-   * response */
+  /**
+   * Max number of Artifacts that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_MAX_ARTIFACT_PAGESIZE =
-    PREFIX + "artifact.pagesize.max";
+      PREFIX + "artifact.pagesize.max";
   public static final int DEFAULT_MAX_ARTIFACT_PAGESIZE = 2000;
 
-  /** Default number of AUIDs that will be returned in a single (paged)
-   * response */
+  /**
+   * Default number of AUIDs that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_DEFAULT_AUID_PAGESIZE =
-    PREFIX + "auid.pagesize.default";
+      PREFIX + "auid.pagesize.default";
   public static final int DEFAULT_DEFAULT_AUID_PAGESIZE = 1000;
 
-  /** Max number of AUIDs that will be returned in a single (paged)
-   * response */
+  /**
+   * Max number of AUIDs that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_MAX_AUID_PAGESIZE =
-    PREFIX + "auid.pagesize.max";
+      PREFIX + "auid.pagesize.max";
   public static final int DEFAULT_MAX_AUID_PAGESIZE = 2000;
 
-  /** Largest Artifact content that will be included in a response to a
-   * getArtifactData call with includeContent == IF_SMALL */
+  /**
+   * Largest Artifact content that will be included in a response to a
+   * getArtifactData call with includeContent == IF_SMALL
+   */
   public static final String PARAM_SMALL_CONTENT_THRESHOLD =
-    PREFIX + "smallContentThreshold";
+      PREFIX + "smallContentThreshold";
   public static final long DEFAULT_SMALL_CONTENT_THRESHOLD = 4096;
 
 
@@ -175,21 +185,21 @@ public class CollectionsApiServiceImpl
 
   @Override
   public void setConfig(Configuration newConfig,
-			Configuration prevConfig,
-			Configuration.Differences changedKeys) {
+                        Configuration prevConfig,
+                        Configuration.Differences changedKeys) {
     if (changedKeys.contains(PREFIX)) {
       defaultArtifactPageSize =
-	newConfig.getInt(PARAM_DEFAULT_ARTIFACT_PAGESIZE,
-			 DEFAULT_DEFAULT_ARTIFACT_PAGESIZE);
+          newConfig.getInt(PARAM_DEFAULT_ARTIFACT_PAGESIZE,
+              DEFAULT_DEFAULT_ARTIFACT_PAGESIZE);
       maxArtifactPageSize = newConfig.getInt(PARAM_MAX_ARTIFACT_PAGESIZE,
-					     DEFAULT_MAX_ARTIFACT_PAGESIZE);
+          DEFAULT_MAX_ARTIFACT_PAGESIZE);
       defaultAuidPageSize = newConfig.getInt(PARAM_DEFAULT_AUID_PAGESIZE,
-					     DEFAULT_DEFAULT_AUID_PAGESIZE);
+          DEFAULT_DEFAULT_AUID_PAGESIZE);
       maxAuidPageSize = newConfig.getInt(PARAM_MAX_AUID_PAGESIZE,
-					 DEFAULT_MAX_AUID_PAGESIZE);
+          DEFAULT_MAX_AUID_PAGESIZE);
       smallContentThreshold =
-	newConfig.getLong(PARAM_SMALL_CONTENT_THRESHOLD,
-			  DEFAULT_SMALL_CONTENT_THRESHOLD);
+          newConfig.getLong(PARAM_SMALL_CONTENT_THRESHOLD,
+              DEFAULT_SMALL_CONTENT_THRESHOLD);
     }
   }
 
@@ -216,6 +226,7 @@ public class CollectionsApiServiceImpl
   public ResponseEntity<List<String>> getCollections() {
     String parsedRequest = String.format("requestUrl: %s",
         ServiceImplUtil.getFullRequestUrl(request));
+
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
@@ -229,8 +240,7 @@ public class CollectionsApiServiceImpl
       log.debug2("collectionIds = {}", collectionIds);
       return new ResponseEntity<>(collectionIds, HttpStatus.OK);
     } catch (IOException e) {
-      String errorMessage =
-          "IOException was caught trying to enumerate collection IDs";
+      String errorMessage = "Could not enumerate collection IDs";
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
@@ -288,8 +298,8 @@ public class CollectionsApiServiceImpl
    * GET /collections/{collectionid}/artifacts/{artifactid}:
    * Retrieves an artifact from the repository.
    *
-   * @param collectionid A String with the name of the collection containing the artifact.
-   * @param artifactid   A String with the Identifier of the artifact.
+   * @param collectionid   A String with the name of the collection containing the artifact.
+   * @param artifactid     A String with the Identifier of the artifact.
    * @param includeContent A {@link Boolean} indicating whether the artifact content part should be included in the
    *                       multipart response.
    * @return a {@link ResponseEntity} containing a {@link org.lockss.util.rest.multipart.MultipartResponse}.
@@ -347,7 +357,7 @@ public class CollectionsApiServiceImpl
 
     } catch (IOException e) {
       String errorMessage = String.format(
-          "IOException occurred while attempting to retrieve artifact from repository (artifactId: %s)",
+          "Caught IOException while attempting to retrieve artifact from repository [artifactId: %s]",
           artifactid
       );
 
@@ -485,7 +495,7 @@ public class CollectionsApiServiceImpl
    */
   @Override
   public ResponseEntity updateArtifact(String collectionid,
-                                                 String artifactid, Boolean committed) {
+                                       String artifactid, Boolean committed) {
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, committed: %s, requestUrl: %s",
         collectionid, artifactid, committed,
@@ -505,17 +515,18 @@ public class CollectionsApiServiceImpl
             errorMessage, parsedRequest);
       }
 
-      log.debug2(String.format(
-          "Updating commit status for %s (%s -> %s)",
-          artifactid,
-          repo.isArtifactCommitted(collectionid, artifactid),
-          committed
-      ));
+      log.debug2(
+          "Updating commit status for {} ({} -> {})",
+          artifactid, repo.isArtifactCommitted(collectionid, artifactid), committed
+      );
 
-      // Record the commit status in storage and return the new representation in the response entity body
+      // Commit the artifact
       Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
-      sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit,
-          artifactKey(collectionid, artifactid));
+
+      // Broadcast an cache invalidate signal for this artifact
+      sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit, artifactKey(collectionid, artifactid));
+
+      // Return the updated Artifact
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
@@ -566,11 +577,11 @@ public class CollectionsApiServiceImpl
       log.debug(String.format("Adding artifact %s, %s, %s",
           collectionid, auid, uri));
 
-      log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
-          content.getContentType()));
+    log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
+        content.getContentType()));
 
-      // Check URI.
-      validateUri(uri, parsedRequest);
+    // Check URI.
+    validateUri(uri, parsedRequest);
 
       // Only accept artifact encoded within an HTTP response
       if (!isHttpResponseType(MediaType.parseMediaType(content
@@ -580,8 +591,8 @@ public class CollectionsApiServiceImpl
             APPLICATION_HTTP_RESPONSE,
             MediaType.parseMediaType(content.getContentType()));
 
-        log.warn(errorMessage);
-        log.warn("Parsed request: {}", parsedRequest);
+      log.warn(errorMessage);
+      log.warn("Parsed request: {}", parsedRequest);
 
         throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
@@ -596,6 +607,7 @@ public class CollectionsApiServiceImpl
       ArtifactIdentifier id =
           new ArtifactIdentifier(collectionid, auid, uri, 0);
       artifactData.setIdentifier(id);
+
       artifactData.setContentLength(content.getSize());
 
       // Set artifact collection date if provided
@@ -618,8 +630,8 @@ public class CollectionsApiServiceImpl
       String errorMessage =
           "Caught IOException while attempting to add an artifact to the repository";
 
-      log.warn(errorMessage, e);
-      log.warn("Parsed request: {}", parsedRequest);
+        log.warn(errorMessage, e);
+        log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
@@ -653,11 +665,13 @@ public class CollectionsApiServiceImpl
   public ResponseEntity<ArtifactPageInfo> getArtifacts(String collectionid,
                                                        String auid, String url, String urlPrefix, String version,
                                                        Boolean includeUncommitted, Integer limit, String continuationToken) {
+
     String parsedRequest = String.format("collectionid: %s, auid: %s, url: %s, "
             + "urlPrefix: %s, version: %s, includeUncommitted: %s, limit: %s, "
             + "continuationToken: %s, requestUrl: %s",
         collectionid, auid, url, urlPrefix, version, includeUncommitted, limit,
         continuationToken, ServiceImplUtil.getFullRequestUrl(request));
+
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
@@ -1335,6 +1349,7 @@ public class CollectionsApiServiceImpl
     log.debug2("collectionid = '{}'", collectionid);
     log.debug2("auid = '{}'", auid);
     log.debug2("parsedRequest = '{}'", parsedRequest);
+
     if (!StreamSupport.stream(repo.getAuIds(collectionid).spliterator(), false)
         .anyMatch(name -> auid.equals(name))) {
       String errorMessage = "The archival unit has no artifacts (possibly because it hasn't been collected yet)";
