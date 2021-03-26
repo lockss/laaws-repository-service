@@ -253,11 +253,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
     spec.assertArtifact(repository, commArt);
+  }
 
+  @Test
+  public void testAddArtifact_badRequest() throws Exception {
     // Try adding an artifact with no URL.
     assertThrowsMatch(LockssRestHttpException.class,
-	"400 Bad Request: addArtifact",
-	() -> {addUncommitted(new ArtifactSpec().setUrl(null));});
+        "400 Bad Request: addArtifact",
+        () -> {addUncommitted(new ArtifactSpec().setUrl(null));});
   }
 
   private static final long LARGE_ARTIFACT_SIZE = (2L * FileUtils.ONE_GB) + (1L * FileUtils.ONE_MB); // 2049 MiB
