@@ -34,13 +34,18 @@ import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
+import org.lockss.app.LockssApp;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.StringUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import javax.annotation.Resource;
 
 /**
@@ -56,6 +61,9 @@ public class ArtifactIndexConfig {
 
   @Resource
     private Environment env;
+
+    @Autowired
+      private ApplicationArguments  appArgs;
 
     @Bean
     public ArtifactIndex setArtifactIndex() {
@@ -74,6 +82,18 @@ public class ArtifactIndexConfig {
                 case "solr":
                     String solrCollection = env.getProperty(SOLR_COLLECTION_KEY);
                     String solrBaseUrl = env.getProperty(SOLR_BASEURL_KEY);
+
+                    // Read the SOLR client credentials.  Note: this may
+                    // delete the secrets file.  If the SOLR credentials
+                    // are requested by some part of the daemon, using the
+                    // normal facility
+                    // (LockssApp.getReadClientCredentials()) (which can't
+                    // be called here because LockssApp hasn't started
+                    // yet), it will fail because the secrets file has
+                    // already been deleted.
+
+                    List<String> solrCred = getSolrCredentials();
+                    log.info("Solr cred: {}", solrCred);
 
                     if (solrCollection != null || !solrCollection.isEmpty()) {
                       return new SolrArtifactIndex(solrBaseUrl, solrCollection);
@@ -107,4 +127,26 @@ public class ArtifactIndexConfig {
         log.warn("No artifact index specification set; setting ArtifactIndex bean to null");
         return null;
     }
+
+  /** Read the SOLR client credentials from the file specified on the
+   * command line.
+   * @return A list of username and password, or null if none specified or
+   * file doesn't exist.
+   */
+  private List<String> getSolrCredentials() {
+    log.debug("getNonOptionArgs: {}", appArgs.getNonOptionArgs());
+    LockssApp.StartupOptions startOpts =
+      LockssApp.getStartupOptions(appArgs.getNonOptionArgs());
+    String filename = startOpts.getSecretFileFor("solr");
+    if (filename != null) {
+      try {
+        LockssApp.ClientCredentials cred =
+          LockssApp.readClientCredentials(filename);
+        return cred.getCredentialsAsList();
+      } catch (IOException e) {
+        log.warn("Couldn't read SOLR credentials from file {}", filename, e);
+      }
+    }
+    return null;
+  }
 }
