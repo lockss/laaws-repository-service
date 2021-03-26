@@ -44,15 +44,16 @@ import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
-import org.lockss.spring.error.RestResponseErrorBody;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
+import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -63,6 +64,8 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.StreamSupport;
@@ -242,7 +245,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -275,9 +280,6 @@ public class CollectionsApiServiceImpl
     } catch (LockssNoSuchArtifactIdException e) {
       return new ResponseEntity<Void>(HttpStatus.NOT_FOUND);
 
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
     } catch (IOException e) {
       String errorMessage = String.format(
           "IOException occurred while attempting to delete artifact from repository (artifactId: %s)",
@@ -286,7 +288,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -325,32 +329,17 @@ public class CollectionsApiServiceImpl
           smallContentThreshold
       );
 
-      //// Set Content-Type of server response to multipart/form-data
-      // FIXME: Technically, multipart/related might be more appropriate here but FormHttpMessageConverter does not
-      //        recognize it. It might be possible to use setSupportedMediaTypes() through a Spring configuration
-      //        bean but using multipart/form-data works for now.
-      HttpHeaders responseHeaders = new HttpHeaders();
-      responseHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
-
       //// Return multiparts response entity
-      return new ResponseEntity<MultiValueMap<String, Object>>(
-          parts,
-          responseHeaders,
-          HttpStatus.OK
-      );
+      return new ResponseEntity<MultiValueMap<String, Object>>(parts, HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
-      // FIXME: Handling of this exception should be moved into SpringControllerAdvice
-
-      HttpHeaders responseHeaders = new HttpHeaders();
-      responseHeaders.setContentType(MediaType.APPLICATION_JSON);
-
-      return new ResponseEntity<>(new RestResponseErrorBody(e.getMessage(),
-          e.getClass().getSimpleName()), responseHeaders, HttpStatus.NOT_FOUND);
-
-    } catch (LockssRestServiceException e) {
-      // Let it cascade to the controller advice exception handler.
-      throw e;
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
 
     } catch (IOException e) {
       String errorMessage = String.format(
@@ -361,7 +350,10 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, errorMessage, e, parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          errorMessage, e, parsedRequest);
     }
   }
 
@@ -502,14 +494,13 @@ public class CollectionsApiServiceImpl
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      // Return bad request if new commit status has not been passed
-      if (committed == null) {
-        String errorMessage = "The committed status cannot be null";
-        log.warn(errorMessage);
-        log.warn("Parsed request: {}", parsedRequest);
-
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
+      if (committed == false) {
+        // Not possible to uncommit an artifact
+        throw new LockssRestServiceException("Cannot uncommit")
+            .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+            .setHttpStatus(HttpStatus.BAD_REQUEST)
+            .setServletPath(request.getServletPath())
+            .setParsedRequest(parsedRequest);
       }
 
       log.debug2(
@@ -529,9 +520,6 @@ public class CollectionsApiServiceImpl
     } catch (LockssNoSuchArtifactIdException e) {
       return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
 
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
     } catch (IOException e) {
       String errorMessage = String.format(
           "IOException occurred while attempting to update artifact metadata (artifactId: %s)",
@@ -540,7 +528,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -570,9 +560,8 @@ public class CollectionsApiServiceImpl
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    try {
-      log.debug(String.format("Adding artifact %s, %s, %s",
-          collectionid, auid, uri));
+    log.debug(String.format("Adding artifact %s, %s, %s",
+        collectionid, auid, uri));
 
     log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
         content.getContentType()));
@@ -580,27 +569,34 @@ public class CollectionsApiServiceImpl
     // Check URI.
     validateUri(uri, parsedRequest);
 
-      // Only accept artifact encoded within an HTTP response
-      if (!isHttpResponseType(MediaType.parseMediaType(content
-          .getContentType()))) {
-        String errorMessage = String.format(
-            "Failed to add artifact; expected %s but got %s",
-            APPLICATION_HTTP_RESPONSE,
-            MediaType.parseMediaType(content.getContentType()));
+    // Content-Type of the content part
+    MediaType contentType = MediaType.parseMediaType(content.getContentType());
+
+    // Only accept artifact encoded within an HTTP response. This is enforced by checking that
+    // the artifact content part is of type "application/http;msgtype=response".
+    if (!isHttpResponseType(contentType)) {
+      String errorMessage = String.format(
+          "Failed to add artifact; expected %s but got %s",
+          APPLICATION_HTTP_RESPONSE,
+          contentType);
 
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
-      }
+      throw new LockssRestServiceException(errorMessage)
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+          .setHttpStatus(HttpStatus.BAD_REQUEST)
+          .setParsedRequest(parsedRequest);
+    }
 
-      // Convert multipart stream to ArtifactData
+    try {
+      //// Convert multipart stream to ArtifactData
       ArtifactData artifactData =
           ArtifactDataFactory.fromHttpResponseStream(content.getInputStream());
 
-      // Set ArtifactData properties from the POST request
-//TODO: FIX THIS CALL
+      //// Set ArtifactData properties from the POST request
+
+      //TODO: FIX THIS CALL
       ArtifactIdentifier id =
           new ArtifactIdentifier(collectionid, auid, uri, 0);
       artifactData.setIdentifier(id);
@@ -612,26 +608,28 @@ public class CollectionsApiServiceImpl
         artifactData.setCollectionDate(collectionDate);
       }
 
-      // Add artifact to internal repository
-      Artifact artifact = repo.addArtifact(artifactData);
+      //// Add artifact to internal repository
+      try {
+        Artifact artifact = repo.addArtifact(artifactData);
+        log.debug("Wrote artifact to {}", artifact.getStorageUrl());
+        return new ResponseEntity<>(artifact, HttpStatus.OK);
 
-      log.debug(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
-
-      return new ResponseEntity<>(artifact, HttpStatus.OK);
-
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
-
-    } catch (IOException e) {
-      String errorMessage =
-          "Caught IOException while attempting to add an artifact to the repository";
+      } catch (IOException e) {
+        String errorMessage =
+            "Caught IOException while attempting to add an artifact to the repository";
 
         log.warn(errorMessage, e);
         log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
-          errorMessage, e, parsedRequest);
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.DATA_ERROR,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            errorMessage, e, parsedRequest);
+      }
+
+    } catch (IOException e) {
+      // Thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream)
+      throw new HttpMessageNotReadableException("Could not read artifact data from content part", e);
     }
   }
 
@@ -686,8 +684,11 @@ public class CollectionsApiServiceImpl
     } catch (IllegalArgumentException iae) {
       String message = "Invalid continuation token '" + continuationToken + "'";
       log.warn(message);
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
-          parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     }
 
     try {
@@ -706,7 +707,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -722,7 +724,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -737,7 +740,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -755,7 +759,8 @@ public class CollectionsApiServiceImpl
             log.warn(errorMessage);
             log.warn("Parsed request: {}", parsedRequest);
 
-            throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+            throw new LockssRestServiceException(
+                LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
                 errorMessage, parsedRequest);
           }
         } catch (NumberFormatException nfe) {
@@ -765,7 +770,8 @@ public class CollectionsApiServiceImpl
           log.warn(errorMessage);
           log.warn("Parsed request: {}", parsedRequest);
 
-          throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+          throw new LockssRestServiceException(
+              LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
               errorMessage, parsedRequest);
         }
       }
@@ -849,7 +855,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1023,18 +1030,21 @@ public class CollectionsApiServiceImpl
 
       log.debug2("Returning OK.");
       return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
-    } catch (Exception e) {
-      String errorMessage =
-          "Unexpected exception caught while attempting to retrieve artifacts";
 
-      log.warn(errorMessage, e);
-      log.warn("Parsed request: {}", parsedRequest);
+    } catch (IOException e) {
+      throw new LockssRestServiceException(LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          "IOException", e, parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
-          errorMessage, e, parsedRequest);
+//    } catch (Exception e) {
+//      String errorMessage =
+//          "Unexpected exception caught while attempting to retrieve artifacts";
+//
+//      log.warn(errorMessage, e);
+//      log.warn("Parsed request: {}", parsedRequest);
+//
+//      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+//          errorMessage, e, parsedRequest);
     }
   }
 
@@ -1075,7 +1085,9 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE,
+            HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1089,7 +1101,9 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE,
+            HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1106,7 +1120,9 @@ public class CollectionsApiServiceImpl
             log.warn(errorMessage);
             log.warn("Parsed request: {}", parsedRequest);
 
-            throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+            throw new LockssRestServiceException(
+                LockssRestHttpException.ServerErrorType.NONE,
+                HttpStatus.BAD_REQUEST,
                 errorMessage, parsedRequest);
           }
         } catch (NumberFormatException nfe) {
@@ -1116,7 +1132,9 @@ public class CollectionsApiServiceImpl
           log.warn(errorMessage);
           log.warn("Parsed request: {}", parsedRequest);
 
-          throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+          throw new LockssRestServiceException(
+              LockssRestHttpException.ServerErrorType.NONE,
+              HttpStatus.BAD_REQUEST,
               errorMessage, parsedRequest);
         }
       }
@@ -1140,7 +1158,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -1180,7 +1200,10 @@ public class CollectionsApiServiceImpl
     } catch (IllegalArgumentException iae) {
       String message = "Invalid continuation token '" + continuationToken + "'";
       log.warn(message);
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message,
           parsedRequest);
     }
 
@@ -1315,10 +1338,10 @@ public class CollectionsApiServiceImpl
 
       log.debug2("Returning OK.");
       return new ResponseEntity<>(auidPageInfo, HttpStatus.OK);
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
-    } catch (Exception e) {
+//    } catch (LockssRestServiceException lre) {
+//      // Let it cascade to the controller advice exception handler.
+//      throw lre;
+    } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get AU ids";
 
@@ -1353,7 +1376,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.NOT_FOUND, errorMessage,
           parsedRequest);
     }
 
@@ -1368,8 +1393,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, errorMessage,
-          parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          errorMessage, parsedRequest);
     }
 
     log.debug2("uri '{}' is valid.", uri);
@@ -1492,8 +1518,10 @@ public class CollectionsApiServiceImpl
           "Limit of requested items must be a positive integer; it was '"
               + requestLimit + "'";
       log.warn(message);
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
-          parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     }
 
     // No: Get the result.

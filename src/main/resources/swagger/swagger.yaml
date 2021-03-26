@@ -160,7 +160,7 @@ paths:
       parameters:
       - name: "committed"
         in: "formData"
-        required: false
+        required: true
         type: "boolean"
         description: "New commit status of artifact"
       responses:
