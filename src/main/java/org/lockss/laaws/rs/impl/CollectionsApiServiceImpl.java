@@ -31,6 +31,7 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.collections4.IterableUtils;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -232,11 +233,7 @@ public class CollectionsApiServiceImpl
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      List<String> collectionIds = new ArrayList<>();
-      Iterable<String> ids = repo.getCollectionIds();
-      log.trace("ids.iterator().hasNext() = {}", ids.iterator().hasNext());
-      ids.forEach(x -> collectionIds.add(x));
-
+      List<String> collectionIds = IterableUtils.toList(repo.getCollectionIds());
       log.debug2("collectionIds = {}", collectionIds);
       return new ResponseEntity<>(collectionIds, HttpStatus.OK);
     } catch (IOException e) {
