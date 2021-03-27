@@ -96,10 +96,10 @@ public class ArtifactIndexConfig {
                     log.info("Solr cred: {}", solrCred);
 
                     if (solrCollection != null || !solrCollection.isEmpty()) {
-                      return new SolrArtifactIndex(solrBaseUrl, solrCollection);
+                      return new SolrArtifactIndex(solrBaseUrl, solrCollection, solrCred);
                     }
 
-                    return new SolrArtifactIndex(solrBaseUrl);
+                    return new SolrArtifactIndex(solrBaseUrl, solrCred);
 
                 case "volatile":
                     return new VolatileArtifactIndex();
