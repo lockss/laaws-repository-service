@@ -30,28 +30,23 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.hdfs.HdfsWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.local.TestingWarcArtifactDataStore;
 import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
+import org.lockss.laaws.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.log.L4JLogger;
-import org.lockss.app.LockssApp;
 import org.lockss.util.PatternIntMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.core.env.Environment;
 import org.springframework.data.hadoop.config.annotation.builders.HadoopConfigBuilder;
 
-import javax.annotation.Resource;
-import java.io.File;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -59,130 +54,149 @@ import java.util.List;
  */
 @Configuration
 public class ArtifactDataStoreConfig {
-  public final static String PARAM_FREE_SPACE_MAP =
-    "org.lockss.repo.testing.freeSpaceMap";
-
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  private final static String DATASTORE_SPEC_KEY = "repo.datastore.spec";
-  private final static String HDFS_SERVER_KEY = "repo.datastore.hdfs.server";
-  private final static String HDFS_BASEDIR_KEY = "repo.datastore.hdfs.basedir";
+  public final static String PARAM_FREE_SPACE_MAP = "org.lockss.repo.testing.freeSpaceMap";
 
-  public final static String LOCAL_BASEDIRS_KEY = "repo.datastore.local.basedirs";
-  public final static String LOCAL_BASEDIRS_FALLBACK_KEY = "repo.datastore.local.basedir";
+  /**
+   * Enables or disables the use of GZIP compression for WARC files in
+   * WARC artifact data store implementations.
+   */
+  public final static String PARAM_REPO_USE_WARC_COMPRESSION = "org.lockss.repo.warc.useCompression";
 
-  @Resource
-  private Environment env;
+  /**
+   * Default settings for use of GZIP compression for WARC files.
+   */
+  public final static boolean DEFAULT_REPO_USE_WARC_COMPRESSION = true;
+
+  private RepositoryServiceProperties repoProps;
+
+  ArtifactIndex index;
+  volatile WarcArtifactDataStore ds;
 
   @Autowired
-  ArtifactIndex index;
-
-  TestingWarcArtifactDataStore twads;
-
+  public ArtifactDataStoreConfig(RepositoryServiceProperties repoProps, ArtifactIndex index) {
+    this.repoProps = repoProps;
+    this.index = index;
+  }
 
   @Bean
-  public ArtifactDataStore setArtifactStore() throws Exception {
-    String repoSpec = env.getProperty(LockssRepositoryConfig.REPO_SPEC_KEY);
-    String datastoreSpec = env.getProperty(DATASTORE_SPEC_KEY);
+  public ArtifactDataStore setArtifactDataStore() throws Exception {
+    // Create WARC artifact data store and set use WARC compression
+    ds = createWarcArtifactDataStore(parseDataStoreSpecs());
 
-    if (!repoSpec.equals("custom")) {
-      log.warn("Ignoring data store specification because a predefined repository specification is being used");
-      return null;
-    }
-
-    if (datastoreSpec != null) {
-      String dsType = datastoreSpec.trim().toLowerCase();
-      switch (dsType) {
-        case "hdfs":
-          String hdfsServer = env.getProperty(HDFS_SERVER_KEY);
-          Path hdfsBaseDir = Paths.get(env.getProperty(HDFS_BASEDIR_KEY));
-
-          log.info(String.format(
-              "Configuring HDFS artifact data store [%s, %s]",
-              hdfsServer,
-              hdfsBaseDir
-          ));
-
-          HadoopConfigBuilder config = new HadoopConfigBuilder();
-          config.fileSystemUri(hdfsServer);
-
-          return new HdfsWarcArtifactDataStore(index, config.build(), hdfsBaseDir);
-
-        case "local":
-        case "testing":
-          String baseDirsProp = env.getProperty(LOCAL_BASEDIRS_KEY);
-
-          if (baseDirsProp == null) {
-            baseDirsProp = env.getProperty(LOCAL_BASEDIRS_FALLBACK_KEY);
-            if (baseDirsProp == null) {
-              log.error("No local base directories specified");
-              throw new IllegalArgumentException("No local base dirs");
-            }
-          }
-
-          String[] dirs = baseDirsProp.split(";");
-          File[] baseDirs = Arrays.stream(dirs).map(File::new).toArray(File[]::new);
-	  switch (dsType) {
-	  case "local":
-	    log.info("Configuring local artifact data store [baseDirs: {}]",
-		     Arrays.asList(baseDirs));
-	    return new LocalWarcArtifactDataStore(index, baseDirs);
-	  case "testing":
-	    log.info("Configuring testing artifact data store [baseDirs: {}]",
-		     Arrays.asList(baseDirs));
-	    twads = new TestingWarcArtifactDataStore(index, baseDirs);
-	    return twads;
-	  default:
-	    throw new RuntimeException("Shouldn't happen");
-	  }
-        case "volatile":
-          log.info("Configuring volatile artifact data store");
-          return new VolatileWarcArtifactDataStore(index);
-
-        default:
-          String errMsg = String.format("Unknown data store specification '%s'", datastoreSpec);
-          log.error(errMsg);
-          throw new IllegalArgumentException(errMsg);
-      }
-    }
-
-    log.warn("No artifact store specification set; setting ArtifactDataStore bean to null");
-    return null;
+    // Return the data store
+    return ds;
   }
 
-  // Register config callback for TestingWarcArtifactDataStore after
-  // LockssDaemon is started
-  @EventListener(ApplicationReadyEvent.class)
-  public void registerConfigCallback() {
-    if (twads != null) {
-      LockssApp.getLockssApp().getConfigManager().registerConfigurationCallback(new TestingArtifactDataStoreConfigCallback(twads));
+  private String parseDataStoreSpecs() {
+    switch (repoProps.getRepositoryType()) {
+      case "volatile":
+        // Allow a volatile data store to be created so that WARC compression can be configured
+        return "volatile";
+
+      case "local":
+        // Support for legacy repo.spec=local:X;Y;Z parameter
+        return "local";
+
+      case "custom":
+        return repoProps.getDatastoreSpec();
+
+      default:
+        throw new IllegalArgumentException("Repository spec not supported: " + repoProps.getRepositorySpec());
     }
   }
 
-  /** Configuration callback to set free space map for testing.
-      Configuration mechanism isn't visible to repocore so config callback
-      must be here. */
-  private static class TestingArtifactDataStoreConfigCallback
-    implements org.lockss.config.Configuration.Callback {
+  private WarcArtifactDataStore createWarcArtifactDataStore(String dsType) throws Exception {
+    switch (dsType) {
+      case "volatile":
+        log.info("Configuring volatile artifact data store");
+        return new VolatileWarcArtifactDataStore(index);
+
+      case "local":
+      case "testing":
+        switch (dsType) {
+          case "local":
+            log.info("Configuring local artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
+            return new LocalWarcArtifactDataStore(index, repoProps.getLocalBaseDirs());
+
+          case "testing":
+            log.info("Configuring testing artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
+            return new TestingWarcArtifactDataStore(index, repoProps.getLocalBaseDirs());
+
+          default:
+            throw new RuntimeException("Shouldn't happen");
+        }
+
+      case "hdfs":
+        log.info(
+            "Configuring HDFS artifact data store [hdfsServer: {}, hdfsBaseDir: {}]",
+            repoProps.getHdfsEndpoint(), repoProps.getHdfsBaseDir()
+        );
+
+        HadoopConfigBuilder hdfsConfigBuilder = new HadoopConfigBuilder();
+        hdfsConfigBuilder.fileSystemUri(repoProps.getHdfsEndpoint());
+
+        return new HdfsWarcArtifactDataStore(index, hdfsConfigBuilder.build(), Paths.get(repoProps.getHdfsBaseDir()));
+
+      default:
+        log.error("Unknown artifact data store: '{}'", dsType);
+        throw new IllegalArgumentException("Unknown artifact data store");
+    }
+  }
+
+  // Register config callback for WarcArtifactDataStore once ConfigManager
+  // has been created.
+  @EventListener
+  public void configMgrCreated(ConfigManager.ConfigManagerCreatedEvent event) {
+    log.debug2("ConfigManagerCreatedEvent triggered");
+    ConfigManager.getConfigManager()
+        .registerConfigurationCallback(new ArtifactDataStoreConfigCallback(ds));
+  }
+
+  /**
+   * Configuration callback to set free space map for testing.
+   * Configuration mechanism isn't visible to repocore so config callback
+   * must be here.
+   */
+  private static class ArtifactDataStoreConfigCallback
+      implements org.lockss.config.Configuration.Callback {
+
     TestingWarcArtifactDataStore twads;
+    WarcArtifactDataStore wads;
 
-    TestingArtifactDataStoreConfigCallback(TestingWarcArtifactDataStore ds) {
-      twads = ds;
+    ArtifactDataStoreConfigCallback(WarcArtifactDataStore ds) {
+      if (ds instanceof TestingWarcArtifactDataStore) {
+        twads = (TestingWarcArtifactDataStore) ds;
+      }
+
+      wads = ds;
     }
 
     public void configurationChanged(org.lockss.config.Configuration newConfig,
-				     org.lockss.config.Configuration oldConfig,
-				     org.lockss.config.Configuration.Differences changedKeys) {
-      PatternIntMap freeSpacePatternMap = PatternIntMap.EMPTY;
-      List lst = newConfig.getList(PARAM_FREE_SPACE_MAP, null);
-      if (lst != null && !lst.isEmpty()) {
-	try {
-	  freeSpacePatternMap = new PatternIntMap(lst);
-	} catch (IllegalArgumentException e) {
-	  log.error("Illegal testing disk space map, ignoring", e);
-	}
+                                     org.lockss.config.Configuration oldConfig,
+                                     org.lockss.config.Configuration.Differences changedKeys) {
+
+      if (twads != null) {
+        PatternIntMap freeSpacePatternMap = PatternIntMap.EMPTY;
+
+        List lst = newConfig.getList(PARAM_FREE_SPACE_MAP, null);
+
+        if (lst != null && !lst.isEmpty()) {
+          try {
+            freeSpacePatternMap = new PatternIntMap(lst);
+          } catch (IllegalArgumentException e) {
+            log.error("Illegal testing disk space map, ignoring", e);
+          }
+        }
+
+        twads.setTestingDiskSpaceMap(freeSpacePatternMap);
       }
-      twads.setTestingDiskSpaceMap(freeSpacePatternMap);
+
+      boolean useWarcCompression =
+          newConfig.getBoolean(PARAM_REPO_USE_WARC_COMPRESSION, DEFAULT_REPO_USE_WARC_COMPRESSION);
+
+      wads.setUseWarcCompression(useWarcCompression);
     }
   }
 }

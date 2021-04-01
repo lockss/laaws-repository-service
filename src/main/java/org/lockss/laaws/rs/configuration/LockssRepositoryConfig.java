@@ -32,7 +32,9 @@ package org.lockss.laaws.rs.configuration;
 
 import org.lockss.app.LockssDaemon;
 import org.lockss.jms.JMSManager;
-import org.lockss.laaws.rs.core.*;
+import org.lockss.laaws.rs.core.BaseLockssRepository;
+import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.util.JmsFactorySource;
@@ -41,13 +43,9 @@ import org.lockss.util.Deadline;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.env.Environment;
 
-import javax.annotation.Resource;
-import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -57,124 +55,102 @@ import java.util.List;
 public class LockssRepositoryConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  public final static String REPO_SPEC_KEY = "repo.spec";
-  public final static String REPO_PERSISTINDEXNAME_KEY = "repo.persistIndexName";
+  private final RepositoryServiceProperties repoProps;
+  private ArtifactDataStore store;
+  private ArtifactIndex index;
 
   @Autowired
-  ArtifactDataStore store;
+  public LockssRepositoryConfig(RepositoryServiceProperties repoProps, ArtifactIndex index, ArtifactDataStore store) {
+    this.repoProps = repoProps;
+    this.index = index;
+    this.store = store;
+  }
 
-  @Autowired
-  ArtifactIndex index;
-
-  @Resource
-  private Environment env;
-
+  /**
+   * Creates and initializes the {@link LockssRepository} that will be made available via the
+   * LOCKSS Repository Service's REST API.
+   *
+   * @return An initialized {@link LockssRepository}.
+   * @throws IOException
+   */
   @Bean
   public LockssRepository createInitializedRepository() throws IOException {
-    LockssRepository repo = createRepository();
+    // Create and initialize the LockssRepository instance
+    LockssRepository repo = createLockssRepository();
     repo.initRepository();
+
+    // Start a new thread to handle JMS messages to this LockssRepository
     // XXX wrong method, below is public
     new Thread(() -> initJmsFactory(repo)).start();
 
     return repo;
   }
 
-  public LockssRepository createRepository() throws IOException {
-    String repositorySpecification = env.getProperty(REPO_SPEC_KEY);
-    String repositoryPersistIndexName = env.getProperty(REPO_PERSISTINDEXNAME_KEY);
+  /**
+   * Creates a {@link LockssRepository}
+   *
+   * @return
+   * @throws IOException
+   */
+  public LockssRepository createLockssRepository() throws IOException {
+    log.debug("Starting internal LOCKSS repository [repoSpec: {}]", repoProps.getRepositorySpec());
 
-    log.debug("Starting internal LOCKSS repository (repositorySpecification = {})", repositorySpecification);
-    log.debug("repositoryPersistIndexName = {}", repositoryPersistIndexName);
+    switch (repoProps.getRepositoryType()) {
+      case "volatile":
+      case "local":
+      case "custom":
+        // Configure artifact index and data store individually using Spring beans (see their
+        // configuration beans in) the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
+        // respectively.
+        return new BaseLockssRepository(index, store);
 
-    if (repositorySpecification != null) {
-      switch (repositorySpecification.trim().toLowerCase()) {
-        case "volatile":
-          return LockssRepositoryFactory.createVolatileRepository();
+      case "rest":
+        if (repoProps.getRepoSpecParts().length <= 1) {
+          log.error("No REST endpoint specified");
+          throw new IllegalArgumentException("No REST endpoint specified");
+        }
 
-        case "custom":
-          // Configure artifact index and data store individually using Spring beans (see their
-          // configuration beans in)the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
-          // respectively.
-          return new BaseLockssRepository(index, store);
+        String repositoryRestUrl = repoProps.getRepoSpecParts()[1];
 
-        default: {
-          if (!(repositorySpecification.indexOf(':') < 0)) {
-            String[] specParts = repositorySpecification.split(":", 2);
+        log.debug("repositoryRestUrl = {}", repositoryRestUrl);
 
-            // Get the type of implementation configured.
-            String repositoryType = specParts[0].trim().toLowerCase();
+        // Get the REST client credentials.
+        List<String> restClientCredentials =
+            LockssDaemon.getLockssDaemon().getRestClientCredentials();
 
-            log.debug("repositoryType = {}", repositoryType);
+        log.trace("restClientCredentials = {}", restClientCredentials);
 
-            // Check whether a local implementation is configured.
-            switch (repositoryType) {
-              case "local": {
-                // Yes: Get the configured filesystem paths.
-                String[] dirs = specParts[1].split(";");
-                File[] baseDirs = Arrays.stream(dirs).map(File::new).toArray(File[]::new);
-                log.trace("baseDirs = {}", Arrays.asList(baseDirs));
-                return new LocalLockssRepository(baseDirs, repositoryPersistIndexName);
-              }
+        String userName = null;
+        String password = null;
 
-              case "rest": {
-                String repositoryRestUrl = specParts[1];
-                log.debug("repositoryRestUrl = {}", repositoryRestUrl);
+        // Check whether there is a user name.
+        if (restClientCredentials != null && restClientCredentials.size() > 0) {
+          // Yes: Get the user name.
+          userName = restClientCredentials.get(0);
 
-                // Get the REST client credentials.
-                List<String> restClientCredentials = LockssDaemon
-                    .getLockssDaemon().getRestClientCredentials();
-                log.trace("restClientCredentials = {}",
-                    restClientCredentials);
+          log.trace("userName = " + userName);
 
-                String userName = null;
-                String password = null;
-
-                // Check whether there is a user name.
-                if (restClientCredentials != null
-                    && restClientCredentials.size() > 0) {
-                  // Yes: Get the user name.
-                  userName = restClientCredentials.get(0);
-                  log.trace("userName = " + userName);
-
-                  // Check whether there is a user password.
-                  if (restClientCredentials.size() > 1) {
-                    // Yes: Get the user password.
-                    password = restClientCredentials.get(1);
-                  }
-
-                  // Check whether no configured user was found.
-                  if (userName == null || password == null) {
-                    String errMsg =
-                        "No user has been configured for authentication";
-                    log.error(errMsg);
-                    throw new IllegalArgumentException(errMsg);
-                  }
-                }
-
-                return new RestLockssRepository(
-                    new URL(repositoryRestUrl), userName, password);
-              }
-
-              default: {
-                String errMsg = String.format(
-                    "Unknown repository type '%s'; cannot continue",
-                    repositoryType
-                );
-                log.error(errMsg);
-                throw new IllegalArgumentException(errMsg);
-              }
-            }
+          // Check whether there is a user password.
+          if (restClientCredentials.size() > 1) {
+            // Yes: Get the user password.
+            password = restClientCredentials.get(1);
           }
 
-          // Unknown repository specification
-          String errMsg = String.format("Unknown repository specification '%s'", repositorySpecification);
-          log.error(errMsg);
-          throw new IllegalArgumentException(errMsg);
+          // Check whether no configured user was found.
+          if (userName == null || password == null) {
+            String errMsg = "No user has been configured for authentication";
+            log.error(errMsg);
+            throw new IllegalArgumentException(errMsg);
+          }
         }
-      }
-    } else {
-      log.warn("No LOCKSS repository specification provided. Using volatile implementation!");
-      return LockssRepositoryFactory.createVolatileRepository();
+
+        return new RestLockssRepository(new URL(repositoryRestUrl), userName, password);
+
+      default:
+        // Unknown repository specification
+        String errMsg = String.format("Unknown repository specification '%s'", repoProps.getRepositorySpec());
+        log.error(errMsg);
+        throw new IllegalArgumentException(errMsg);
     }
   }
 

@@ -23,7 +23,7 @@ import java.io.IOException;
 public class RepositoryServiceSpringConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  /** Max size of in-mamory buffering of multipart requests */
+  /** Max size of in-memory buffering of multipart requests */
   public static String PARAM_MULTIPART_MAX_IN_MEMORY_SIZE =
     org.lockss.config.Configuration.PREFIX + "spring.multipart.maxInMemorySize";
   public static final int DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE =
