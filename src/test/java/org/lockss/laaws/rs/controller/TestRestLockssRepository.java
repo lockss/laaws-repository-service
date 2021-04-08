@@ -44,8 +44,8 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.junit.Ignore;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -242,7 +242,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal ArtifactData (at least one null field)
     for (ArtifactData illAd : nullPointerArtData) {
       assertThrows(NullPointerException.class,
-		   (Executable) () -> {repository.addArtifact(illAd);});
+          (Executable) () -> {repository.addArtifact(illAd);});
     }
 
     // legal use of addArtifact is tested in the normal course of setting
@@ -715,11 +715,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testCommitArtifact() throws IOException {
     // Illegal args
     assertThrows(IllegalArgumentException.class,
-		 (Executable) () -> {repository.commitArtifact(null, null);});
+        (Executable) () -> {repository.commitArtifact(null, null);});
     assertThrows(IllegalArgumentException.class,
-                 (Executable) () -> {repository.commitArtifact(null, ARTID1);});
+        (Executable) () -> {repository.commitArtifact(null, ARTID1);});
     assertThrows(IllegalArgumentException.class,
-                 (Executable) () -> {repository.commitArtifact(COLL1, null);});
+        (Executable) () -> {repository.commitArtifact(COLL1, null);});
 
     // Commit already committed artifact
     ArtifactSpec commSpec = anyCommittedSpec();

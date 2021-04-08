@@ -30,6 +30,7 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import org.lockss.app.LockssApp;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
@@ -37,8 +38,12 @@ import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal artifact index.
@@ -58,6 +63,9 @@ public class ArtifactIndexConfig {
   public ArtifactIndex setArtifactIndex() {
     return createArtifactIndex(parseIndexSpecs());
   }
+
+  @Autowired
+  private ApplicationArguments appArgs;
 
   private String parseIndexSpecs() {
     switch (repoProps.getRepositoryType()) {
@@ -90,17 +98,46 @@ public class ArtifactIndexConfig {
         return new LocalArtifactIndex(repoProps.getLocalBaseDirs()[0], repoProps.getLocalPersistIndexName());
 
       case "solr":
+        // Get Solr BasicAuth credentials from LockssApp
+        List<String> credentials = getSolrCredentials();
+
         if (!StringUtil.isNullString(repoProps.getSolrCollectionName())) {
           // Use provided Solr collection name
-          return new SolrArtifactIndex(repoProps.getSolrEndpoint(), repoProps.getSolrCollectionName());
+          return new SolrArtifactIndex(repoProps.getSolrEndpoint(), repoProps.getSolrCollectionName(), credentials);
         }
 
-        return new SolrArtifactIndex(repoProps.getSolrEndpoint());
+        return new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials);
 
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);
         log.error(errMsg);
         throw new IllegalArgumentException(errMsg);
     }
+  }
+
+  /**
+   * Read the SOLR client credentials from the file specified on the command line.
+   *
+   * @return A list of username and password, or null if none specified or
+   * file doesn't exist.
+   */
+  private List<String> getSolrCredentials() {
+    log.debug("getNonOptionArgs: {}", appArgs.getNonOptionArgs());
+
+    LockssApp.StartupOptions startOpts =
+        LockssApp.getStartupOptions(appArgs.getNonOptionArgs());
+
+    String filename = startOpts.getSecretFileFor("solr");
+
+    if (filename != null) {
+      try {
+        LockssApp.ClientCredentials cred = LockssApp.readClientCredentials(filename);
+        return cred.getCredentialsAsList();
+      } catch (IOException e) {
+        log.warn("Couldn't read SOLR credentials from file {}", filename, e);
+      }
+    }
+
+    return null;
   }
 }
