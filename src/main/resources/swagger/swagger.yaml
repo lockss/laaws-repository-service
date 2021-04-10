@@ -48,6 +48,8 @@ tags:
     description: Tasks on the repository collections
 schemes:
 - "http"
+produces:
+- "application/json"
 paths:
   /collections:
     get:
@@ -133,6 +135,8 @@ paths:
         description: "Controls whether to include the artifact content part in multipart response"
         required: false
         default: "ALWAYS"
+      produces:
+        - "multipart/form-data"
       responses:
         200:
           description: "Artifact created"
