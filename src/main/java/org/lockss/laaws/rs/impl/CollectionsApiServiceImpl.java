@@ -128,7 +128,6 @@ public class CollectionsApiServiceImpl
       PREFIX + "smallContentThreshold";
   public static final long DEFAULT_SMALL_CONTENT_THRESHOLD = 4096;
 
-
   @Autowired
   LockssRepository repo;
 
@@ -278,7 +277,13 @@ public class CollectionsApiServiceImpl
       return new ResponseEntity<>(HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
-      return new ResponseEntity<Void>(HttpStatus.NOT_FOUND);
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
 
     } catch (IOException e) {
       String errorMessage = String.format(
@@ -518,7 +523,13 @@ public class CollectionsApiServiceImpl
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
-      return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
 
     } catch (IOException e) {
       String errorMessage = String.format(
@@ -628,7 +639,8 @@ public class CollectionsApiServiceImpl
       }
 
     } catch (IOException e) {
-      // Thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream)
+      // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
+      // parsing HTTP request. Return a 400 Bad Request response.
       throw new HttpMessageNotReadableException("Could not read artifact data from content part", e);
     }
   }
@@ -1032,19 +1044,9 @@ public class CollectionsApiServiceImpl
       return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
 
     } catch (IOException e) {
-      throw new LockssRestServiceException(LockssRestHttpException.ServerErrorType.DATA_ERROR,
-          HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
           "IOException", e, parsedRequest);
-
-//    } catch (Exception e) {
-//      String errorMessage =
-//          "Unexpected exception caught while attempting to retrieve artifacts";
-//
-//      log.warn(errorMessage, e);
-//      log.warn("Parsed request: {}", parsedRequest);
-//
-//      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
-//          errorMessage, e, parsedRequest);
     }
   }
 
@@ -1148,9 +1150,6 @@ public class CollectionsApiServiceImpl
       Long result = repo.auSize(collectionid, auid);
       log.debug2("result = {}", result);
       return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
     } catch (Exception e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get artifacts size";
@@ -1200,6 +1199,7 @@ public class CollectionsApiServiceImpl
     } catch (IllegalArgumentException iae) {
       String message = "Invalid continuation token '" + continuationToken + "'";
       log.warn(message);
+
       throw new LockssRestServiceException(
           LockssRestHttpException.ServerErrorType.NONE,
           HttpStatus.BAD_REQUEST,
@@ -1338,9 +1338,7 @@ public class CollectionsApiServiceImpl
 
       log.debug2("Returning OK.");
       return new ResponseEntity<>(auidPageInfo, HttpStatus.OK);
-//    } catch (LockssRestServiceException lre) {
-//      // Let it cascade to the controller advice exception handler.
-//      throw lre;
+
     } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get AU ids";
@@ -1348,7 +1346,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+//          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }

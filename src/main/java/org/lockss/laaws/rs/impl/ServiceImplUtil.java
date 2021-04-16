@@ -31,14 +31,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.impl;
 
-import java.io.IOException;
-import java.util.stream.StreamSupport;
-import javax.servlet.http.HttpServletRequest;
 import org.json.JSONObject;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.springframework.http.HttpStatus;
+
+import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.util.stream.StreamSupport;
 
 /**
  * Utility method used in the service controllers.
@@ -58,6 +60,12 @@ public class ServiceImplUtil {
    * @return a String with the full URL of the request.
    */
   static String getFullRequestUrl(HttpServletRequest request) {
+    // FIXME: Is this still needed? Came up during testing with mock controller
+    if (request == null) {
+      log.warn("request = null");
+      return "";
+    }
+
     if (request.getQueryString() == null
 	|| request.getQueryString().trim().isEmpty()) {
       return "'" + request.getMethod() + " " + request.getRequestURL() + "'";
@@ -79,8 +87,11 @@ public class ServiceImplUtil {
       String parsedRequest) {
     if (!repo.isReady()) {
       String errorMessage = "LOCKSS repository is not ready";
-      throw new LockssRestServiceException(HttpStatus.SERVICE_UNAVAILABLE,
-	  errorMessage, parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          errorMessage, parsedRequest);
     }
   }
 
