@@ -762,7 +762,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withServerError());
 
 
-	assertThrowsMatch(LockssUncheckedException.class,
+	assertThrowsMatch(LockssRestHttpException.class,
 		      "500 Internal Server Error",
 		      () -> {repository.getAuIds("collection1");});
         mockServer.verify();
