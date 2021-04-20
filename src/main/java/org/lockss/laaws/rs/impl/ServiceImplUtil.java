@@ -125,8 +125,9 @@ public class ServiceImplUtil {
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage, 
-	  parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.NOT_FOUND,
+          errorMessage, parsedRequest);
     }
 
     log.debug2("collectionid '{}' is valid.", collectionid);

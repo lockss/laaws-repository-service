@@ -777,7 +777,7 @@ public class CollectionsApiServiceImpl
           }
         } catch (NumberFormatException nfe) {
           String errorMessage =
-              "The 'version' argument is not a positive integer";
+              "The 'version' argument is invalid";
 
           log.warn(errorMessage);
           log.warn("Parsed request: {}", parsedRequest);
@@ -1073,7 +1073,6 @@ public class CollectionsApiServiceImpl
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    try {
       boolean isLatestVersion =
           version == null || version.toLowerCase().equals("latest");
 
@@ -1129,7 +1128,7 @@ public class CollectionsApiServiceImpl
           }
         } catch (NumberFormatException nfe) {
           String errorMessage =
-              "The 'version' argument is not a positive integer";
+              "The 'version' argument is invalid";
 
           log.warn(errorMessage);
           log.warn("Parsed request: {}", parsedRequest);
@@ -1141,6 +1140,7 @@ public class CollectionsApiServiceImpl
         }
       }
 
+    try {
       // Check that the collection exists.
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
@@ -1150,7 +1150,7 @@ public class CollectionsApiServiceImpl
       Long result = repo.auSize(collectionid, auid);
       log.debug2("result = {}", result);
       return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (Exception e) {
+    } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get artifacts size";
 
