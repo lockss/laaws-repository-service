@@ -371,7 +371,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     assertNull(repository.getArtifact(coll, AUID1, URL1));
 
-    assertEquals(0, (long)repository.auSize(coll, AUID1));
+    assertThrows(LockssRestHttpException.class,
+        (Executable) () -> repository.auSize(coll, AUID1));
 
     assertThrows(
         LockssNoSuchArtifactIdException.class,
@@ -695,7 +696,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 		      () -> {repository.auSize(COLL1, null);});
 
     // non-existent AU
-    assertEquals(0, (long)repository.auSize(COLL1, NO_AUID));
+    assertThrows(LockssRestHttpException.class,
+        (Executable) () -> repository.auSize(NO_COLL, NO_AUID));
 
     // Calculate the expected size of each AU in each collection, compare
     // with auSize()

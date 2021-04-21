@@ -691,20 +691,21 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 //        "archival unit has no artifacts", HttpStatus.NOT_FOUND,
 //        LockssRestHttpException.ServerErrorType.DATA_ERROR);
 
-//    // Rest mock
-//    reset(internalRepo);
-//    initInternalLockssRepository();
-//
-//    //// Assert 500 Internal Server Error if IOException is thrown
-//    when(internalRepo.getCollectionIds()).thenReturn(ListUtil.list("collection"));
-//    when(internalRepo.auSize("collection", "auid"))
-//        .thenThrow(new IOException("Test error message"));
-//
-//    // Process request and assert response
-//    assertLockssRestHttpException(
-//        (Executable) () -> clientRepo.auSize("collection", "auid"),
-//        "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
-//        LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
+    // Rest mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 500 Internal Server Error if IOException is thrown
+    when(internalRepo.getCollectionIds())
+        .thenReturn(ListUtil.list("collection"));
+    when(internalRepo.auSize("collection", "auid"))
+        .thenThrow(new IOException("Test error message"));
+
+    // Process request and assert response
+    assertLockssRestHttpException(
+        (Executable) () -> clientRepo.auSize("collection", "auid"),
+        "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
+        LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
   }
 
   @Test
