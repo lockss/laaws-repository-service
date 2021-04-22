@@ -192,10 +192,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
       } else {
         // Assert a 4xx series error and not a server error
         assertTrue(lrhe.getHttpStatus().is4xxClientError());
-
-        // Q: Is it always NONE?
         assertEquals(LockssRestHttpException.ServerErrorType.NONE, lrhe.getServerErrorType());
-        // assertEquals(serverErrorType, lrhe.getServerErrorType());
       }
     }
   }
@@ -412,21 +409,25 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     // Initialize internal repository
     initInternalLockssRepository();
 
-    //// Assert invalid URI
-//    URL endpoint1 =
-//        new URL(String.format("http://localhost:%d/collections/collectionId/artifacts?uri=", port));
-//
-//    HttpPost request1 = new HttpPost(endpoint1.toURI());
-//    request1.addHeader("Content-Type", "multipart/form-data");
-//    request1.setEntity();
-//
-//    assertLockssRestHttpException(
-//        (Executable) () -> processRequest(request1),
-//        "URI has not been provided", HttpStatus.BAD_REQUEST,
-//        LockssRestHttpException.ServerErrorType.NONE);
+    //// Assert 400 Bad Request if invalid URI is provided
+
+    // Artifact spec with bad URI
+    ArtifactSpec spec1 = new ArtifactSpec()
+        .setCollectionDate(1234)
+        .setUrl("")
+        .setContentLength(1234)
+        .generateContent();
+
+    // Assert response
+    assertLockssRestHttpException(
+        (Executable) () -> clientRepo.addArtifact(spec1.getArtifactData()),
+        "URI has not been provided", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
+
+    //// Assert 500 Internal Server error if an IOException occurs
 
     // Artifact spec to test with
-    ArtifactSpec spec = new ArtifactSpec()
+    ArtifactSpec spec2 = new ArtifactSpec()
         .setCollectionDate(1234)
         .setUrl("http://example.com/")
         .setContentLength(1234)
@@ -438,7 +439,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     // Assert response
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.addArtifact(spec.getArtifactData()),
+        (Executable) () -> clientRepo.addArtifact(spec2.getArtifactData()),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
   }
