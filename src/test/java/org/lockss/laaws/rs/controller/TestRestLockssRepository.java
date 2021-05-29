@@ -1600,7 +1600,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertNotNull(repository.getArtifactData(spec.getCollection(), newArt.getId()));
     // Get the same artifact when uncommitted may be included.
     Artifact newArt2 = getArtifact(repository, spec, true);
-    assertEquals(newArt, newArt2);
+    assertTrue(newArt.equalsExceptStorageUrl(newArt2));
     return newArt;
   }
 
