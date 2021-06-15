@@ -1102,6 +1102,18 @@ public class CollectionsApiServiceImpl
     }
 
     try {
+      if (urlPrefix != null && url != null) {
+        String errorMessage =
+            "The 'urlPrefix' and 'url' arguments are mutually exclusive";
+
+        log.warn(errorMessage);
+        log.warn("Parsed request: {}", parsedRequest);
+
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            errorMessage, parsedRequest);
+      }
+
       // Check that the collection exists.
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
@@ -1126,11 +1138,6 @@ public class CollectionsApiServiceImpl
         artifactIterable = repo.getArtifactsAllVersionsAllAus(collectionid, url);
       } else if (urlPrefix != null) {
         artifactIterable = repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, urlPrefix);
-      } else {
-        throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE,
-            HttpStatus.BAD_REQUEST,
-            "url and urlPrefix arguments are mutually exclusive", parsedRequest);
       }
 
       ArtifactContinuationToken responseAct = null;
