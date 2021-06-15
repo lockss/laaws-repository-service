@@ -401,6 +401,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testGetAllArtifactsAllVersions();
     testGetAllArtifactsWithPrefixAllVersions();
     testGetArtifactAllVersions();
+    testGetArtifactAllVersionsAllAus();
     testGetAuIds();
     testGetCollectionIds();
     testIsArtifactCommitted();
@@ -1098,6 +1099,34 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 		    repository.getArtifactsAllVersions(urlSpec.getCollection(),
 						       urlSpec.getAuid(),
 						       urlSpec.getUrl()));
+    }
+  }
+
+  public void testGetArtifactAllVersionsAllAus() throws IOException {
+    // Illegal args
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "Null collection id or url",
+		      () -> {repository.getArtifactsAllVersionsAllAus(null, null);});
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "url",
+		      () -> {repository.getArtifactsAllVersionsAllAus(COLL1, null);});
+    assertThrowsMatch(IllegalArgumentException.class,
+		      "coll",
+		      () -> {repository.getArtifactsAllVersionsAllAus(null, URL1);});
+
+    // Non-existent collection or url
+    assertEmpty(repository.getArtifactsAllVersionsAllAus(NO_COLL, URL1));
+    assertEmpty(repository.getArtifactsAllVersionsAllAus(COLL1, NO_URL));
+
+    // For each ArtButVer in the repository, enumerate all its versions and
+    // compare with expected
+    Stream<ArtifactSpec> s =
+      committedSpecStream().filter(distinctByKey(ArtifactSpec::artButVerKey));
+    for (ArtifactSpec urlSpec : (Iterable<ArtifactSpec>)s::iterator) {
+      ArtifactSpec.assertArtList(repository, orderedAllCommitted()
+		    .filter(spec -> spec.sameArtButVer(urlSpec)),
+		    repository.getArtifactsAllVersionsAllAus(urlSpec.getCollection(),
+                                                             urlSpec.getUrl()));
     }
   }
 
