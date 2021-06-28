@@ -67,6 +67,52 @@ paths:
             items:
               type: "string"
   /collections/{collectionid}/artifacts:
+    get:
+      tags:
+        - collections
+      summary: "This endpoint returns the committed artifacts of all versions of a given URL, from a specified
+      collection."
+      operationId: getArtifactsAllVersionsAllAus
+      parameters:
+        - name: "collectionid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Identifier of the collection containing the artifacts"
+        - name: "url"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The URL contained by the artifacts"
+        - name: "urlPrefix"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The prefix to be matched by the artifact URLs"
+        - name: "limit"
+          in: "query"
+          description: "The requested maximum number of artifacts per response"
+          required: false
+          type: "integer"
+        - name: "continuationToken"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The continuation token of the next page of artifacts to\
+          \ be returned"
+      responses:
+        200:
+          description: "The requested artifacts"
+          schema:
+            $ref: '#/definitions/artifactPageInfo'
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve data"
+        404:
+          description: "Collection not found"
+        502:
+          description: "Could not read from external resource"
     post:
       tags:
         - collections
@@ -91,11 +137,11 @@ paths:
         type: "integer"
         format: "int64"
         description: "Artifact collection/crawl date (milliseconds since epoch; UTC)"
-      - name: "content"
+      - name: "artifact"
         in: "formData"
         required: true
         type: "file"
-        description: "Content byte stream"
+        description: "Artifact data"
       responses:
         201:
           description: "Artifact created"
@@ -164,7 +210,7 @@ paths:
       parameters:
       - name: "committed"
         in: "formData"
-        required: false
+        required: true
         type: "boolean"
         description: "New commit status of artifact"
       responses:

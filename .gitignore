@@ -433,3 +433,7 @@ lib/run-props
 /src/generated/
 
 .swagger-codegen/
+
+/pom.xml.bak
+/*/pom.xml.bak
+/.surefire-*

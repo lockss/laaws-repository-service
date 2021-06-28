@@ -31,6 +31,7 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.collections4.IterableUtils;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -43,15 +44,16 @@ import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
-import org.lockss.spring.error.RestResponseErrorBody;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
+import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -62,6 +64,8 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.StreamSupport;
@@ -84,36 +88,45 @@ public class CollectionsApiServiceImpl
 
   // Config params for response pagination sizes.
 
-  /** Default number of Artifacts that will be returned in a single (paged)
-   * response */
+  /**
+   * Default number of Artifacts that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_DEFAULT_ARTIFACT_PAGESIZE =
-    PREFIX + "artifact.pagesize.default";
+      PREFIX + "artifact.pagesize.default";
   public static final int DEFAULT_DEFAULT_ARTIFACT_PAGESIZE = 1000;
 
-  /** Max number of Artifacts that will be returned in a single (paged)
-   * response */
+  /**
+   * Max number of Artifacts that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_MAX_ARTIFACT_PAGESIZE =
-    PREFIX + "artifact.pagesize.max";
+      PREFIX + "artifact.pagesize.max";
   public static final int DEFAULT_MAX_ARTIFACT_PAGESIZE = 2000;
 
-  /** Default number of AUIDs that will be returned in a single (paged)
-   * response */
+  /**
+   * Default number of AUIDs that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_DEFAULT_AUID_PAGESIZE =
-    PREFIX + "auid.pagesize.default";
+      PREFIX + "auid.pagesize.default";
   public static final int DEFAULT_DEFAULT_AUID_PAGESIZE = 1000;
 
-  /** Max number of AUIDs that will be returned in a single (paged)
-   * response */
+  /**
+   * Max number of AUIDs that will be returned in a single (paged)
+   * response
+   */
   public static final String PARAM_MAX_AUID_PAGESIZE =
-    PREFIX + "auid.pagesize.max";
+      PREFIX + "auid.pagesize.max";
   public static final int DEFAULT_MAX_AUID_PAGESIZE = 2000;
 
-  /** Largest Artifact content that will be included in a response to a
-   * getArtifactData call with includeContent == IF_SMALL */
+  /**
+   * Largest Artifact content that will be included in a response to a
+   * getArtifactData call with includeContent == IF_SMALL
+   */
   public static final String PARAM_SMALL_CONTENT_THRESHOLD =
-    PREFIX + "smallContentThreshold";
+      PREFIX + "smallContentThreshold";
   public static final long DEFAULT_SMALL_CONTENT_THRESHOLD = 4096;
-
 
   @Autowired
   LockssRepository repo;
@@ -175,21 +188,21 @@ public class CollectionsApiServiceImpl
 
   @Override
   public void setConfig(Configuration newConfig,
-			Configuration prevConfig,
-			Configuration.Differences changedKeys) {
+                        Configuration prevConfig,
+                        Configuration.Differences changedKeys) {
     if (changedKeys.contains(PREFIX)) {
       defaultArtifactPageSize =
-	newConfig.getInt(PARAM_DEFAULT_ARTIFACT_PAGESIZE,
-			 DEFAULT_DEFAULT_ARTIFACT_PAGESIZE);
+          newConfig.getInt(PARAM_DEFAULT_ARTIFACT_PAGESIZE,
+              DEFAULT_DEFAULT_ARTIFACT_PAGESIZE);
       maxArtifactPageSize = newConfig.getInt(PARAM_MAX_ARTIFACT_PAGESIZE,
-					     DEFAULT_MAX_ARTIFACT_PAGESIZE);
+          DEFAULT_MAX_ARTIFACT_PAGESIZE);
       defaultAuidPageSize = newConfig.getInt(PARAM_DEFAULT_AUID_PAGESIZE,
-					     DEFAULT_DEFAULT_AUID_PAGESIZE);
+          DEFAULT_DEFAULT_AUID_PAGESIZE);
       maxAuidPageSize = newConfig.getInt(PARAM_MAX_AUID_PAGESIZE,
-					 DEFAULT_MAX_AUID_PAGESIZE);
+          DEFAULT_MAX_AUID_PAGESIZE);
       smallContentThreshold =
-	newConfig.getLong(PARAM_SMALL_CONTENT_THRESHOLD,
-			  DEFAULT_SMALL_CONTENT_THRESHOLD);
+          newConfig.getLong(PARAM_SMALL_CONTENT_THRESHOLD,
+              DEFAULT_SMALL_CONTENT_THRESHOLD);
     }
   }
 
@@ -216,26 +229,24 @@ public class CollectionsApiServiceImpl
   public ResponseEntity<List<String>> getCollections() {
     String parsedRequest = String.format("requestUrl: %s",
         ServiceImplUtil.getFullRequestUrl(request));
+
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      List<String> collectionIds = new ArrayList<>();
-      Iterable<String> ids = repo.getCollectionIds();
-      log.trace("ids.iterator().hasNext() = {}", ids.iterator().hasNext());
-      ids.forEach(x -> collectionIds.add(x));
-
+      List<String> collectionIds = IterableUtils.toList(repo.getCollectionIds());
       log.debug2("collectionIds = {}", collectionIds);
       return new ResponseEntity<>(collectionIds, HttpStatus.OK);
     } catch (IOException e) {
-      String errorMessage =
-          "IOException was caught trying to enumerate collection IDs";
+      String errorMessage = "Could not enumerate collection IDs";
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -266,11 +277,14 @@ public class CollectionsApiServiceImpl
       return new ResponseEntity<>(HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
-      return new ResponseEntity<Void>(HttpStatus.NOT_FOUND);
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
 
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
     } catch (IOException e) {
       String errorMessage = String.format(
           "IOException occurred while attempting to delete artifact from repository (artifactId: %s)",
@@ -279,7 +293,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -288,8 +304,8 @@ public class CollectionsApiServiceImpl
    * GET /collections/{collectionid}/artifacts/{artifactid}:
    * Retrieves an artifact from the repository.
    *
-   * @param collectionid A String with the name of the collection containing the artifact.
-   * @param artifactid   A String with the Identifier of the artifact.
+   * @param collectionid   A String with the name of the collection containing the artifact.
+   * @param artifactid     A String with the Identifier of the artifact.
    * @param includeContent A {@link Boolean} indicating whether the artifact content part should be included in the
    *                       multipart response.
    * @return a {@link ResponseEntity} containing a {@link org.lockss.util.rest.multipart.MultipartResponse}.
@@ -318,43 +334,31 @@ public class CollectionsApiServiceImpl
           smallContentThreshold
       );
 
-      //// Set Content-Type of server response to multipart/form-data
-      // FIXME: Technically, multipart/related might be more appropriate here but FormHttpMessageConverter does not
-      //        recognize it. It might be possible to use setSupportedMediaTypes() through a Spring configuration
-      //        bean but using multipart/form-data works for now.
-      HttpHeaders responseHeaders = new HttpHeaders();
-      responseHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
-
       //// Return multiparts response entity
-      return new ResponseEntity<MultiValueMap<String, Object>>(
-          parts,
-          responseHeaders,
-          HttpStatus.OK
-      );
+      return new ResponseEntity<MultiValueMap<String, Object>>(parts, HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
-      // FIXME: Handling of this exception should be moved into SpringControllerAdvice
-
-      HttpHeaders responseHeaders = new HttpHeaders();
-      responseHeaders.setContentType(MediaType.APPLICATION_JSON);
-
-      return new ResponseEntity<>(new RestResponseErrorBody(e.getMessage(),
-          e.getClass().getSimpleName()), responseHeaders, HttpStatus.NOT_FOUND);
-
-    } catch (LockssRestServiceException e) {
-      // Let it cascade to the controller advice exception handler.
-      throw e;
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
 
     } catch (IOException e) {
       String errorMessage = String.format(
-          "IOException occurred while attempting to retrieve artifact from repository (artifactId: %s)",
+          "Caught IOException while attempting to retrieve artifact from repository [artifactId: %s]",
           artifactid
       );
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, errorMessage, e, parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          errorMessage, e, parsedRequest);
     }
   }
 
@@ -485,7 +489,7 @@ public class CollectionsApiServiceImpl
    */
   @Override
   public ResponseEntity updateArtifact(String collectionid,
-                                                 String artifactid, Boolean committed) {
+                                       String artifactid, Boolean committed) {
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, committed: %s, requestUrl: %s",
         collectionid, artifactid, committed,
@@ -495,35 +499,38 @@ public class CollectionsApiServiceImpl
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      // Return bad request if new commit status has not been passed
-      if (committed == null) {
-        String errorMessage = "The committed status cannot be null";
-        log.warn(errorMessage);
-        log.warn("Parsed request: {}", parsedRequest);
-
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
+      if (committed == false) {
+        // Not possible to uncommit an artifact
+        throw new LockssRestServiceException("Cannot uncommit")
+            .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+            .setHttpStatus(HttpStatus.BAD_REQUEST)
+            .setServletPath(request.getServletPath())
+            .setParsedRequest(parsedRequest);
       }
 
-      log.debug2(String.format(
-          "Updating commit status for %s (%s -> %s)",
-          artifactid,
-          repo.isArtifactCommitted(collectionid, artifactid),
-          committed
-      ));
+      log.debug2(
+          "Updating commit status for {} ({} -> {})",
+          artifactid, repo.isArtifactCommitted(collectionid, artifactid), committed
+      );
 
-      // Record the commit status in storage and return the new representation in the response entity body
+      // Commit the artifact
       Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
-      sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit,
-          artifactKey(collectionid, artifactid));
+
+      // Broadcast an cache invalidate signal for this artifact
+      sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit, artifactKey(collectionid, artifactid));
+
+      // Return the updated Artifact
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
-      return new ResponseEntity<String>("Artifact not found", HttpStatus.NOT_FOUND);
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
 
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
     } catch (IOException e) {
       String errorMessage = String.format(
           "IOException occurred while attempting to update artifact metadata (artifactId: %s)",
@@ -532,7 +539,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -562,40 +571,47 @@ public class CollectionsApiServiceImpl
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
+    log.debug(String.format("Adding artifact %s, %s, %s",
+        collectionid, auid, uri));
+
+    log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
+        content.getContentType()));
+
+    // Check URI.
+    validateUri(uri, parsedRequest);
+
+    // Content-Type of the content part
+    MediaType contentType = MediaType.parseMediaType(content.getContentType());
+
+    // Only accept artifact encoded within an HTTP response. This is enforced by checking that
+    // the artifact content part is of type "application/http;msgtype=response".
+    if (!isHttpResponseType(contentType)) {
+      String errorMessage = String.format(
+          "Failed to add artifact; expected %s but got %s",
+          APPLICATION_HTTP_RESPONSE,
+          contentType);
+
+      log.warn(errorMessage);
+      log.warn("Parsed request: {}", parsedRequest);
+
+      throw new LockssRestServiceException(errorMessage)
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+          .setHttpStatus(HttpStatus.BAD_REQUEST)
+          .setParsedRequest(parsedRequest);
+    }
+
     try {
-      log.debug(String.format("Adding artifact %s, %s, %s",
-          collectionid, auid, uri));
-
-      log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
-          content.getContentType()));
-
-      // Check URI.
-      validateUri(uri, parsedRequest);
-
-      // Only accept artifact encoded within an HTTP response
-      if (!isHttpResponseType(MediaType.parseMediaType(content
-          .getContentType()))) {
-        String errorMessage = String.format(
-            "Failed to add artifact; expected %s but got %s",
-            APPLICATION_HTTP_RESPONSE,
-            MediaType.parseMediaType(content.getContentType()));
-
-        log.warn(errorMessage);
-        log.warn("Parsed request: {}", parsedRequest);
-
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
-      }
-
-      // Convert multipart stream to ArtifactData
+      //// Convert multipart stream to ArtifactData
       ArtifactData artifactData =
           ArtifactDataFactory.fromHttpResponseStream(content.getInputStream());
 
-      // Set ArtifactData properties from the POST request
-//TODO: FIX THIS CALL
+      //// Set ArtifactData properties from the POST request
+
+      //TODO: FIX THIS CALL
       ArtifactIdentifier id =
           new ArtifactIdentifier(collectionid, auid, uri, 0);
       artifactData.setIdentifier(id);
+
       artifactData.setContentLength(content.getSize());
 
       // Set artifact collection date if provided
@@ -603,26 +619,29 @@ public class CollectionsApiServiceImpl
         artifactData.setCollectionDate(collectionDate);
       }
 
-      // Add artifact to internal repository
-      Artifact artifact = repo.addArtifact(artifactData);
+      //// Add artifact to internal repository
+      try {
+        Artifact artifact = repo.addArtifact(artifactData);
+        log.debug("Wrote artifact to {}", artifact.getStorageUrl());
+        return new ResponseEntity<>(artifact, HttpStatus.OK);
 
-      log.debug(String.format("Wrote artifact to %s", artifactData.getStorageUrl()));
+      } catch (IOException e) {
+        String errorMessage =
+            "Caught IOException while attempting to add an artifact to the repository";
 
-      return new ResponseEntity<>(artifact, HttpStatus.OK);
+        log.warn(errorMessage, e);
+        log.warn("Parsed request: {}", parsedRequest);
 
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.DATA_ERROR,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            errorMessage, e, parsedRequest);
+      }
 
     } catch (IOException e) {
-      String errorMessage =
-          "Caught IOException while attempting to add an artifact to the repository";
-
-      log.warn(errorMessage, e);
-      log.warn("Parsed request: {}", parsedRequest);
-
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
-          errorMessage, e, parsedRequest);
+      // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
+      // parsing HTTP request. Return a 400 Bad Request response.
+      throw new HttpMessageNotReadableException("Could not read artifact data from content part", e);
     }
   }
 
@@ -653,11 +672,13 @@ public class CollectionsApiServiceImpl
   public ResponseEntity<ArtifactPageInfo> getArtifacts(String collectionid,
                                                        String auid, String url, String urlPrefix, String version,
                                                        Boolean includeUncommitted, Integer limit, String continuationToken) {
+
     String parsedRequest = String.format("collectionid: %s, auid: %s, url: %s, "
             + "urlPrefix: %s, version: %s, includeUncommitted: %s, limit: %s, "
             + "continuationToken: %s, requestUrl: %s",
         collectionid, auid, url, urlPrefix, version, includeUncommitted, limit,
         continuationToken, ServiceImplUtil.getFullRequestUrl(request));
+
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
@@ -675,8 +696,11 @@ public class CollectionsApiServiceImpl
     } catch (IllegalArgumentException iae) {
       String message = "Invalid continuation token '" + continuationToken + "'";
       log.warn(message);
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
-          parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     }
 
     try {
@@ -695,7 +719,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -711,7 +736,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -726,7 +752,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -744,17 +771,19 @@ public class CollectionsApiServiceImpl
             log.warn(errorMessage);
             log.warn("Parsed request: {}", parsedRequest);
 
-            throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+            throw new LockssRestServiceException(
+                LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
                 errorMessage, parsedRequest);
           }
         } catch (NumberFormatException nfe) {
           String errorMessage =
-              "The 'version' argument is not a positive integer";
+              "The 'version' argument is invalid";
 
           log.warn(errorMessage);
           log.warn("Parsed request: {}", parsedRequest);
 
-          throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+          throw new LockssRestServiceException(
+              LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
               errorMessage, parsedRequest);
         }
       }
@@ -838,7 +867,8 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1012,18 +1042,256 @@ public class CollectionsApiServiceImpl
 
       log.debug2("Returning OK.");
       return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
-    } catch (Exception e) {
-      String errorMessage =
-          "Unexpected exception caught while attempting to retrieve artifacts";
 
-      log.warn(errorMessage, e);
-      log.warn("Parsed request: {}", parsedRequest);
+    } catch (IOException e) {
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+          "IOException", e, parsedRequest);
+    }
+  }
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
-          errorMessage, e, parsedRequest);
+  /**
+   * GET /collections/{collectionid}/artifacts: Returns the committed artifacts of all versions
+   * of a given URL, from a specified collection.
+   *
+   * @param collectionid       A String with the name of the collection
+   *                           containing the artifact.
+   * @param url                A String with the URL contained by the artifacts.
+   * @param urlPrefix          A String with the prefix to be matched by the
+   *                           artifact URLs.
+   * @param limit              An Integer with the maximum number of artifacts
+   *                           to be returned.
+   * @param continuationToken  A String with the continuation token of the next
+   *                           page of artifacts to be returned.
+   * @return a {@code ResponseEntity<ArtifactPageInfo>} with the requested
+   * artifacts.
+   */
+  @Override
+  public ResponseEntity<ArtifactPageInfo> getArtifactsAllVersionsAllAus(String collectionid,
+                                                                        String url,
+                                                                        String urlPrefix,
+                                                                        Integer limit,
+                                                                        String continuationToken) {
+
+    String parsedRequest = String.format(
+        "collectionid: %s, url: %s, urlPrefix: %s, requestUrl: %s",
+        collectionid, url, urlPrefix, ServiceImplUtil.getFullRequestUrl(request));
+
+    log.debug2("Parsed request: {}", parsedRequest);
+
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+
+    Integer requestLimit = limit;
+    limit = validateLimit(requestLimit, defaultArtifactPageSize,
+        maxArtifactPageSize, parsedRequest);
+
+    // Parse the request continuation token.
+    ArtifactContinuationToken requestAct = null;
+
+    try {
+      requestAct = new ArtifactContinuationToken(continuationToken);
+      log.trace("requestAct = {}", requestAct);
+    } catch (IllegalArgumentException iae) {
+      String message = "Invalid continuation token '" + continuationToken + "'";
+      log.warn(message);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
+    }
+
+    try {
+      if (urlPrefix != null && url != null) {
+        String errorMessage =
+            "The 'urlPrefix' and 'url' arguments are mutually exclusive";
+
+        log.warn(errorMessage);
+        log.warn("Parsed request: {}", parsedRequest);
+
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            errorMessage, parsedRequest);
+      }
+
+      // Check that the collection exists.
+      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
+
+      Iterable<Artifact> artifactIterable = null;
+      List<Artifact> artifacts = new ArrayList<>();
+      Iterator<Artifact> iterator = null;
+      boolean missingIterator = false;
+
+      // Get the iterator hash code (if any) used to provide a previous page
+      // of results.
+      Integer iteratorHashCode = requestAct.getIteratorHashCode();
+
+      // Check whether this request is for a previous page of results.
+      if (iteratorHashCode != null) {
+        // Yes: Get the iterator (if any) used to provide a previous page of
+        // results.
+        iterator = artifactIterators.remove(iteratorHashCode);
+        missingIterator = iterator == null;
+      }
+
+      if (url != null) {
+        artifactIterable = repo.getArtifactsAllVersionsAllAus(collectionid, url);
+      } else if (urlPrefix != null) {
+        artifactIterable = repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, urlPrefix);
+      }
+
+      ArtifactContinuationToken responseAct = null;
+
+      // Check whether an iterator is involved in obtaining the response.
+      if (iterator != null || artifactIterable != null) {
+        // Yes: Check whether a new iterator is needed.
+        if (iterator == null) {
+          // Yes: Get the iterator pointing to the first page of results.
+          iterator = artifactIterable.iterator();
+
+          // Set up the iterator timeout.
+          TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
+              artifactIteratorTimeoutCallback, iterator.hashCode());
+
+          // Check whether the artifacts provided in a previous response need to
+          // be skipped.
+          if (missingIterator) {
+            // Yes: Initialize an artifact with properties from the last one
+            // already returned in the previous page of results.
+            Artifact lastArtifact = new Artifact();
+            lastArtifact.setCollection(requestAct.getCollectionId());
+            lastArtifact.setAuid(requestAct.getAuid());
+            lastArtifact.setUri(requestAct.getUri());
+            lastArtifact.setVersion(requestAct.getVersion());
+
+            // Loop through the artifacts skipping those already returned
+            // through a previous response.
+            while (iterator.hasNext()) {
+              Artifact artifact = iterator.next();
+
+              // Check whether this artifact comes after the last one returned
+              // on the previous response for this operation.
+              if (ArtifactComparators.BY_URI_BY_DECREASING_VERSION
+                  .compare(artifact, lastArtifact) > 0) {
+                // Yes: Add this artifact to the results.
+                artifacts.add(artifact);
+
+                // Add the rest of the artifacts to the results for this
+                // response separately.
+                break;
+              }
+            }
+          }
+        }
+
+        // Populate the the rest of the results for this response.
+        populateArtifacts(iterator, limit, artifacts);
+
+        // Check whether the iterator may be used in the future to provide more
+        // results.
+        if (iterator.hasNext()) {
+          // Yes: Store it locally.
+          iteratorHashCode = iterator.hashCode();
+          artifactIterators.put(iteratorHashCode, iterator);
+
+          // Create the response continuation token.
+          Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
+          responseAct = new ArtifactContinuationToken(
+              lastArtifact.getCollection(), lastArtifact.getAuid(),
+              lastArtifact.getUri(), lastArtifact.getVersion(),
+              iteratorHashCode);
+          log.trace("responseAct = {}", responseAct);
+        }
+      }
+
+      log.trace("artifacts.size() = {}", artifacts.size());
+
+      PageInfo pageInfo = new PageInfo();
+      pageInfo.setResultsPerPage(artifacts.size());
+
+      // Get the current link.
+      StringBuffer curLinkBuffer = request.getRequestURL();
+
+      if (request.getQueryString() != null
+          && !request.getQueryString().trim().isEmpty()) {
+        curLinkBuffer.append("?").append(request.getQueryString());
+      }
+
+      String curLink = curLinkBuffer.toString();
+      log.trace("curLink = {}", curLink);
+
+      pageInfo.setCurLink(curLink);
+
+      // Check whether there is a response continuation token.
+      if (responseAct != null) {
+        // Yes.
+        continuationToken = responseAct.toWebResponseContinuationToken();
+        pageInfo.setContinuationToken(continuationToken);
+
+        // Start building the next link.
+        StringBuffer nextLinkBuffer = request.getRequestURL();
+        boolean hasQueryParameters = false;
+
+        if (curLink.indexOf("limit=") > 0) {
+          nextLinkBuffer.append("?limit=").append(requestLimit);
+          hasQueryParameters = true;
+        }
+
+        if (url != null) {
+          if (!hasQueryParameters) {
+            nextLinkBuffer.append("?");
+            hasQueryParameters = true;
+          } else {
+            nextLinkBuffer.append("&");
+          }
+
+          nextLinkBuffer.append("url=").append(UrlUtil.encodeUrl(url));
+        }
+
+        if (urlPrefix != null) {
+          if (!hasQueryParameters) {
+            nextLinkBuffer.append("?");
+            hasQueryParameters = true;
+          } else {
+            nextLinkBuffer.append("&");
+          }
+
+          nextLinkBuffer.append("urlPrefix=")
+              .append(UrlUtil.encodeUrl(urlPrefix));
+        }
+
+        continuationToken = pageInfo.getContinuationToken();
+
+        if (continuationToken != null) {
+          if (!hasQueryParameters) {
+            nextLinkBuffer.append("?");
+            hasQueryParameters = true;
+          } else {
+            nextLinkBuffer.append("&");
+          }
+
+          nextLinkBuffer.append("continuationToken=")
+              .append(UrlUtil.encodeUrl(continuationToken));
+        }
+
+        String nextLink = nextLinkBuffer.toString();
+        log.trace("nextLink = {}", nextLink);
+
+        pageInfo.setNextLink(nextLink);
+      }
+
+      ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
+      artifactPageInfo.setArtifacts(artifacts);
+      artifactPageInfo.setPageInfo(pageInfo);
+      log.trace("artifactPageInfo = {}", artifactPageInfo);
+
+      log.debug2("Returning OK.");
+      return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
+
+    } catch (IOException e) {
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+          "IOException", e, parsedRequest);
     }
   }
 
@@ -1050,7 +1318,6 @@ public class CollectionsApiServiceImpl
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    try {
       boolean isLatestVersion =
           version == null || version.toLowerCase().equals("latest");
 
@@ -1064,7 +1331,9 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE,
+            HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1078,7 +1347,9 @@ public class CollectionsApiServiceImpl
         log.warn(errorMessage);
         log.warn("Parsed request: {}", parsedRequest);
 
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE,
+            HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1095,21 +1366,26 @@ public class CollectionsApiServiceImpl
             log.warn(errorMessage);
             log.warn("Parsed request: {}", parsedRequest);
 
-            throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+            throw new LockssRestServiceException(
+                LockssRestHttpException.ServerErrorType.NONE,
+                HttpStatus.BAD_REQUEST,
                 errorMessage, parsedRequest);
           }
         } catch (NumberFormatException nfe) {
           String errorMessage =
-              "The 'version' argument is not a positive integer";
+              "The 'version' argument is invalid";
 
           log.warn(errorMessage);
           log.warn("Parsed request: {}", parsedRequest);
 
-          throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+          throw new LockssRestServiceException(
+              LockssRestHttpException.ServerErrorType.NONE,
+              HttpStatus.BAD_REQUEST,
               errorMessage, parsedRequest);
         }
       }
 
+    try {
       // Check that the collection exists.
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
@@ -1119,17 +1395,16 @@ public class CollectionsApiServiceImpl
       Long result = repo.auSize(collectionid, auid);
       log.debug2("result = {}", result);
       return new ResponseEntity<>(result, HttpStatus.OK);
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
-    } catch (Exception e) {
+    } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get artifacts size";
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -1169,7 +1444,11 @@ public class CollectionsApiServiceImpl
     } catch (IllegalArgumentException iae) {
       String message = "Invalid continuation token '" + continuationToken + "'";
       log.warn(message);
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message,
           parsedRequest);
     }
 
@@ -1304,17 +1583,17 @@ public class CollectionsApiServiceImpl
 
       log.debug2("Returning OK.");
       return new ResponseEntity<>(auidPageInfo, HttpStatus.OK);
-    } catch (LockssRestServiceException lre) {
-      // Let it cascade to the controller advice exception handler.
-      throw lre;
-    } catch (Exception e) {
+
+    } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get AU ids";
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+      throw new LockssRestServiceException(
+//          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
   }
@@ -1335,13 +1614,16 @@ public class CollectionsApiServiceImpl
     log.debug2("collectionid = '{}'", collectionid);
     log.debug2("auid = '{}'", auid);
     log.debug2("parsedRequest = '{}'", parsedRequest);
+
     if (!StreamSupport.stream(repo.getAuIds(collectionid).spliterator(), false)
         .anyMatch(name -> auid.equals(name))) {
       String errorMessage = "The archival unit has no artifacts (possibly because it hasn't been collected yet)";
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.NOT_FOUND, errorMessage,
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.NOT_FOUND, errorMessage,
           parsedRequest);
     }
 
@@ -1356,8 +1638,9 @@ public class CollectionsApiServiceImpl
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);
 
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, errorMessage,
-          parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          errorMessage, parsedRequest);
     }
 
     log.debug2("uri '{}' is valid.", uri);
@@ -1480,8 +1763,10 @@ public class CollectionsApiServiceImpl
           "Limit of requested items must be a positive integer; it was '"
               + requestLimit + "'";
       log.warn(message);
-      throw new LockssRestServiceException(HttpStatus.BAD_REQUEST, message,
-          parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     }
 
     // No: Get the result.

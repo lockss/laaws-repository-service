@@ -33,6 +33,7 @@ import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -762,7 +763,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withServerError());
 
 
-	assertThrowsMatch(LockssUncheckedException.class,
+	assertThrowsMatch(LockssRestHttpException.class,
 		      "500 Internal Server Error",
 		      () -> {repository.getAuIds("collection1");});
         mockServer.verify();
@@ -1183,11 +1184,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
-        Long result = repository.auSize("collection1", "auid1");
-        mockServer.verify();
+        assertThrows(LockssRestHttpException.class,
+            (Executable) () -> repository.auSize("collection1", "auid1"));
 
-        assertNotNull(result);
-        assertEquals(0, result.longValue());
+        mockServer.verify();
     }
 
     @Test
@@ -1196,11 +1196,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Long result = repository.auSize("collection1", "auid1");
-        mockServer.verify();
+        assertThrows(LockssRestHttpException.class,
+            (Executable) () -> repository.auSize("collection1", "auid1"));
 
-        assertNotNull(result);
-        assertEquals(0, result.longValue());
+        mockServer.verify();
     }
 
     @Test
@@ -1235,10 +1234,9 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withServerError());
 
-        Long result = repository.auSize("collection1", "auid1");
-        mockServer.verify();
+        assertThrows(LockssRestHttpException.class,
+            (Executable) () -> repository.auSize("collection1", "auid1"));
 
-        assertNotNull(result);
-        assertEquals(0, result.longValue());
+        mockServer.verify();
     }
 }
