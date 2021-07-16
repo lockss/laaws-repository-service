@@ -1067,9 +1067,10 @@ public class CollectionsApiServiceImpl
    * artifacts.
    */
   @Override
-  public ResponseEntity<ArtifactPageInfo> getArtifactsAllVersionsAllAus(String collectionid,
+  public ResponseEntity<ArtifactPageInfo> getArtifactsFromAllAus(String collectionid,
                                                                         String url,
                                                                         String urlPrefix,
+                                                                        String versions,
                                                                         Integer limit,
                                                                         String continuationToken) {
 
@@ -1134,10 +1135,12 @@ public class CollectionsApiServiceImpl
         missingIterator = iterator == null;
       }
 
+      ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions);
+
       if (url != null) {
-        artifactIterable = repo.getArtifactsAllVersionsAllAus(collectionid, url);
+        artifactIterable = repo.getArtifactsWithUrlFromAllAus(collectionid, url, artifactVersions);
       } else if (urlPrefix != null) {
-        artifactIterable = repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, urlPrefix);
+        artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(collectionid, urlPrefix, artifactVersions);
       }
 
       ArtifactContinuationToken responseAct = null;
