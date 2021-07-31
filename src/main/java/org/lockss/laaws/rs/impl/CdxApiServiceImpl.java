@@ -45,11 +45,7 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.lockss.laaws.rs.api.CdxApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactData;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.CdxRecord;
-import org.lockss.laaws.rs.model.CdxRecords;
+import org.lockss.laaws.rs.model.*;
 import org.archive.wayback.surt.SURTTokenizer;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -434,10 +430,10 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
     if (isPrefix) {
       // Yes: Get from the repository the artifacts for URLs with the passed prefix.
-      iterable = repo.getArtifactsWithUrlPrefixFromAllAus(collectionid, url);
+      iterable = repo.getArtifactsWithUrlPrefixFromAllAus(collectionid, url, ArtifactVersions.ALL);
     } else {
       // No: Get from the repository the artifacts for the passed URL.
-      iterable = repo.getArtifactsWithUrlFromAllAus(collectionid, url);
+      iterable = repo.getArtifactsWithUrlFromAllAus(collectionid, url, ArtifactVersions.ALL);
     }
 
     // Initialize the iterator on the collection of artifacts to be returned.
