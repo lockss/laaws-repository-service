@@ -47,11 +47,8 @@ import org.junit.Test;
 import org.junit.Ignore;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.core.LockssRepository.IncludeContent;
-import org.lockss.laaws.rs.core.LockssRepositoryFactory;
-import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
@@ -161,9 +158,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         @Bean
         public LockssRepository createInitializedRepository() throws IOException {
             LockssRepository repository =
-              LockssRepositoryFactory.createLocalRepository(LockssTestCase4.getTempDir(tmpDirs),
-                                                            COLL1);
-            repository.initRepository();
+                new LocalLockssRepository(LockssTestCase4.getTempDir(tmpDirs), COLL1);
+
+          repository.initRepository();
             return repository;
         }
 
