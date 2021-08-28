@@ -18,6 +18,7 @@ public class RepositoryServiceProperties {
 
   // LOCKSS repository properties
   @Value("${repo.spec}") String repoSpec;
+  @Value("${repo.state.dir:/data/state}") String repoStateDir;
 
   // Artifact data store properties
   @Value("${repo.datastore.spec:#{null}}") String datastoreSpec;
@@ -118,5 +119,9 @@ public class RepositoryServiceProperties {
 
   public String getHdfsBaseDir() {
     return hdfsBaseDir;
+  }
+
+  public File getRepositoryStateDir() {
+    return new File(repoStateDir);
   }
 }
