@@ -44,6 +44,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
@@ -77,6 +78,7 @@ public class LockssRepositoryConfig {
   public LockssRepository createInitializedRepository() throws IOException {
     // Create and initialize the LockssRepository instance
     LockssRepository repo = createLockssRepository();
+
     repo.initRepository();
 
     // Start a new thread to handle JMS messages to this LockssRepository
@@ -99,10 +101,13 @@ public class LockssRepositoryConfig {
       case "volatile":
       case "local":
       case "custom":
+        // Local state directory for this Repository Service
+        File stateDir = repoProps.getRepositoryStateDir();
+
         // Configure artifact index and data store individually using Spring beans (see their
         // configuration beans in) the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
         // respectively.
-        return new BaseLockssRepository(index, store);
+        return new BaseLockssRepository(stateDir, index, store);
 
       case "rest":
         if (repoProps.getRepoSpecParts().length <= 1) {
