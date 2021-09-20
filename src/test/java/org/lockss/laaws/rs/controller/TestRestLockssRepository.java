@@ -157,11 +157,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     static class TestLockssRepositoryConfig {
         @Bean
         public LockssRepository createInitializedRepository() throws IOException {
-            LockssRepository repository =
-                new LocalLockssRepository(LockssTestCase4.getTempDir(tmpDirs), COLL1);
+          File stateDir = LockssTestCase4.getTempDir(tmpDirs);
+          File basePath = LockssTestCase4.getTempDir(tmpDirs);
+
+          LockssRepository repository =
+                new LocalLockssRepository(stateDir, basePath, COLL1);
 
           repository.initRepository();
-            return repository;
+
+          return repository;
         }
 
         @Bean

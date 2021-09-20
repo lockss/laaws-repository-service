@@ -111,18 +111,18 @@ public class ArtifactDataStoreConfig {
     switch (dsType) {
       case "volatile":
         log.info("Configuring volatile artifact data store");
-        return new VolatileWarcArtifactDataStore(index);
+        return new VolatileWarcArtifactDataStore();
 
       case "local":
       case "testing":
         switch (dsType) {
           case "local":
             log.info("Configuring local artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
-            return new LocalWarcArtifactDataStore(index, repoProps.getLocalBaseDirs());
+            return new LocalWarcArtifactDataStore(repoProps.getLocalBaseDirs());
 
           case "testing":
             log.info("Configuring testing artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
-            return new TestingWarcArtifactDataStore(index, repoProps.getLocalBaseDirs());
+            return new TestingWarcArtifactDataStore(repoProps.getLocalBaseDirs());
 
           default:
             throw new RuntimeException("Shouldn't happen");
@@ -137,7 +137,7 @@ public class ArtifactDataStoreConfig {
         HadoopConfigBuilder hdfsConfigBuilder = new HadoopConfigBuilder();
         hdfsConfigBuilder.fileSystemUri(repoProps.getHdfsEndpoint());
 
-        return new HdfsWarcArtifactDataStore(index, hdfsConfigBuilder.build(), Paths.get(repoProps.getHdfsBaseDir()));
+        return new HdfsWarcArtifactDataStore(hdfsConfigBuilder.build(), Paths.get(repoProps.getHdfsBaseDir()));
 
       default:
         log.error("Unknown artifact data store: '{}'", dsType);
