@@ -508,10 +508,7 @@ public class CollectionsApiServiceImpl
             .setParsedRequest(parsedRequest);
       }
 
-      log.debug2(
-          "Updating commit status for {} ({} -> {})",
-          artifactid, repo.isArtifactCommitted(collectionid, artifactid), committed
-      );
+      log.debug2("Committing artifact to permanent storage [artifactId: {}]", artifactid);
 
       // Commit the artifact
       Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
