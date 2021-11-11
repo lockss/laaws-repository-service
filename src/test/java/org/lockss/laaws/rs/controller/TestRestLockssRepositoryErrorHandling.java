@@ -1,6 +1,5 @@
 package org.lockss.laaws.rs.controller;
 
-import org.apache.commons.collections.ListUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -45,6 +44,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.util.Collections;
 
 import static org.mockito.Mockito.*;
 
@@ -545,7 +545,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     HttpUriRequest request8 = new HttpGet(endpoint8.toURI());
 
     // Setup mock
-    when(internalRepo.getCollectionIds()).thenReturn(ListUtils.EMPTY_LIST);
+    when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
 
     // Process request and assert response
     assertLockssRestHttpException(
@@ -563,7 +563,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 //
 //    // Setup mock
 //    when(internalRepo.getCollectionIds()).thenReturn(ListUtil.list("collectionId"));
-//    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(ListUtils.EMPTY_LIST);
+//    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(Collections.emptyList());
 //
 //    // Process request and assert response
 //    assertLockssRestHttpException(
@@ -666,7 +666,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     HttpUriRequest request5 = new HttpGet(endpoint5.toURI());
 
     // Setup mock
-    when(internalRepo.getCollectionIds()).thenReturn(ListUtils.EMPTY_LIST);
+    when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
 
     // Process request and assert response
     assertLockssRestHttpException(
@@ -684,7 +684,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 //
 //    // Setup mock
 //    when(internalRepo.getCollectionIds()).thenReturn(ListUtil.list("collectionId"));
-//    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(ListUtils.EMPTY_LIST);
+//    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(Collections.emptyList());
 //
 //    // Process request and assert response
 //    assertLockssRestHttpException(
@@ -741,7 +741,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     HttpUriRequest request3 = new HttpGet(endpoint3.toURI());
 
-    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(ListUtils.EMPTY_LIST);
+    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(Collections.emptyList());
 
     assertLockssRestHttpException(
         (Executable) () -> processRequest(request3),
