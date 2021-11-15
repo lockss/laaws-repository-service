@@ -37,6 +37,7 @@ public class RepositoryServiceProperties {
 
   @Value("${repo.index.solr.solrUrl:#{null}}") String solrEndpoint;
   @Value("${repo.index.solr.solrCollection:#{null}}") String solrCollectionName;
+  @Value("${repo.index.solr.hardCommitInterval:15000}") long solrHardCommitInterval;
 
   public String getRepositorySpec() {
     return repoSpec;
@@ -107,6 +108,10 @@ public class RepositoryServiceProperties {
 
   public String getSolrCollectionName() {
     return solrCollectionName;
+  }
+
+  public long getSolrHardCommitInterval() {
+    return solrHardCommitInterval;
   }
 
   public String getDatastoreSpec() {

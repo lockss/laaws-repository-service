@@ -103,10 +103,12 @@ public class ArtifactIndexConfig {
 
         if (!StringUtil.isNullString(repoProps.getSolrCollectionName())) {
           // Use provided Solr collection name
-          return new SolrArtifactIndex(repoProps.getSolrEndpoint(), repoProps.getSolrCollectionName(), credentials);
+          return new SolrArtifactIndex(repoProps.getSolrEndpoint(), repoProps.getSolrCollectionName(), credentials)
+              .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
         }
 
-        return new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials);
+        return new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials)
+            .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
 
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);
