@@ -560,6 +560,8 @@ public class CollectionsApiServiceImpl
                                                  MultipartFile content,
                                                  Long collectionDate) {
 
+    long start = System.currentTimeMillis();
+
     String parsedRequest = String.format(
         "collectionid: %s, auid: %s, uri: %s, collectionDate: %s, requestUrl: %s",
         collectionid, auid, uri, collectionDate, ServiceImplUtil.getFullRequestUrl(request));
@@ -620,6 +622,14 @@ public class CollectionsApiServiceImpl
       try {
         Artifact artifact = repo.addArtifact(artifactData);
         log.debug("Wrote artifact to {}", artifact.getStorageUrl());
+
+        long end = System.currentTimeMillis();
+
+        log.debug("createArtifact [artifactId: {}, duration: {}, length: {}]",
+            artifact.getId(),
+            end-start,
+            content.getSize());
+
         return new ResponseEntity<>(artifact, HttpStatus.OK);
 
       } catch (IOException e) {
@@ -634,7 +644,6 @@ public class CollectionsApiServiceImpl
             HttpStatus.INTERNAL_SERVER_ERROR,
             errorMessage, e, parsedRequest);
       }
-
     } catch (IOException e) {
       // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
       // parsing HTTP request. Return a 400 Bad Request response.
