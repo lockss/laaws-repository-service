@@ -1,5 +1,13 @@
 # `laaws-repository-service` Release Notes
 
+## 2.12.0
+
+### Features
+* The Repository Service now supports instance-local state. The state directory it uses can be adjusted by setting the
+  `repo.state.dir` application property. The default is `/data/state`.
+* When using a Solr artifact index, the interval (in milliseconds) between Solr hard commits can now be adjusted by 
+  setting the `repo.index.solr.hardCommitInterval` application property. The default is `15000` (15 seconds).
+
 ## Changes Since 2.0.10.1
 
 *   Switched to a 3-part version numbering scheme.
