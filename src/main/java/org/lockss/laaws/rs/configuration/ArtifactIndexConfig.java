@@ -31,6 +31,7 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.app.LockssApp;
+import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
@@ -41,6 +42,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 
 import java.io.IOException;
 import java.util.List;
@@ -50,9 +52,19 @@ import java.util.List;
  */
 @Configuration
 public class ArtifactIndexConfig {
+  /**
+   * Determines how frequently Solr hard commits are performed. (And
+   * checks for Solr restart lossage.).
+   */
+  public final static String PARAM_SOLR_HARDCOMMTI_INTERVAL =
+    "org.lockss.repo.index.solr.hardCommitInterval";
+  public final static long DEFAULT_SOLR_HARDCOMMTI_INTERVAL =
+    SolrArtifactIndex.DEFAULT_SOLR_HARDCOMMIT_INTERVAL;
+
   private final static L4JLogger log = L4JLogger.getLogger();
 
   private RepositoryServiceProperties repoProps;
+  private SolrArtifactIndex solrIndex;
 
   @Autowired
   public ArtifactIndexConfig(RepositoryServiceProperties repoProps) {
@@ -103,13 +115,14 @@ public class ArtifactIndexConfig {
 
         if (!StringUtil.isNullString(repoProps.getSolrCollectionName())) {
           // Use provided Solr collection name
-          return new SolrArtifactIndex(repoProps.getSolrEndpoint(), repoProps.getSolrCollectionName(), credentials)
+          solrIndex = new SolrArtifactIndex(repoProps.getSolrEndpoint(), repoProps.getSolrCollectionName(), credentials)
               .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
+          return solrIndex;
         }
 
-        return new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials)
+        solrIndex = new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials)
             .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
-
+        return solrIndex;
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);
         log.error(errMsg);
@@ -141,5 +154,29 @@ public class ArtifactIndexConfig {
     }
 
     return null;
+  }
+
+  // Register config callback once ConfigManager has been created.
+  @EventListener
+  public void configMgrCreated(ConfigManager.ConfigManagerCreatedEvent event) {
+    log.debug2("ConfigManagerCreatedEvent triggered");
+    ConfigManager.getConfigManager()
+        .registerConfigurationCallback(new ArtifactIndexConfigCallback());
+  }
+
+  private class ArtifactIndexConfigCallback
+    implements org.lockss.config.Configuration.Callback {
+
+    public void configurationChanged(org.lockss.config.Configuration newConfig,
+                                     org.lockss.config.Configuration oldConfig,
+                                     org.lockss.config.Configuration.Differences changedKeys) {
+
+      if (changedKeys.contains(PARAM_SOLR_HARDCOMMTI_INTERVAL)) {
+        if (solrIndex != null) {
+          solrIndex.setHardCommitInterval(newConfig.getTimeInterval(PARAM_SOLR_HARDCOMMTI_INTERVAL,
+                                                                    DEFAULT_SOLR_HARDCOMMTI_INTERVAL));
+        }
+      }
+    }
   }
 }
