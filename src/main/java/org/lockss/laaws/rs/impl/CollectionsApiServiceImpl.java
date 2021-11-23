@@ -44,6 +44,7 @@ import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.StringUtil;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
@@ -625,10 +626,10 @@ public class CollectionsApiServiceImpl
 
         long end = System.currentTimeMillis();
 
-        log.debug("createArtifact [artifactId: {}, duration: {}, length: {}]",
+        log.debug2("artifactId: {}, duration: {}, length: {}",
             artifact.getId(),
-            end-start,
-            content.getSize());
+            TimeUtil.timeIntervalToString(end-start),
+            StringUtil.sizeToString(content.getSize()));
 
         return new ResponseEntity<>(artifact, HttpStatus.OK);
 
