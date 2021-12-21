@@ -44,6 +44,7 @@ import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.StringUtil;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
@@ -508,10 +509,7 @@ public class CollectionsApiServiceImpl
             .setParsedRequest(parsedRequest);
       }
 
-      log.debug2(
-          "Updating commit status for {} ({} -> {})",
-          artifactid, repo.isArtifactCommitted(collectionid, artifactid), committed
-      );
+      log.debug2("Committing artifact to permanent storage [artifactId: {}]", artifactid);
 
       // Commit the artifact
       Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
@@ -562,6 +560,8 @@ public class CollectionsApiServiceImpl
                                                  String uri,
                                                  MultipartFile content,
                                                  Long collectionDate) {
+
+    long start = System.currentTimeMillis();
 
     String parsedRequest = String.format(
         "collectionid: %s, auid: %s, uri: %s, collectionDate: %s, requestUrl: %s",
@@ -623,6 +623,14 @@ public class CollectionsApiServiceImpl
       try {
         Artifact artifact = repo.addArtifact(artifactData);
         log.debug("Wrote artifact to {}", artifact.getStorageUrl());
+
+        long end = System.currentTimeMillis();
+
+        log.debug2("artifactId: {}, duration: {}, length: {}",
+            artifact.getId(),
+            TimeUtil.timeIntervalToString(end-start),
+            StringUtil.sizeToString(content.getSize()));
+
         return new ResponseEntity<>(artifact, HttpStatus.OK);
 
       } catch (IOException e) {
@@ -637,7 +645,6 @@ public class CollectionsApiServiceImpl
             HttpStatus.INTERNAL_SERVER_ERROR,
             errorMessage, e, parsedRequest);
       }
-
     } catch (IOException e) {
       // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
       // parsing HTTP request. Return a 400 Bad Request response.
@@ -1067,9 +1074,10 @@ public class CollectionsApiServiceImpl
    * artifacts.
    */
   @Override
-  public ResponseEntity<ArtifactPageInfo> getArtifactsAllVersionsAllAus(String collectionid,
+  public ResponseEntity<ArtifactPageInfo> getArtifactsFromAllAus(String collectionid,
                                                                         String url,
                                                                         String urlPrefix,
+                                                                        String versions,
                                                                         Integer limit,
                                                                         String continuationToken) {
 
@@ -1134,10 +1142,12 @@ public class CollectionsApiServiceImpl
         missingIterator = iterator == null;
       }
 
+      ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions);
+
       if (url != null) {
-        artifactIterable = repo.getArtifactsAllVersionsAllAus(collectionid, url);
+        artifactIterable = repo.getArtifactsWithUrlFromAllAus(collectionid, url, artifactVersions);
       } else if (urlPrefix != null) {
-        artifactIterable = repo.getArtifactsWithPrefixAllVersionsAllAus(collectionid, urlPrefix);
+        artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(collectionid, urlPrefix, artifactVersions);
       }
 
       ArtifactContinuationToken responseAct = null;

@@ -72,7 +72,7 @@ paths:
         - collections
       summary: "This endpoint returns the committed artifacts of all versions of a given URL, from a specified
       collection."
-      operationId: getArtifactsAllVersionsAllAus
+      operationId: getArtifactsFromAllAus
       parameters:
         - name: "collectionid"
           in: "path"
@@ -89,6 +89,14 @@ paths:
           required: false
           type: "string"
           description: "The prefix to be matched by the artifact URLs"
+        - name: "versions"
+          in: "query"
+          description: "Versions of the artifacts to return"
+          type: string
+          enum:
+            - all
+            - latest
+          default: all
         - name: "limit"
           in: "query"
           description: "The requested maximum number of artifacts per response"

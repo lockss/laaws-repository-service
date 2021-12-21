@@ -31,7 +31,6 @@
 package org.lockss.laaws.rs.controller;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -48,22 +47,18 @@ import org.junit.Test;
 import org.junit.Ignore;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.core.*;
 import org.lockss.laaws.rs.core.LockssRepository.IncludeContent;
-import org.lockss.laaws.rs.core.LockssRepositoryFactory;
-import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactData;
-import org.lockss.laaws.rs.model.ArtifactSpec;
+import org.lockss.laaws.rs.model.*;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.ConfigurationUtil;
 import org.lockss.test.LockssTestCase4;
 import org.lockss.test.ZeroInputStream;
+import org.lockss.util.PreOrderComparator;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -162,11 +157,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     static class TestLockssRepositoryConfig {
         @Bean
         public LockssRepository createInitializedRepository() throws IOException {
-            LockssRepository repository =
-              LockssRepositoryFactory.createLocalRepository(LockssTestCase4.getTempDir(tmpDirs),
-                                                            COLL1);
-            repository.initRepository();
-            return repository;
+          File stateDir = LockssTestCase4.getTempDir(tmpDirs);
+          File basePath = LockssTestCase4.getTempDir(tmpDirs);
+
+          LockssRepository repository =
+                new LocalLockssRepository(stateDir, basePath, COLL1);
+
+          repository.initRepository();
+
+          return repository;
         }
 
         @Bean
@@ -393,6 +392,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  public void testFromAllAusMethods() throws IOException {
+    testGetArtifactsWithUrlFromAllAus();
+    testGetArtifactsWithUrlPrefixFromAllAus();
+  }
+
   public void testAllNoSideEffect() throws IOException {
     testGetArtifact();
     testGetArtifactData();
@@ -404,8 +408,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testGetAllArtifactsAllVersions();
     testGetAllArtifactsWithPrefixAllVersions();
     testGetArtifactAllVersions();
-    testGetArtifactsAllVersionsAllAus();
-    testGetArtifactsWithPrefixAllVersionsAllAus();
+    testGetArtifactsWithUrlFromAllAus();
+    testGetArtifactsWithUrlPrefixFromAllAus();
     testGetAuIds();
     testGetCollectionIds();
     testIsArtifactCommitted();
@@ -1106,21 +1110,34 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
-  public void testGetArtifactsAllVersionsAllAus() throws IOException {
+  public void testGetArtifactsWithUrlFromAllAus() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
 		      "Null collection id or url",
-		      () -> {repository.getArtifactsAllVersionsAllAus(null, null);});
+		      () -> {repository.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.ALL);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "url",
-		      () -> {repository.getArtifactsAllVersionsAllAus(COLL1, null);});
+		      () -> {repository.getArtifactsWithUrlFromAllAus(COLL1, null, ArtifactVersions.ALL);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "coll",
-		      () -> {repository.getArtifactsAllVersionsAllAus(null, URL1);});
+		      () -> {repository.getArtifactsWithUrlFromAllAus(null, URL1, ArtifactVersions.ALL);});
+
+    assertThrowsMatch(IllegalArgumentException.class,
+        "Null collection id or url",
+        () -> {repository.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.LATEST);});
+    assertThrowsMatch(IllegalArgumentException.class,
+        "url",
+        () -> {repository.getArtifactsWithUrlFromAllAus(COLL1, null, ArtifactVersions.LATEST);});
+    assertThrowsMatch(IllegalArgumentException.class,
+        "coll",
+        () -> {repository.getArtifactsWithUrlFromAllAus(null, URL1, ArtifactVersions.LATEST);});
 
     // Non-existent collection or url
-    assertEmpty(repository.getArtifactsAllVersionsAllAus(NO_COLL, URL1));
-    assertEmpty(repository.getArtifactsAllVersionsAllAus(COLL1, NO_URL));
+    assertEmpty(repository.getArtifactsWithUrlFromAllAus(NO_COLL, URL1, ArtifactVersions.ALL));
+    assertEmpty(repository.getArtifactsWithUrlFromAllAus(COLL1, NO_URL, ArtifactVersions.ALL));
+
+    assertEmpty(repository.getArtifactsWithUrlFromAllAus(NO_COLL, URL1, ArtifactVersions.LATEST));
+    assertEmpty(repository.getArtifactsWithUrlFromAllAus(COLL1, NO_URL, ArtifactVersions.LATEST));
 
     // For each distinct URL in the specs, ask the repo for all artifacts
     // with that URL, check against the specs (sorted by (uri, auid,
@@ -1133,26 +1150,61 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                                  .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
                                  .filter(spec -> spec.getUrl().equals(urlSpec.getUrl()))
                                  .filter(spec -> spec.getCollection().equals(urlSpec.getCollection())),
-                                 repository.getArtifactsAllVersionsAllAus(urlSpec.getCollection(),
-                                                                          urlSpec.getUrl()));
+                                 repository.getArtifactsWithUrlFromAllAus(urlSpec.getCollection(),
+                                                                          urlSpec.getUrl(), ArtifactVersions.ALL));
+
+      ArtifactSpec.assertArtList(repository,
+          committedSpecStream()
+              .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
+              .filter(spec -> spec.getUrl().equals(urlSpec.getUrl()))
+              .filter(spec -> spec.getCollection().equals(urlSpec.getCollection()))
+              .collect(Collectors.groupingBy(
+                  spec -> new ArtifactIdentifier.ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
+                  Collectors.maxBy(Comparator.comparingInt(ArtifactSpec::getVersion))))
+              .values()
+              .stream()
+              .filter(Optional::isPresent)
+              .map(Optional::get)
+              .sorted(
+                  // ArtifactSpec equivalent of ArtifactComparators.BY_URI_BY_AUID_BY_DECREASING_VERSION
+                  Comparator.comparing(ArtifactSpec::getUrl, PreOrderComparator.INSTANCE)
+                      .thenComparing(ArtifactSpec::getAuid)
+                      .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
+              ),
+          repository.getArtifactsWithUrlFromAllAus(urlSpec.getCollection(),
+              urlSpec.getUrl(), ArtifactVersions.LATEST));
     }
   }
 
-  public void testGetArtifactsWithPrefixAllVersionsAllAus() throws IOException {
+  public void testGetArtifactsWithUrlPrefixFromAllAus() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
 		      "Null collection id or prefix",
-		      () -> {repository.getArtifactsWithPrefixAllVersionsAllAus(null, null);});
+		      () -> {repository.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.ALL);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "Null collection id or prefix",
-		      () -> {repository.getArtifactsWithPrefixAllVersionsAllAus(COLL1, null);});
+		      () -> {repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, null, ArtifactVersions.ALL);});
     assertThrowsMatch(IllegalArgumentException.class,
 		      "Null collection id or prefix",
-		      () -> {repository.getArtifactsWithPrefixAllVersionsAllAus(null, URL1);});
+		      () -> {repository.getArtifactsWithUrlPrefixFromAllAus(null, URL1, ArtifactVersions.ALL);});
+
+    // Illegal args
+    assertThrowsMatch(IllegalArgumentException.class,
+        "Null collection id or prefix",
+        () -> {repository.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.LATEST);});
+    assertThrowsMatch(IllegalArgumentException.class,
+        "Null collection id or prefix",
+        () -> {repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, null, ArtifactVersions.LATEST);});
+    assertThrowsMatch(IllegalArgumentException.class,
+        "Null collection id or prefix",
+        () -> {repository.getArtifactsWithUrlPrefixFromAllAus(null, URL1, ArtifactVersions.LATEST);});
 
     // Non-existent collection or url
-    assertEmpty(repository.getArtifactsWithPrefixAllVersionsAllAus(NO_COLL, URL1));
-    assertEmpty(repository.getArtifactsWithPrefixAllVersionsAllAus(COLL1, NO_URL));
+    assertEmpty(repository.getArtifactsWithUrlPrefixFromAllAus(NO_COLL, URL1, ArtifactVersions.ALL));
+    assertEmpty(repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, NO_URL, ArtifactVersions.ALL));
+
+    assertEmpty(repository.getArtifactsWithUrlPrefixFromAllAus(NO_COLL, URL1, ArtifactVersions.LATEST));
+    assertEmpty(repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, NO_URL, ArtifactVersions.LATEST));
 
     // Get all the Artifacts beginning with URL_PREFIX, check agains the specs
     // (sorted by (uri, auid, version), to match ...AllAus())
@@ -1161,14 +1213,53 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                                .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
                                .filter(spec -> spec.getUrl().startsWith(URL_PREFIX))
                                .filter(spec -> spec.getCollection().equals(COLL1)),
-                               repository.getArtifactsWithPrefixAllVersionsAllAus(COLL1, URL_PREFIX));
+                               repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, URL_PREFIX, ArtifactVersions.ALL));
+
+    ArtifactSpec.assertArtList(repository,
+        committedSpecStream()
+            .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
+            .filter(spec -> spec.getUrl().startsWith(URL_PREFIX))
+            .filter(spec -> spec.getCollection().equals(COLL1))
+            .collect(Collectors.groupingBy(
+                spec -> new ArtifactIdentifier.ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
+                Collectors.maxBy(Comparator.comparingInt(ArtifactSpec::getVersion))))
+            .values()
+            .stream()
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .sorted(
+                // ArtifactSpec equivalent of ArtifactComparators.BY_URI_BY_AUID_BY_DECREASING_VERSION
+                Comparator.comparing(ArtifactSpec::getUrl, PreOrderComparator.INSTANCE)
+                    .thenComparing(ArtifactSpec::getAuid)
+                    .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
+            ),
+        repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, URL_PREFIX, ArtifactVersions.LATEST));
 
     // Same with empty prefix
     ArtifactSpec.assertArtList(repository,
                                committedSpecStream()
                                .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
                                .filter(spec -> spec.getCollection().equals(COLL1)),
-                               repository.getArtifactsWithPrefixAllVersionsAllAus(COLL1, ""));
+                               repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, "", ArtifactVersions.ALL));
+
+    ArtifactSpec.assertArtList(repository,
+        committedSpecStream()
+            .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
+            .filter(spec -> spec.getCollection().equals(COLL1))
+            .collect(Collectors.groupingBy(
+                spec -> new ArtifactIdentifier.ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
+                Collectors.maxBy(Comparator.comparingInt(ArtifactSpec::getVersion))))
+            .values()
+            .stream()
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .sorted(
+                // ArtifactSpec equivalent of ArtifactComparators.BY_URI_BY_AUID_BY_DECREASING_VERSION
+                Comparator.comparing(ArtifactSpec::getUrl, PreOrderComparator.INSTANCE)
+                    .thenComparing(ArtifactSpec::getAuid)
+                    .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
+            ),
+        repository.getArtifactsWithUrlPrefixFromAllAus(COLL1, "", ArtifactVersions.LATEST));
   }
 
   public void testGetAuIds() throws IOException {

@@ -18,6 +18,7 @@ public class RepositoryServiceProperties {
 
   // LOCKSS repository properties
   @Value("${repo.spec}") String repoSpec;
+  @Value("${repo.state.dir:/data/state}") String repoStateDir;
 
   // Artifact data store properties
   @Value("${repo.datastore.spec:#{null}}") String datastoreSpec;
@@ -36,6 +37,7 @@ public class RepositoryServiceProperties {
 
   @Value("${repo.index.solr.solrUrl:#{null}}") String solrEndpoint;
   @Value("${repo.index.solr.solrCollection:#{null}}") String solrCollectionName;
+  @Value("${repo.index.solr.hardCommitInterval:15000}") long solrHardCommitInterval;
 
   public String getRepositorySpec() {
     return repoSpec;
@@ -108,6 +110,10 @@ public class RepositoryServiceProperties {
     return solrCollectionName;
   }
 
+  public long getSolrHardCommitInterval() {
+    return solrHardCommitInterval;
+  }
+
   public String getDatastoreSpec() {
     return datastoreSpec.trim().toLowerCase();
   }
@@ -118,5 +124,9 @@ public class RepositoryServiceProperties {
 
   public String getHdfsBaseDir() {
     return hdfsBaseDir;
+  }
+
+  public File getRepositoryStateDir() {
+    return new File(repoStateDir);
   }
 }
