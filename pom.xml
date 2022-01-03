@@ -75,6 +75,12 @@ POSSIBILITY OF SUCH DAMAGE.
 
     <dependency>
       <groupId>org.lockss</groupId>
+      <artifactId>lockss-util-core</artifactId>
+      <version>${version.lockss.lockss-util-core}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.lockss</groupId>
       <artifactId>lockss-spring-bundle</artifactId>
       <version>${version.lockss.lockss-spring-bundle}</version>
     </dependency>
