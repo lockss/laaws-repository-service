@@ -83,6 +83,10 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
       this.repository = null;
   }
 
+  protected boolean wantTempTmpDir() {
+    return true;
+  }
+
   /**
    * Tests the repository readiness.
    */
