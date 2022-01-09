@@ -151,7 +151,7 @@ POSSIBILITY OF SUCH DAMAGE.
         <dependency>
           <groupId>org.skyscreamer</groupId>
           <artifactId>jsonassert</artifactId>
-          <version>1.4.0</version>
+          <version>${version.dependency.jsonassert}</version>
           <scope>test</scope>
           <exclusions>
             <exclusion>
