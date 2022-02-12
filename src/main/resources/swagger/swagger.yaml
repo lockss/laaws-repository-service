@@ -663,15 +663,18 @@ definitions:
         type: "string"
       uri:
         type: "string"
+      sortUri:
+        type: "string"
       version:
         type: "integer"
       committed:
         type: "boolean"
       storageUrl:
         type: "string"
-      originDate:
+      contentLength:
         type: "integer"
-        format: "int64"
+      contentDigest:
+        type: "string"
       collectionDate:
         type: "integer"
         format: "int64"
