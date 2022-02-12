@@ -663,8 +663,6 @@ definitions:
         type: "string"
       uri:
         type: "string"
-      sortUri:
-        type: "string"
       version:
         type: "integer"
       committed:
