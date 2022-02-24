@@ -724,11 +724,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .mapToLong(ArtifactSpec::getContentLength)
             .sum();
 
+        long expTotalWarcSize = repository.auSize(coll, auid).getTotalWarcSize();
+
         AuSize auSize = repository.auSize(coll, auid);
 
         assertEquals((long) expTotalAllVersions, (long) auSize.getTotalAllVersions());
         assertEquals((long) expTotalLatestVersions, (long) auSize.getTotalLatestVersions());
-        assertEquals(-1L, (long) auSize.getTotalWarcSize()); // TODO
+
+        // FIXME: We don't actually remove anything from disk yet so we expect the size to be the same
+        assertEquals(expTotalWarcSize, (long) auSize.getTotalWarcSize());
       }
     }
   }
@@ -845,6 +849,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
 	long expectedTotalAllVersions = auSize1.getTotalAllVersions() - artsize;
   long expectedTotalLatestVersions = auSize1.getTotalLatestVersions() - artsize;
+  long expectedTotalWarcSize = repository.auSize(spec.getCollection(), spec.getAuid()).getTotalWarcSize();
 
   ArtifactSpec newHigh = highestCommittedVerSpec.get(spec.artButVerKey());
 	if (newHigh != null) {
@@ -857,8 +862,10 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       (long)expectedTotalAllVersions, (long)auSize2.getTotalAllVersions());
   assertEquals("AU latest artifact versions size wrong after deleting highest version",
       (long)expectedTotalLatestVersions, (long)auSize2.getTotalLatestVersions());
+
+  // FIXME: We don't actually remove anything from disk yet so we expect the size to be the same
   assertEquals("AU WARC size total wrong after deleting highest version",
-      -1L, (long)auSize2.getTotalWarcSize()); // TODO
+      expectedTotalWarcSize, (long)auSize2.getTotalWarcSize());
       }
     }
     // Delete an uncommitted artifact, it should disappear and size should
