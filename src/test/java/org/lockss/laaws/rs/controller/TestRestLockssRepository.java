@@ -428,6 +428,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testDeleteAllArtifacts();
   }
 
+
   @Test
   public void testConditionalContent() throws IOException {
     String url_small = "https://art/small/";
@@ -708,19 +709,28 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertThrows(LockssRestHttpException.class,
         (Executable) () -> repository.auSize(NO_COLL, NO_AUID));
 
-    // Calculate the expected size of each AU in each collection, compare
-    // with auSize()
+    // Calculate the expected size of each AU in each collection, compare with auSize()
     for (String coll : addedCollections()) {
       for (String auid : addedAuids()) {
-	long expSize = highestCommittedVerSpec.values().stream()
-	  .filter(s -> s.getAuid().equals(auid))
-	  .filter(s -> s.getCollection().equals(coll))
-	  .mapToLong(ArtifactSpec::getContentLength)
-	  .sum();
-	assertEquals(expSize, (long)repository.auSize(coll, auid));
+        long expTotalAllVersions = committedSpecStream()
+            .filter(spec -> spec.getAuid().equals(auid))
+            .filter(spec -> spec.getCollection().equals(coll))
+            .mapToLong(ArtifactSpec::getContentLength)
+            .sum();
+
+        long expTotalLatestVersions = highestCommittedVerSpec.values().stream()
+            .filter(spec -> spec.getAuid().equals(auid))
+            .filter(spec -> spec.getCollection().equals(coll))
+            .mapToLong(ArtifactSpec::getContentLength)
+            .sum();
+
+        AuSize auSize = repository.auSize(coll, auid);
+
+        assertEquals((long) expTotalAllVersions, (long) auSize.getTotalAllVersions());
+        assertEquals((long) expTotalLatestVersions, (long) auSize.getTotalLatestVersions());
+        assertEquals(-1L, (long) auSize.getTotalWarcSize()); // TODO
       }
     }
-
   }
 
   public void testCommitArtifact() throws IOException {
@@ -782,7 +792,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 	.filter(s -> s != highestCommittedVerSpec.get(s.artButVerKey()))
 	.findAny().orElse(null);
       if (spec != null) {
-	long totsize = repository.auSize(spec.getCollection(), spec.getAuid());
+  AuSize auSize1 = repository.auSize(spec.getCollection(), spec.getAuid());
+
   assertNotNull(repository.getArtifactData(spec.getCollection(), spec.getArtifactId()));
 	assertNotNull(getArtifact(repository, spec, false));
 	assertNotNull(getArtifact(repository, spec, true));
@@ -797,10 +808,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 	assertNull(getArtifact(repository, spec, false));
 	assertNull(getArtifact(repository, spec, true));
 	delFromAll(spec);
-	assertEquals("AU size changed after deleting non-highest version",
-		     totsize,
-		     (long)repository.auSize(spec.getCollection(),
-					     spec.getAuid()));
+
+  AuSize auSize2  = repository.auSize(spec.getCollection(), spec.getAuid());
+
+  // Assert totalLatestVersions remains the same but totalAllVersions is different
+	assertEquals("Latest versions size changed after deleting non-highest version",
+      auSize1.getTotalLatestVersions(), auSize2.getTotalLatestVersions());
+  assertNotEquals("All versions size did NOT change after deleting non-highest version",
+      auSize1.getTotalAllVersions(), auSize2.getTotalAllVersions());
+  assertEquals(auSize1.getTotalWarcSize(), auSize2.getTotalWarcSize());
       }
     }
     {
@@ -809,7 +825,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       ArtifactSpec spec = highestCommittedVerSpec.values().stream()
 	.findAny().orElse(null);
       if (spec != null) {
-	long totsize = repository.auSize(spec.getCollection(), spec.getAuid());
+  AuSize auSize1 = repository.auSize(spec.getCollection(), spec.getAuid());
+
 	long artsize = spec.getContentLength();
   assertNotNull(repository.getArtifactData(spec.getCollection(), spec.getArtifactId()));
 	assertNotNull(getArtifact(repository, spec, false));
@@ -825,17 +842,23 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 	assertNull(getArtifact(repository, spec, false));
 	assertNull(getArtifact(repository, spec, true));
 	delFromAll(spec);
-	ArtifactSpec newHigh = highestCommittedVerSpec.get(spec.artButVerKey());
-	long exp = totsize - artsize;
+
+	long expectedTotalAllVersions = auSize1.getTotalAllVersions() - artsize;
+  long expectedTotalLatestVersions = auSize1.getTotalLatestVersions() - artsize;
+
+  ArtifactSpec newHigh = highestCommittedVerSpec.get(spec.artButVerKey());
 	if (newHigh != null) {
-	  exp += newHigh.getContentLength();
+	  expectedTotalLatestVersions += newHigh.getContentLength();
 	}
-	assertEquals("AU size wrong after deleting highest version",
-		     exp,
-		     (long)repository.auSize(spec.getCollection(),
-					     spec.getAuid()));
-	log.info("AU size right after deleting highest version was: "
-		 + totsize + " now " + exp);
+
+  AuSize auSize2 = repository.auSize(spec.getCollection(), spec.getAuid());
+
+	assertEquals("AU all artifact versions size wrong after deleting highest version",
+      (long)expectedTotalAllVersions, (long)auSize2.getTotalAllVersions());
+  assertEquals("AU latest artifact versions size wrong after deleting highest version",
+      (long)expectedTotalLatestVersions, (long)auSize2.getTotalLatestVersions());
+  assertEquals("AU WARC size total wrong after deleting highest version",
+      -1L, (long)auSize2.getTotalWarcSize()); // TODO
       }
     }
     // Delete an uncommitted artifact, it should disappear and size should
@@ -843,8 +866,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     {
       ArtifactSpec uspec = anyUncommittedSpec();
       if (uspec != null) {
-	long totsize =
-	  repository.auSize(uspec.getCollection(), uspec.getAuid());
+  AuSize auSize1 = repository.auSize(uspec.getCollection(), uspec.getAuid());
+
   assertNotNull(repository.getArtifactData(uspec.getCollection(), uspec.getArtifactId()));
 	assertNull(getArtifact(repository, uspec, false));
 	assertNotNull(getArtifact(repository, uspec, true));
@@ -859,10 +882,10 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 	assertNull(getArtifact(repository, uspec, false));
 	assertNull(getArtifact(repository, uspec, true));
 	delFromAll(uspec);
-	assertEquals("AU size changed after deleting uncommitted",
-		     totsize,
-		     (long)repository.auSize(uspec.getCollection(),
-					     uspec.getAuid()));
+
+  AuSize auSize2 = repository.auSize(uspec.getCollection(), uspec.getAuid());
+
+	assertEquals("AU size changed after deleting uncommitted", auSize1, auSize2);
       }
     }
   }

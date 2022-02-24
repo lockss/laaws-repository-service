@@ -601,76 +601,20 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     // Initialize the internal LOCKSS repository
     initInternalLockssRepository();
 
-    //// Assert 400 Bad request if urlPrefix and url provided (should be mutually exclusive)
-    URL endpoint1 =
-        new URL(
-            String.format("http://localhost:%d/collections/collectionId/aus/auid/size?urlPrefix=a&url=b", port));
-
-    // Create a GET request
-    HttpUriRequest request = new HttpGet(endpoint1.toURI());
-
-    // Process request and assert response
-    assertLockssRestHttpException(
-        (Executable) () -> processRequest(request),
-        "arguments are mutually exclusive", HttpStatus.BAD_REQUEST,
-        LockssRestHttpException.ServerErrorType.NONE);
-
-    //// Assert 400 Bad request if version specified without url or urlPrefix
-    URL endpoint2 =
-        new URL(
-            String.format("http://localhost:%d/collections/collectionId/aus/auid/size?version=1", port));
-
-    // Create a GET request
-    HttpUriRequest request2 = new HttpGet(endpoint2.toURI());
-
-    // Process request and assert response
-    assertLockssRestHttpException(
-        (Executable) () -> processRequest(request2),
-        "'version' argument requires a 'url' argument", HttpStatus.BAD_REQUEST,
-        LockssRestHttpException.ServerErrorType.NONE);
-
-    //// Assert 400 Bad request if negative version number
-    URL endpoint3 =
-        new URL(
-            String.format("http://localhost:%d/collections/collectionId/aus/auid/size?version=-1&url=test", port));
-
-    // Create a GET request
-    HttpUriRequest request3 = new HttpGet(endpoint3.toURI());
-
-    // Process request and assert response
-    assertLockssRestHttpException(
-        (Executable) () -> processRequest(request3),
-        "not a positive integer", HttpStatus.BAD_REQUEST,
-        LockssRestHttpException.ServerErrorType.NONE);
-
-    //// Assert 400 Bad request if NaN
-    URL endpoint4 =
-        new URL(
-            String.format("http://localhost:%d/collections/collectionId/aus/auid/size?version=NaN&url=test", port));
-
-    // Create a GET request
-    HttpUriRequest request4 = new HttpGet(endpoint4.toURI());
-
-    // Process request and assert response
-    assertLockssRestHttpException(
-        (Executable) () -> processRequest(request4),
-        "'version' argument is invalid", HttpStatus.BAD_REQUEST,
-        LockssRestHttpException.ServerErrorType.NONE);
-
     //// Assert invalid collection ID
-    URL endpoint5 =
+    URL endpoint =
         new URL(
             String.format("http://localhost:%d/collections/collectionId/aus/auid/size", port));
 
     // Create a GET request
-    HttpUriRequest request5 = new HttpGet(endpoint5.toURI());
+    HttpUriRequest request = new HttpGet(endpoint.toURI());
 
     // Setup mock
     when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
 
     // Process request and assert response
     assertLockssRestHttpException(
-        (Executable) () -> processRequest(request5),
+        () -> processRequest(request),
         "collection does not exist", HttpStatus.NOT_FOUND,
         LockssRestHttpException.ServerErrorType.NONE);
 

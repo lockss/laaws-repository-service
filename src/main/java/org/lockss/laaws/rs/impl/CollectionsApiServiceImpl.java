@@ -1309,102 +1309,28 @@ public class CollectionsApiServiceImpl
    * GET /collections/{collectionid}/aus/{auid}/size:
    * Get the size of Archival Unit artifacts in a collection.
    *
-   * @param collectionid A String with the name of the collection containing the Archival
-   *                     Unit.
+   * @param collectionid A String with the name of the collection containing the Archival Unit.
    * @param auid         A String with the Archival Unit ID (AUID).
-   * @param url          A String with the URL contained by the artifacts.
-   * @param urlPrefix    A String with the prefix to be matched by the artifact URLs.
-   * @param version      An Integer with the version of the URL contained by the artifacts.
-   * @return a Long{@code ResponseEntity<Long>}.
+   * @return a {@link ResponseEntity<AuSize>}.
    */
   @Override
-  public ResponseEntity<Long> getArtifactsSize(String collectionid, String auid,
-                                               String url, String urlPrefix, String version) {
-    String parsedRequest = String.format(
-        "collectionid: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, requestUrl: %s",
-        collectionid, auid, url, urlPrefix, version,
-        ServiceImplUtil.getFullRequestUrl(request));
+  public ResponseEntity<AuSize> getArtifactsSize(String collectionid, String auid) {
+
+    String parsedRequest = String.format("collectionid: %s, auid: %s, requestUrl: %s",
+        collectionid, auid, ServiceImplUtil.getFullRequestUrl(request));
+
     log.debug2("Parsed request: {}", parsedRequest);
 
-    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
-
-      boolean isLatestVersion =
-          version == null || version.toLowerCase().equals("latest");
-
-      boolean isAllVersions =
-          version != null && version.toLowerCase().equals("all");
-
-      if (urlPrefix != null && url != null) {
-        String errorMessage =
-            "The 'urlPrefix' and 'url' arguments are mutually exclusive";
-
-        log.warn(errorMessage);
-        log.warn("Parsed request: {}", parsedRequest);
-
-        throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE,
-            HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
-      }
-
-      boolean isSpecificVersion = !isAllVersions && !isLatestVersion;
-      boolean isAllUrls = url == null && urlPrefix == null;
-
-      if (isSpecificVersion && (isAllUrls || urlPrefix != null)) {
-        String errorMessage =
-            "A specific 'version' argument requires a 'url' argument";
-
-        log.warn(errorMessage);
-        log.warn("Parsed request: {}", parsedRequest);
-
-        throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE,
-            HttpStatus.BAD_REQUEST,
-            errorMessage, parsedRequest);
-      }
-
-      int numericVersion = 0;
-
-      if (isSpecificVersion) {
-        try {
-          numericVersion = Integer.parseInt(version);
-
-          if (numericVersion <= 0) {
-            String errorMessage =
-                "The 'version' argument is not a positive integer";
-
-            log.warn(errorMessage);
-            log.warn("Parsed request: {}", parsedRequest);
-
-            throw new LockssRestServiceException(
-                LockssRestHttpException.ServerErrorType.NONE,
-                HttpStatus.BAD_REQUEST,
-                errorMessage, parsedRequest);
-          }
-        } catch (NumberFormatException nfe) {
-          String errorMessage =
-              "The 'version' argument is invalid";
-
-          log.warn(errorMessage);
-          log.warn("Parsed request: {}", parsedRequest);
-
-          throw new LockssRestServiceException(
-              LockssRestHttpException.ServerErrorType.NONE,
-              HttpStatus.BAD_REQUEST,
-              errorMessage, parsedRequest);
-        }
-      }
-
     try {
-      // Check that the collection exists.
+      // Validate request
+      ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-
-      // Check that the Archival Unit exists.
       validateAuId(collectionid, auid, parsedRequest);
 
-      Long result = repo.auSize(collectionid, auid);
+      // Get and return AU size from internal LOCKSS repository
+      AuSize result = repo.auSize(collectionid, auid);
       log.debug2("result = {}", result);
-      return new ResponseEntity<>(result, HttpStatus.OK);
+      return new ResponseEntity<AuSize>(result, HttpStatus.OK);
     } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get artifacts size";

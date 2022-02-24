@@ -39,10 +39,7 @@ import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactData;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.ArtifactRepositoryState;
+import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.LockssUncheckedException;
@@ -1205,27 +1202,31 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     @Test
     public void testAuSize_empty() throws Exception {
         mockServer.expect(requestTo(String.format("%s/collections/collection1/aus/auid1/size?version=all", BASEURL)))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("0", MediaType.APPLICATION_JSON));
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess("{\"totalAllVersions\":\"0\",\"totalLatestVersions\":\"0\",\"totalWarcSize\":\"0\"}", MediaType.APPLICATION_JSON));
 
-        Long result = repository.auSize("collection1", "auid1");
+        AuSize auSize = repository.auSize("collection1", "auid1");
         mockServer.verify();
 
-        assertNotNull(result);
-        assertEquals(0, result.longValue());
+        assertNotNull(auSize);
+        assertEquals(0L, (long)auSize.getTotalAllVersions());
+        assertEquals(0L, (long)auSize.getTotalLatestVersions());
+        assertEquals(0L, (long)auSize.getTotalWarcSize());
     }
 
     @Test
     public void testAuSize_found() throws Exception {
         mockServer.expect(requestTo(String.format("%s/collections/collection1/aus/auid1/size?version=all", BASEURL)))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("123456", MediaType.APPLICATION_JSON));
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess("{\"totalAllVersions\":\"12345\",\"totalLatestVersions\":\"54321\",\"totalWarcSize\":\"67890\"}", MediaType.APPLICATION_JSON));
 
-        Long result = repository.auSize("collection1", "auid1");
+        AuSize auSize = repository.auSize("collection1", "auid1");
         mockServer.verify();
 
-        assertNotNull(result);
-        assertEquals(123456, result.longValue());
+        assertNotNull(auSize);
+        assertEquals(12345L, (long)auSize.getTotalAllVersions());
+        assertEquals(54321L, (long)auSize.getTotalLatestVersions());
+        assertEquals(67890L, (long)auSize.getTotalWarcSize());
     }
 
     @Test

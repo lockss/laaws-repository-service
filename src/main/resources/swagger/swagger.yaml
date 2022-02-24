@@ -378,10 +378,10 @@ paths:
       operationId: getArtifactsSize
       responses:
         200:
-          description: "The size of the artifacts"
+          description: "Returns an AuSize containing the sizes of all the artifacts, only the latest artifact \
+          version of all URLs, and the sum of the size of all the underlying WARC files, of an AU."
           schema:
-            type: "integer"
-            format: "int64"
+            $ref: "#/definitions/auSize"
         401:
           description: "Unauthorized request"
         403:
@@ -401,21 +401,6 @@ paths:
       required: true
       type: "string"
       description: "Identifier of the Archival Unit containing the artifacts"
-    - name: "url"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The URL contained by the artifacts"
-    - name: "urlPrefix"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The prefix to be matched by the artifact URLs"
-    - name: "version"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The version of the artifact"
   /status:
     get:
       tags:
@@ -652,6 +637,18 @@ definitions:
       pageInfo:
         $ref: "#/definitions/pageInfo"
     description: "A display page of artifacts"
+  auSize:
+    type: "object"
+    properties:
+      totalLatestVersions:
+        type: "integer"
+        format: "int64"
+      totalAllVersions:
+        type: "integer"
+        format: "int64"
+      totalWarcSize:
+        type: "integer"
+        format: "int64"
   artifact:
     type: "object"
     properties:
