@@ -165,6 +165,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
           repository.initRepository();
 
+          internalRepository = (LocalLockssRepository) repository;
+
           return repository;
         }
 
@@ -185,6 +187,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
 
     protected RestLockssRepository repository;
+    protected static LocalLockssRepository internalRepository;
+
 
   // ArtifactSpec for each Artifact that has been added to the repository
   List<ArtifactSpec> addedSpecs = new ArrayList<ArtifactSpec>();
@@ -427,7 +431,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testAllNoSideEffect();
     testDeleteAllArtifacts();
   }
-
 
   @Test
   public void testConditionalContent() throws IOException {
@@ -724,7 +727,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .mapToLong(ArtifactSpec::getContentLength)
             .sum();
 
-        long expTotalWarcSize = repository.auSize(coll, auid).getTotalWarcSize();
+        long expTotalWarcSize = internalRepository.auSize(coll, auid).getTotalWarcSize();
 
         AuSize auSize = repository.auSize(coll, auid);
 
@@ -824,8 +827,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       }
     }
     {
-      // Delete a highest-version committed artifact, it should disappear and
-      // size should change
+      // Delete a committed artifact that isn't the highest version. Latest version
+      // should remain same, but all versions should decrease.
       ArtifactSpec spec = highestCommittedVerSpec.values().stream()
 	.findAny().orElse(null);
       if (spec != null) {
