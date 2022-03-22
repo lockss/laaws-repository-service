@@ -123,6 +123,17 @@ public class ArtifactIndexConfig {
         solrIndex = new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials)
             .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
         return solrIndex;
+
+      case "dispatching":
+        // Create Volatile index
+        ArtifactIndex volatileIndex = new VolatileArtifactIndex();
+
+        // Create Solr index
+        ArtifactIndex solrIndex = createArtifactIndex("solr");
+
+        // Create Dispatching with Solr and Volatile
+        return new DispatchingArtifactIndex(solrIndex, volatileIndex);
+
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);
         log.error(errMsg);

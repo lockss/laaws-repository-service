@@ -32,6 +32,7 @@ package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections4.IterableUtils;
+import org.apache.commons.lang.NotImplementedException;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -250,6 +251,20 @@ public class CollectionsApiServiceImpl
           HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
+  }
+
+  /**
+   * Handles bulk transfer operations for an AUID in a collection. Possible operations are {@code start} and {@code
+   * finish}.
+   *
+   * @param collectionid A {@link String} containing the collection ID of the AUID to operate on.
+   * @param auid A {@link String} containing the AUID to operate on.
+   * @param op A {@link String} with the operation to perform. Must be either {@code start} or {@code finish}.
+   * @return TBD
+   */
+  @Override
+  public ResponseEntity<Void> handleBulkAuOp(String collectionid, String auid, String op) {
+    throw new NotImplementedException();
   }
 
   /**

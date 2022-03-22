@@ -304,6 +304,39 @@ paths:
           type: "string"
           description: "The continuation token of the next page of Archival\
             \ Unit identifiers to be returned"
+  /collections/{collectionid}/aus/{auid}/bulk:
+    post:
+      tags:
+        - collections
+      summary: "Marks the AUID for bulk artifact transfer"
+      description: ""
+      operationId: handleBulkAuOp
+      responses:
+        200:
+          description: "Bulk operation succeeded"
+        401:
+          description: "Unauthorized"
+        403:
+          description: "Client is forbidden from performing bulk operation"
+        404:
+          description: "Collection or AUID not found"
+      parameters:
+        - name: "collectionid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Collection ID containing the AU"
+        - name: "auid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Archival Unit ID"
+        - name: "op"
+          description: "Bulk AU transfer operation"
+          in: "formData"
+          required: true
+          type: string
+          enum: ["start", "finish"]
   /collections/{collectionid}/aus/{auid}/artifacts:
     get:
       tags:
