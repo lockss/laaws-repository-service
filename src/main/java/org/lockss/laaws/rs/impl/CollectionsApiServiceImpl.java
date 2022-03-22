@@ -272,7 +272,7 @@ public class CollectionsApiServiceImpl
 
     switch (op) {
       case "start":
-        index.setBulkStore(collectionid, auid);
+        index.startBulkStore(collectionid, auid);
         break;
 
       case "finish":
