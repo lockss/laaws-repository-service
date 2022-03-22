@@ -32,13 +32,10 @@ package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections4.IterableUtils;
-import org.apache.commons.lang.NotImplementedException;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
-import org.lockss.laaws.rs.core.ArtifactCache;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.core.*;
+import org.lockss.laaws.rs.io.index.DispatchingArtifactIndex;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.*;
 import org.lockss.log.L4JLogger;
@@ -264,7 +261,33 @@ public class CollectionsApiServiceImpl
    */
   @Override
   public ResponseEntity<Void> handleBulkAuOp(String collectionid, String auid, String op) {
-    throw new NotImplementedException();
+
+    String parsedRequest = String.format("collectionid: %s, auid: %s, op: %s, requestUrl: %s",
+        collectionid, auid, op, ServiceImplUtil.getFullRequestUrl(request));
+
+    log.debug2("Parsed request: {}", parsedRequest);
+
+    DispatchingArtifactIndex index =
+        (DispatchingArtifactIndex) ((BaseLockssRepository)repo).getArtifactIndex(); // FIXME
+
+    switch (op) {
+      case "start":
+        index.setBulkStore(collectionid, auid);
+        break;
+
+      case "finish":
+        index.finishBulkStore(collectionid, auid);
+        break;
+
+      default:
+        throw new LockssRestServiceException("Unknown bulk operation")
+            .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+            .setHttpStatus(HttpStatus.BAD_REQUEST)
+            .setServletPath(request.getServletPath())
+            .setParsedRequest(parsedRequest);
+    }
+
+    return new ResponseEntity<>(HttpStatus.OK);
   }
 
   /**
