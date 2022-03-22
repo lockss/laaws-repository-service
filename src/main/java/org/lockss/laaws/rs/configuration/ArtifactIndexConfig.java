@@ -33,6 +33,7 @@ package org.lockss.laaws.rs.configuration;
 import org.lockss.app.LockssApp;
 import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.io.index.DispatchingArtifactIndex;
 import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
