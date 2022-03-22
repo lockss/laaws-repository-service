@@ -61,6 +61,11 @@ POSSIBILITY OF SUCH DAMAGE.
     <build.docker.skip>false</build.docker.skip>
     <build.docker.dockerBuild.servicePort>24610</build.docker.dockerBuild.servicePort>
     <build.docker.dockerBuild.restPort>24610</build.docker.dockerBuild.restPort>
+
+    <!-- Use OpenAPI generator instead of Swagger -->
+    <skipSwagger>true</skipSwagger>
+    <skipSwaggerPostprocess>false</skipSwaggerPostprocess>
+    <skipOpenApi>false</skipOpenApi>
   </properties>
 
   <dependencies>

@@ -44,6 +44,7 @@ import org.lockss.laaws.rs.api.WarcsApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.laaws.rs.model.ArtifactData;
+import org.lockss.laaws.rs.util.FixedInputStreamResource;
 import org.lockss.log.L4JLogger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -173,7 +174,7 @@ public class WarcsApiServiceImpl implements WarcsApiDelegate {
       headers.setContentLength(warcRecordLength);
       log.trace("headers = {}", headers);
 
-      return new ResponseEntity<Resource>(new InputStreamResource(inputStream),
+      return new ResponseEntity<Resource>(new FixedInputStreamResource(inputStream),
 	  headers, HttpStatus.OK);
     } catch (IllegalArgumentException iae) {
       String message =
@@ -216,6 +217,6 @@ public class WarcsApiServiceImpl implements WarcsApiDelegate {
     String result = ServiceImplUtil.toJsonError(status.value(), errorMessage);
     InputStream is =
 	new ByteArrayInputStream(result.getBytes(Charset.forName("UTF-8")));
-    return new ResponseEntity<Resource>(new InputStreamResource(is), status);
+    return new ResponseEntity<Resource>(new FixedInputStreamResource(is), status);
   }
 }

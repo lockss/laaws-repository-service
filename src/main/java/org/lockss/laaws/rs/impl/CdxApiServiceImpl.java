@@ -43,13 +43,18 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+
+import org.apache.http.StatusLine;
 import org.lockss.laaws.rs.api.CdxApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.*;
 import org.archive.wayback.surt.SURTTokenizer;
+import org.lockss.laaws.rs.util.ArtifactConstants;
+import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -531,7 +536,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
    *           repository.
    */
   List<Artifact> getArtifactsSortedByTemporalGap(Iterator<Artifact> artIterator,
-      String closest) throws IOException {
+                                                        String closest) throws IOException {
     log.debug2("closest = {}", closest);
 
     // Convert the passed CDX record timestamp to the one stored in the
@@ -581,7 +586,7 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Initialize the result for this artifact.
     CdxRecord record = new CdxRecord();
 
-    String artifactUrl = artifactData.getIdentifier().getUri();
+    String artifactUrl = artifactData.getUri();
     log.trace("artifactUrl = {}", artifactUrl);
 
     // Set the sort key.
@@ -599,13 +604,18 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     record.setUrl(artifactUrl);
 
     // Set the artifact MIME type.
-    MediaType ctype = artifactData.getMetadata().getContentType();
+    MediaType ctype = MediaType.parseMediaType(artifactData.getContentType());
     if (ctype != null) {
       record.setMimeType(ctype.toString());
     }
 
+    HttpHeaders props = (HttpHeaders) artifactData.getProperties();
+
+    StatusLine sl =
+        ArtifactDataUtil.getStatusLine(props.getFirst(ArtifactConstants.ARTIFACT_HTTP_RESPONSE_STATUS));
+
     // Set the artifact HTTP status.
-    record.setHttpStatus(artifactData.getHttpStatus().getStatusCode());
+    record.setHttpStatus(sl.getStatusCode());
 
     // Set the artifact digest.
     record.setDigest(artifactData.getContentDigest());
@@ -616,11 +626,9 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Set the artifact offset. Each artifact has its own archive.
     record.setOffset(0);
 
-    ArtifactIdentifier artifactIdentifier = artifactData.getIdentifier();
-
     // Set the artifact archive name.
-    record.setArchiveName(ServiceImplUtil.getArtifactArchiveName(
-	artifactIdentifier.getCollection(), artifactIdentifier.getId()));
+    record.setArchiveName(
+        ServiceImplUtil.getArtifactArchiveName(artifactData.getCollection(), artifactData.getId()));
 
     log.debug2("record = {}", record);
     return record;

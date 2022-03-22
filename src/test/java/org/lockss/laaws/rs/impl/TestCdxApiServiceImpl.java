@@ -50,8 +50,12 @@ import org.lockss.laaws.rs.model.ArtifactData;
 import org.lockss.laaws.rs.model.ArtifactIdentifier;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
+import org.lockss.laaws.rs.util.ArtifactConstants;
+import org.lockss.laaws.rs.util.ArtifactDataUtil;
+import org.lockss.laaws.rs.util.FixedInputStreamResource;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
@@ -133,7 +137,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     ArtifactData ad = makeArtifactData("id1", "coll1", "auid1",
 	"url1.example.com", 1, MediaType.TEXT_HTML, 24 * 60 * 60 * 1000);
     ad.setContentDigest("cd1");
-    ad.setContentLength(9876);
+    ad.setContentLength(9876L);
 
     CdxRecord cdxRecord = new CdxApiServiceImpl(null).getCdxRecord(ad);
 
@@ -740,9 +744,14 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
    */
   private ArtifactData makeArtifactData(String id, String collection,
       String auid, String url, Integer version, MediaType contentType,
-      long collectionDate) {
-    ArtifactIdentifier ai =
-	new ArtifactIdentifier(id, collection, auid, url, version);
+      long collectionDate) throws IOException {
+
+//    ArtifactIdentifier ai = new ArtifactIdentifier()
+//        .id(id)
+//        .collection(collection)
+//        .auid(auid)
+//        .uri(url)
+//        .version(version);
 
     HttpHeaders am = new HttpHeaders();
     am.setContentType(contentType);
@@ -761,7 +770,18 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     StatusLine sl =
 	new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, null);
 
-    ArtifactData ad = new ArtifactData(ai, am, is, sl);
+    am.add(ArtifactConstants.ARTIFACT_HTTP_RESPONSE_STATUS,
+        String.valueOf(ArtifactDataUtil.getHttpStatusByteArray(sl)));
+
+    ArtifactData ad = new ArtifactData()
+        .id(id)
+        .collection(collection)
+        .auid(auid)
+        .uri(url)
+        .version(version)
+        .properties(am)
+        .data(new FixedInputStreamResource(is));
+
     ad.setCollectionDate(collectionDate);
 
     return ad;

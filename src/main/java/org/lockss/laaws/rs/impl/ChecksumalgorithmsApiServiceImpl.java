@@ -111,11 +111,6 @@ public class ChecksumalgorithmsApiServiceImpl extends BaseSpringApiServiceImpl
     }
   }
 
-  @Override
-  public Optional<ObjectMapper> getObjectMapper() {
-    return Optional.ofNullable(objectMapper);
-  }
-
   /**
    * Provides the names of the supported checksum algorithms.
    * 

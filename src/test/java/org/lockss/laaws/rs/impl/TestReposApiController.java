@@ -50,7 +50,6 @@ import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.UrlUtil;
-import org.lockss.test.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -62,7 +61,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(CollectionsApiController.class)
-@AutoConfigureMockMvc(secure = false)
+//@AutoConfigureMockMvc(secure = false)
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
 public class TestReposApiController extends SpringLockssTestCase4 {
@@ -393,31 +392,32 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       assertEquals(0, api.getArtifacts().size());
 
       // Add artifacts to the collection that the repository will return.
-      Artifact art1 = new Artifact("test01", collId, auId, "http://u1", 1, true,
+
+      Artifact art1 = generateArtifact("test01", collId, auId, "http://u1", 1, true,
 	  "surl", 1, null);
       artifacts.add(art1);
-      Artifact art2 = new Artifact("test02", collId, auId, "http://u2", 1, true,
+      Artifact art2 = generateArtifact("test02", collId, auId, "http://u2", 1, true,
 	  "surl", 1, null);
       artifacts.add(art2);
-      Artifact art3 = new Artifact("test03", collId, auId, "http://u2/b", 1,
-	  true, "surl", 1, null);
+      Artifact art3 = generateArtifact("test03", collId, auId, "http://u2/b", 1,
+          true, "surl", 1, null);
       artifacts.add(art3);
-      Artifact art4 = new Artifact("test04", collId, auId, "http://u2,a", 1,
+      Artifact art4 = generateArtifact("test04", collId, auId, "http://u2,a", 1,
 	  true, "surl", 1, null);
       artifacts.add(art4);
-      Artifact art5 = new Artifact("test05", collId, auId, "http://u3", 3, true,
+      Artifact art5 = generateArtifact("test05", collId, auId, "http://u3", 3, true,
 	  "surl", 1, null);
       artifacts.add(art5);
-      Artifact art6 = new Artifact("test06", collId, auId, "http://u3", 2, true,
+      Artifact art6 = generateArtifact("test06", collId, auId, "http://u3", 2, true,
 	  "surl", 1, null);
       artifacts.add(art6);
-      Artifact art7 = new Artifact("test07", collId, auId, "http://u4", 8, true,
+      Artifact art7 = generateArtifact("test07", collId, auId, "http://u4", 8, true,
 	  "surl", 1, null);
       artifacts.add(art7);
-      Artifact art8 = new Artifact("test08", collId, auId, "http://u4", 4, true,
+      Artifact art8 = generateArtifact("test08", collId, auId, "http://u4", 4, true,
 	  "surl", 1, null);
       artifacts.add(art8);
-      Artifact art9 = new Artifact("test09", collId, auId, "http://u4", 1, true,
+      Artifact art9 = generateArtifact("test09", collId, auId, "http://u4", 1, true,
 	  "surl", 1, null);
       artifacts.add(art9);
 
@@ -452,6 +452,22 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Test the pagination for all versions with a prefix.
       runUrlPrefixPaginationTest(collId, auId, "http://u", artifacts, mapper);
       log.debug2("Done");
+    }
+
+    @Deprecated
+    private Artifact generateArtifact(String artifactId, String collectionId, String auId, String uri, int version,
+                                      boolean committed, String storageUrl, long contentLength, String contentDigest) {
+
+      return new Artifact()
+          .id(artifactId)
+          .collection(collectionId)
+          .auid(auId)
+          .uri(uri)
+          .version(version)
+          .committed(committed)
+          .storageUrl(storageUrl)
+          .contentLength(contentLength)
+          .contentDigest(contentDigest);
     }
 
     private void runAllVersionsPaginationTest(String collId, String auId,

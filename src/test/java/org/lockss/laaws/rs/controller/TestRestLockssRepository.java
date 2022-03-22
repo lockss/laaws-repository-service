@@ -53,21 +53,24 @@ import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.util.ArtifactConstants;
+import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
-import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.ConfigurationUtil;
 import org.lockss.test.LockssTestCase4;
 import org.lockss.test.ZeroInputStream;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -88,7 +91,7 @@ import java.util.stream.Stream;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @ActiveProfiles("test")
-public class TestRestLockssRepository extends SpringLockssTestCase4 {
+public class TestRestLockssRepository extends LockssTestCase5 {
   private final static L4JLogger log = L4JLogger.getLogger();
 
   protected static int MAX_RANDOM_FILE = 50000;
@@ -235,7 +238,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       .toCommit(true).setContentLength(size);
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
-    spec.assertArtifact(repository, commArt);
+    spec.assertArtifactData(repository, commArt);
   }
 
   @Test
@@ -258,7 +261,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     ArtifactSpec spec = new ArtifactSpec().setUrl("https://mr/ed/").setContent(CONTENT1).setCollectionDate(0);
     Artifact newArt = addUncommitted(spec);
     Artifact commArt = commit(spec, newArt);
-    spec.assertArtifact(repository, commArt);
+    spec.assertArtifactData(repository, commArt);
   }
 
   @Test
@@ -341,7 +344,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       log.info("commArt.getStorageUrl(): " + commArt.getStorageUrl());
     }
 
-    spec.assertArtifact(repository, commArt);
+    spec.assertArtifactData(repository, commArt);
   }
 
   @Test
@@ -353,7 +356,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       .setCollectionDate(0);
     Artifact newArt1 = addUncommitted(spec1);
     Artifact commArt1 = commit(spec1, newArt1);
-    spec1.assertArtifact(repository, commArt1);
+    spec1.assertArtifactData(repository, commArt1);
 
     ArtifactSpec spec2 =
       new ArtifactSpec()
@@ -362,7 +365,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       .setCollectionDate(0);
     Artifact newArt2 = addUncommitted(spec2);
     Artifact commArt2 = commit(spec2, newArt2);
-    spec2.assertArtifact(repository, commArt2);
+    spec2.assertArtifactData(repository, commArt2);
   }
 
   @Test
@@ -502,14 +505,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   void assertReceivesContent(Artifact art, IncludeContent ic)
       throws IOException {
     ArtifactData ad = repository.getArtifactData(art, ic);
-    assertTrue(ad.hasContentInputStream());
+    assertNotNull(ad.getData().getInputStream());
   }
 
   /** Assert that the repo does not supply content with the ArtifactData */
   void assertReceivesNoContent(Artifact art, IncludeContent ic)
       throws IOException {
     ArtifactData ad = repository.getArtifactData(art, ic);
-    assertFalse(ad.hasContentInputStream());
+    assertNull(ad.getData().getInputStream());
   }
 
   public void testGetArtifact() throws IOException {
@@ -530,14 +533,16 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Artifact not found
     for (ArtifactSpec spec : notFoundArtifactSpecs()) {
       log.info("s.b. notfound: " + spec);
-      assertNull("Null or non-existent name shouldn't be found: " + spec,
-		 getArtifact(repository, spec, false));
+//      assertNull("Null or non-existent name shouldn't be found: " + spec,
+//		 getArtifact(repository, spec, false));
+      assertNull(getArtifact(repository, spec, false),
+          "Null or non-existent name shouldn't be found: " + spec);
     }
 
     // Ensure that a no-version retrieval gets the expected highest version
     for (ArtifactSpec highSpec : highestCommittedVerSpec.values()) {
       log.info("highSpec: " + highSpec);
-      highSpec.assertArtifact(repository, repository.getArtifact(
+      highSpec.assertArtifactData(repository, repository.getArtifact(
 	  highSpec.getCollection(),
 	  highSpec.getAuid(),
 	  highSpec.getUrl()));
@@ -651,27 +656,32 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     for (ArtifactSpec spec : neverFoundArtifactSpecs) {
       log.info("s.b. notfound: " + spec);
-      assertNull("Null or non-existent name shouldn't be found: " + spec,
-		 getArtifactVersion(repository, spec, 1, false));
-      assertNull("Null or non-existent name shouldn't be found: " + spec,
-		 getArtifactVersion(repository, spec, 1, true));
-      assertNull("Null or non-existent name shouldn't be found: " + spec,
-		 getArtifactVersion(repository, spec, 2, false));
-      assertNull("Null or non-existent name shouldn't be found: " + spec,
-		 getArtifactVersion(repository, spec, 2, true));
+      assertNull(
+		 getArtifactVersion(repository, spec, 1, false),
+      "Null or non-existent name shouldn't be found: " + spec);
+      assertNull(
+		 getArtifactVersion(repository, spec, 1, true),
+      "Null or non-existent name shouldn't be found: " + spec);
+      assertNull(
+		 getArtifactVersion(repository, spec, 2, false),
+      "Null or non-existent name shouldn't be found: " + spec);
+      assertNull(
+		 getArtifactVersion(repository, spec, 2, true),
+      "Null or non-existent name shouldn't be found: " + spec);
     }
 
     // Get all added artifacts, check correctness
     for (ArtifactSpec spec : addedSpecs) {
-      spec.assertArtifact(repository, getArtifact(repository, spec, true));
+      spec.assertArtifactData(repository, getArtifact(repository, spec, true));
 
       if (spec.isCommitted()) {
 	log.info("s.b. data: " + spec);
-	spec.assertArtifact(repository, getArtifact(repository, spec, false));
+	spec.assertArtifactData(repository, getArtifact(repository, spec, false));
       } else {
 	log.info("s.b. uncommitted: " + spec);
-	assertNull("Uncommitted shouldn't be found: " + spec,
-		   getArtifact(repository, spec, false));
+	assertNull(
+		   getArtifact(repository, spec, false),
+        "Uncommitted shouldn't be found: " + spec);
       }
       // XXXAPI illegal version numbers
       assertNull(getArtifactVersion(repository, spec, 0, false));
@@ -761,7 +771,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       Artifact dupArt = repository.commitArtifact(commSpec.getCollection(),
 						  commSpec.getArtifactId());
       assertEquals(commArt, dupArt);
-      commSpec.assertArtifact(repository, dupArt);
+      commSpec.assertArtifactData(repository, dupArt);
 
       // Get the same artifact when uncommitted may be included.
       commArt = getArtifact(repository, commSpec, true);
@@ -819,10 +829,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   AuSize auSize2  = repository.auSize(spec.getCollection(), spec.getAuid());
 
   // Assert totalLatestVersions remains the same but totalAllVersions is different
-	assertEquals("Latest versions size changed after deleting non-highest version",
-      auSize1.getTotalLatestVersions(), auSize2.getTotalLatestVersions());
-  assertNotEquals("All versions size did NOT change after deleting non-highest version",
-      auSize1.getTotalAllVersions(), auSize2.getTotalAllVersions());
+	assertEquals(
+      auSize1.getTotalLatestVersions(), auSize2.getTotalLatestVersions(),
+        "Latest versions size changed after deleting non-highest version");
+  assertNotEquals(
+      auSize1.getTotalAllVersions(), auSize2.getTotalAllVersions(),
+  "All versions size did NOT change after deleting non-highest version");
   assertEquals(auSize1.getTotalWarcSize(), auSize2.getTotalWarcSize());
       }
     }
@@ -861,14 +873,17 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   AuSize auSize2 = repository.auSize(spec.getCollection(), spec.getAuid());
 
-	assertEquals("AU all artifact versions size wrong after deleting highest version",
-      (long)expectedTotalAllVersions, (long)auSize2.getTotalAllVersions());
-  assertEquals("AU latest artifact versions size wrong after deleting highest version",
-      (long)expectedTotalLatestVersions, (long)auSize2.getTotalLatestVersions());
+	assertEquals(
+      (long)expectedTotalAllVersions, (long)auSize2.getTotalAllVersions(),
+        "AU all artifact versions size wrong after deleting highest version");
+  assertEquals(
+      (long)expectedTotalLatestVersions, (long)auSize2.getTotalLatestVersions(),
+        "AU latest artifact versions size wrong after deleting highest version");
 
   // FIXME: We don't actually remove anything from disk yet so we expect the size to be the same
-  assertEquals("AU WARC size total wrong after deleting highest version",
-      expectedTotalWarcSize, (long)auSize2.getTotalWarcSize());
+  assertEquals(
+      expectedTotalWarcSize, (long)auSize2.getTotalWarcSize(),
+  "AU WARC size total wrong after deleting highest version");
       }
     }
     // Delete an uncommitted artifact, it should disappear and size should
@@ -895,7 +910,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   AuSize auSize2 = repository.auSize(uspec.getCollection(), uspec.getAuid());
 
-	assertEquals("AU size changed after deleting uncommitted", auSize1, auSize2);
+	assertEquals( auSize1, auSize2, "AU size changed after deleting uncommitted");
       }
     }
   }
@@ -1192,7 +1207,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
               .filter(spec -> spec.getUrl().equals(urlSpec.getUrl()))
               .filter(spec -> spec.getCollection().equals(urlSpec.getCollection()))
               .collect(Collectors.groupingBy(
-                  spec -> new ArtifactIdentifier.ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
+                  spec -> new ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
                   Collectors.maxBy(Comparator.comparingInt(ArtifactSpec::getVersion))))
               .values()
               .stream()
@@ -1254,7 +1269,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .filter(spec -> spec.getUrl().startsWith(URL_PREFIX))
             .filter(spec -> spec.getCollection().equals(COLL1))
             .collect(Collectors.groupingBy(
-                spec -> new ArtifactIdentifier.ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
+                spec -> new ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
                 Collectors.maxBy(Comparator.comparingInt(ArtifactSpec::getVersion))))
             .values()
             .stream()
@@ -1280,7 +1295,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
             .filter(spec -> spec.getCollection().equals(COLL1))
             .collect(Collectors.groupingBy(
-                spec -> new ArtifactIdentifier.ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
+                spec -> new ArtifactStem(spec.getCollection(), spec.getAuid(), spec.getUrl()),
                 Collectors.maxBy(Comparator.comparingInt(ArtifactSpec::getVersion))))
             .values()
             .stream()
@@ -1714,10 +1729,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact newArt = repository.addArtifact(ad);
     assertNotNull(newArt);
 
-    spec.assertArtifact(repository, newArt);
+    spec.assertArtifactData(repository, newArt);
     long expVers = expectedVersions(spec);
-    assertEquals("version of " + newArt,
-		 expVers + 1, (int)newArt.getVersion());
+    assertEquals(
+		 expVers + 1, (int)newArt.getVersion(),
+    "version of " + newArt);
     if (spec.getExpVer() >= 0) {
       throw new IllegalStateException("addUncommitted() must be called with unused ArtifactSpec");
     }
@@ -1784,7 +1800,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 					      commArt.getId()));
     assertTrue(commArt.getCommitted());
 
-    spec.assertArtifact(repository, commArt);
+    spec.assertArtifactData(repository, commArt);
 
     Artifact newArt = getArtifact(repository, spec, false);
     assertNotNull(newArt);
@@ -1794,20 +1810,58 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertNotNull(repository.getArtifactData(spec.getCollection(), newArt.getId()));
     // Get the same artifact when uncommitted may be included.
     Artifact newArt2 = getArtifact(repository, spec, true);
-    assertTrue(newArt.equalsExceptStorageUrl(newArt2));
+//    assertTrue(newArt.equalsExceptStorageUrl(newArt2));
+    assertArtifactEqualsExceptStorageUrl(newArt, newArt2);
     return newArt;
+  }
+
+  public void assertArtifactEqualsExceptStorageUrl(Artifact expected, Artifact actual) {
+    assertEquals(expected.getId(), actual.getId());
+    assertEquals(expected.getCollection(), actual.getCollection());
+    assertEquals(expected.getAuid(), actual.getAuid());
+    assertEquals(expected.getUri(), actual.getUri());
+    assertEquals(expected.getVersion(), actual.getVersion());
+    assertEquals(expected.getCommitted(), actual.getCommitted());
+//    assertEquals(expected.getStorageUrl(), actual.getStorageUrl());
+    assertEquals(expected.getContentLength(), actual.getContentLength());
+    assertEquals(expected.getContentDigest(), actual.getContentDigest());
+    assertEquals(expected.getContentType(), actual.getContentType());
+    assertEquals(expected.getCollectionDate(), actual.getCollectionDate());
+    assertEquals(expected.getProperties(), actual.getProperties());
   }
 
   // These should all cause addArtifact to throw NPE 
   protected ArtifactData[] nullPointerArtData = {
-    new ArtifactData(null, null, null),
-    new ArtifactData(null, null, STATUS_LINE_OK), 
-    new ArtifactData(null, stringInputStream(""), null),
-    new ArtifactData(null, stringInputStream(""), STATUS_LINE_OK), 
-    new ArtifactData(HEADERS1, null, null),
-    new ArtifactData(HEADERS1, null, STATUS_LINE_OK), 
-    new ArtifactData(HEADERS1, stringInputStream(""), null), 
-  };    
+    generateArtifactData(null, null, null),
+    generateArtifactData(null, null, STATUS_LINE_OK),
+    generateArtifactData(null, stringInputStream(""), null),
+    generateArtifactData(null, stringInputStream(""), STATUS_LINE_OK),
+    generateArtifactData(HEADERS1, null, null),
+    generateArtifactData(HEADERS1, null, STATUS_LINE_OK),
+    generateArtifactData(HEADERS1, stringInputStream(""), null),
+  };
+
+  /**
+   * Deprecated. Support for old ArtifactData constructor.
+   */
+  @Deprecated
+  private static ArtifactData generateArtifactData(HttpHeaders headers, InputStream is,
+                                                   StatusLine statusLine) {
+    if (headers == null && statusLine != null) {
+      headers = new HttpHeaders();
+    }
+
+    try {
+      headers.add(ArtifactConstants.ARTIFACT_HTTP_RESPONSE_STATUS,
+          String.valueOf(ArtifactDataUtil.getHttpStatusByteArray(statusLine)));
+    } catch (IOException e) {
+      throw new IllegalStateException("Could not generate ArtifactData", e);
+    }
+
+    return new ArtifactData()
+        .properties(headers)
+        .data(new InputStreamResource(is));
+  }
 
   // These describe artifacts that getArtifact() should never find
   protected ArtifactSpec[] neverFoundArtifactSpecs = {

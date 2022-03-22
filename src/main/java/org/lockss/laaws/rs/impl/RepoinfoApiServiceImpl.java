@@ -32,7 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import org.lockss.laaws.rs.api.RepoinfoApiDelegate;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -98,10 +97,5 @@ public class RepoinfoApiServiceImpl extends BaseSpringApiServiceImpl
       throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
 	  errorMessage, e);
     }
-  }
-
-  @Override
-  public Optional<ObjectMapper> getObjectMapper() {
-    return Optional.ofNullable(objectMapper);
   }
 }

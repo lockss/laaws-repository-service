@@ -32,6 +32,8 @@ package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.collections4.IterableUtils;
+import org.apache.http.StatusLine;
+import org.apache.http.message.BasicStatusLine;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -65,6 +67,7 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -312,7 +315,7 @@ public class CollectionsApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link org.lockss.util.rest.multipart.MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifact(String collectionid, String artifactid, String includeContent) {
+  public ResponseEntity<ArtifactData> getArtifact(String collectionid, String artifactid, String includeContent) {
     String parsedRequest = String.format(
         "collectionid: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
         collectionid, artifactid, includeContent, ServiceImplUtil.getFullRequestUrl(request)
@@ -327,16 +330,7 @@ public class CollectionsApiServiceImpl
 
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData = repo.getArtifactData(collectionid, artifactid);
-
-      // Break ArtifactData into multiparts
-      MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
-          artifactData,
-          LockssRepository.IncludeContent.valueOf(includeContent),
-          smallContentThreshold
-      );
-
-      //// Return multiparts response entity
-      return new ResponseEntity<MultiValueMap<String, Object>>(parts, HttpStatus.OK);
+      return new ResponseEntity<ArtifactData>(artifactData, HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
       // Translate to LockssRestServiceException and throw
@@ -368,7 +362,7 @@ public class CollectionsApiServiceImpl
   ) throws IOException {
 
     // Get artifact ID
-    String artifactid = artifactData.getIdentifier().getId();
+    String artifactid = artifactData.getId();
 
     // Holds multipart response parts
     MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
@@ -387,36 +381,42 @@ public class CollectionsApiServiceImpl
       );
     }
 
-    //// Add artifact headers multipart
+    //// Add artifact properties multipart
     {
       // Part's headers
       HttpHeaders partHeaders = new HttpHeaders();
       partHeaders.setContentType(MediaType.APPLICATION_JSON);
 
-      // Add artifact headers multipart
+      HttpHeaders props = new HttpHeaders();
+      props.putAll(artifactData.getProperties());
+
+      // Add artifact properties multipart
       parts.add(
           RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
-          new HttpEntity<>(artifactData.getMetadata(), partHeaders)
+          new HttpEntity<>(props, partHeaders)
       );
     }
 
+    Map<String, List<String>> props = artifactData.getProperties();
+
     //// Add artifact HTTP status multipart if present
-    if (artifactData.getHttpStatus() != null) {
+    if (props.containsKey(ArtifactConstants.ARTIFACT_HTTP_RESPONSE_STATUS)) {
       // Part's headers
       HttpHeaders partHeaders = new HttpHeaders();
       partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
 
+      List<String> statusVals = props.get(ArtifactConstants.ARTIFACT_HTTP_RESPONSE_STATUS);
+      String status = statusVals.get(0);
+
       // Create resource containing HTTP status byte array
       Resource resource = new NamedByteArrayResource(
           artifactid,
-          ArtifactDataUtil.getHttpStatusByteArray(artifactData.getHttpStatus())
-      );
+          status.getBytes(StandardCharsets.UTF_8));
 
       // Add artifact headers multipart
       parts.add(
           RestLockssRepository.MULTIPART_ARTIFACT_HTTP_STATUS,
-          new HttpEntity<>(resource, partHeaders)
-      );
+          new HttpEntity<>(resource, partHeaders));
     }
 
     //// Add artifact content part if requested or if small enough
@@ -430,7 +430,8 @@ public class CollectionsApiServiceImpl
       partHeaders.setContentLength(artifactData.getContentLength());
 
       // Artifact content
-      Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
+//      Resource resource = new NamedInputStreamResource(artifactid, artifactData.getData());
+      Resource resource = artifactData.getData();
 
       // Assemble content part and add to multiparts map
       parts.add(
@@ -447,23 +448,29 @@ public class CollectionsApiServiceImpl
     HttpHeaders headers = new HttpHeaders();
 
     //// Artifact repository ID information headers
-    ArtifactIdentifier id = ad.getIdentifier();
-    headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
-    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getCollection());
-    headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
-    headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
-    headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
+    headers.set(ArtifactConstants.ARTIFACT_ID_KEY, ad.getId());
+    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, ad.getCollection());
+    headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, ad.getAuid());
+    headers.set(ArtifactConstants.ARTIFACT_URI_KEY, ad.getUri());
+    headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(ad.getVersion()));
+
+//    ArtifactRepositoryState state =
+//        repo.getArtifactState(ArtifactIdentifierUtil.from(ad));
+
+    ArtifactRepositoryState state = new ArtifactRepositoryState();
+    state.setDeleted(false);
+    state.setCommitted(ad.getCommitted());
 
     //// Artifact repository state information headers if present
-    if (ad.getArtifactRepositoryState() != null) {
+    if (state != null) {
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-          String.valueOf(ad.getArtifactRepositoryState().getCommitted())
+          String.valueOf(state.getCommitted())
       );
 
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_DELETED,
-          String.valueOf(ad.getArtifactRepositoryState().getDeleted())
+          String.valueOf(state.getDeleted())
       );
     }
 
@@ -556,10 +563,10 @@ public class CollectionsApiServiceImpl
    */
   @Override
   public ResponseEntity<Artifact> createArtifact(String collectionid,
-                                                 String auid,
-                                                 String uri,
-                                                 MultipartFile content,
-                                                 Long collectionDate) {
+                                                        String auid,
+                                                        String uri,
+                                                        Long collectionDate,
+                                                        MultipartFile content) {
 
     long start = System.currentTimeMillis();
 
@@ -608,9 +615,13 @@ public class CollectionsApiServiceImpl
       //// Set ArtifactData properties from the POST request
 
       //TODO: FIX THIS CALL
-      ArtifactIdentifier id =
-          new ArtifactIdentifier(collectionid, auid, uri, 0);
-      artifactData.setIdentifier(id);
+//      ArtifactIdentifier id = new ArtifactIdentifier(collectionid, auid, uri, 0);
+//      artifactData.setIdentifier(id);
+      artifactData
+          .collection(collectionid)
+          .auid(auid)
+          .uri(uri)
+          .version(0);
 
       artifactData.setContentLength(content.getSize());
 
@@ -1582,21 +1593,16 @@ public class CollectionsApiServiceImpl
     log.debug2("uri '{}' is valid.", uri);
   }
 
-  @Override
-  public Optional<ObjectMapper> getObjectMapper() {
-    return Optional.ofNullable(objectMapper);
-  }
-
-  @Override
-  public Optional<HttpServletRequest> getRequest() {
-    return Optional.ofNullable(request);
-  }
+//  @Override
+//  public Optional<HttpServletRequest> getRequest() {
+//    return Optional.ofNullable(request);
+//  }
 
   String artifactKey(String collectionid, String artifactid)
       throws IOException {
     Artifact art = repo.getArtifactFromId(artifactid);
     if (art != null) {
-      return art.makeKey();
+      return ArtifactUtil.makeKey(art);
     } else {
       log.error("Expected artifact not found, can't send invalidate: {}",
           artifactid);
