@@ -133,7 +133,7 @@ public class CollectionsApiServiceImpl
    */
   public static final String PARAM_BULK_INDEX_BATCH_SIZE =
       PREFIX + "bulkIndexBatchSize";
-  public static final long DEFAULT_BULK_INDEX_BATCH_SIZE = 250;
+  public static final int DEFAULT_BULK_INDEX_BATCH_SIZE = 250;
 
   @Autowired
   LockssRepository repo;
@@ -171,7 +171,7 @@ public class CollectionsApiServiceImpl
   private int maxAuidPageSize = DEFAULT_MAX_AUID_PAGESIZE;
   private int defaultAuidPageSize = DEFAULT_DEFAULT_AUID_PAGESIZE;
   private long smallContentThreshold = DEFAULT_SMALL_CONTENT_THRESHOLD;
-  private long bulkIndexBatchSize = DEFAULT_BULK_INDEX_BATCH_SIZE;
+  private int bulkIndexBatchSize = DEFAULT_BULK_INDEX_BATCH_SIZE;
 
   /**
    * Constructor for autowiring.
@@ -212,7 +212,7 @@ public class CollectionsApiServiceImpl
           newConfig.getLong(PARAM_SMALL_CONTENT_THRESHOLD,
               DEFAULT_SMALL_CONTENT_THRESHOLD);
       bulkIndexBatchSize =
-          newConfig.getLong(PARAM_BULK_INDEX_BATCH_SIZE,
+          newConfig.getInt(PARAM_BULK_INDEX_BATCH_SIZE,
               DEFAULT_BULK_INDEX_BATCH_SIZE);
     }
   }
