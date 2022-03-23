@@ -35,6 +35,7 @@ import org.apache.commons.collections4.IterableUtils;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.*;
+import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.DispatchingArtifactIndex;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.util.*;
@@ -267,10 +268,9 @@ public class CollectionsApiServiceImpl
 
     log.debug2("Parsed request: {}", parsedRequest);
 
-    DispatchingArtifactIndex index =
-        (DispatchingArtifactIndex) ((BaseLockssRepository)repo).getArtifactIndex(); // FIXME
-
-    switch (op) {
+    ArtifactIndex index = ((BaseLockssRepository)repo).getArtifactIndex();
+    try {
+      switch (op) {
       case "start":
         index.startBulkStore(collectionid, auid);
         break;
@@ -281,12 +281,21 @@ public class CollectionsApiServiceImpl
 
       default:
         throw new LockssRestServiceException("Unknown bulk operation")
-            .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
-            .setHttpStatus(HttpStatus.BAD_REQUEST)
-            .setServletPath(request.getServletPath())
-            .setParsedRequest(parsedRequest);
-    }
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+          .setHttpStatus(HttpStatus.BAD_REQUEST)
+          .setServletPath(request.getServletPath())
+          .setParsedRequest(parsedRequest);
+      }
+    } catch (IOException e) {
+      String errorMessage = String.format("IOException attempting to start or finish bulk store: %s", auid);
+      log.warn(errorMessage, e);
+      log.warn("Parsed request: {}", parsedRequest);
 
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          errorMessage, e, parsedRequest);
+    }
     return new ResponseEntity<>(HttpStatus.OK);
   }
 
