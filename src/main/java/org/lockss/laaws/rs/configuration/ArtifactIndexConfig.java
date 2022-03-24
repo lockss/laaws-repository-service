@@ -126,14 +126,11 @@ public class ArtifactIndexConfig {
         return solrIndex;
 
       case "dispatching":
-        // Create Volatile index
-        ArtifactIndex volatileIndex = new VolatileArtifactIndex();
-
         // Create Solr index
         ArtifactIndex solrIndex = createArtifactIndex("solr");
 
-        // Create Dispatching with Solr and Volatile
-        return new DispatchingArtifactIndex(solrIndex, volatileIndex);
+        // Create Dispatching with Solr
+        return new DispatchingArtifactIndex(solrIndex);
 
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);

@@ -133,7 +133,7 @@ public class CollectionsApiServiceImpl
    */
   public static final String PARAM_BULK_INDEX_BATCH_SIZE =
       PREFIX + "bulkIndexBatchSize";
-  public static final int DEFAULT_BULK_INDEX_BATCH_SIZE = 250;
+  public static final int DEFAULT_BULK_INDEX_BATCH_SIZE = 1000;
 
   @Autowired
   LockssRepository repo;
@@ -283,10 +283,12 @@ public class CollectionsApiServiceImpl
     try {
       switch (op) {
       case "start":
+        log.debug("startBulkStore({}, {})", collectionid, auid);
         index.startBulkStore(collectionid, auid);
         break;
 
       case "finish":
+        log.debug("finishBulkStore({}, {})", collectionid, auid);
         index.finishBulkStore(collectionid, auid, bulkIndexBatchSize);
         break;
 
