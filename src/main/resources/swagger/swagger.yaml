@@ -701,6 +701,7 @@ definitions:
         type: "string"
       contentLength:
         type: "integer"
+        format: "int64"
       contentDigest:
         type: "string"
       collectionDate:
