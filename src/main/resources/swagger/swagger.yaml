@@ -13,7 +13,7 @@
 #
 # 3. Neither the name of the copyright holder nor the names of its contributors
 # may be used to endorse or promote products derived from this software without
-# specific prior written permission. 
+# specific prior written permission.
 #
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -50,6 +50,8 @@ schemes:
 - "http"
 produces:
 - "application/json"
+security:
+  - basicAuth: []
 paths:
   /collections:
     get:
@@ -217,7 +219,7 @@ paths:
       - "multipart/form-data"
       parameters:
       - name: "committed"
-        in: "formData"
+        in: "query"
         required: true
         type: "boolean"
         description: "New commit status of artifact"
@@ -655,6 +657,10 @@ paths:
           description: Unauthorized
         '500':
           description: Internal Server Error
+securityDefinitions:
+  basicAuth:
+    description: "HTTP Basic Authentication. Works over `HTTP` and `HTTPS`"
+    type: "basic"
 definitions:
   artifactPageInfo:
     type: "object"
