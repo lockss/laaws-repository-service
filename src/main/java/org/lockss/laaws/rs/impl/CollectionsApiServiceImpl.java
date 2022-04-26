@@ -918,10 +918,10 @@ public class CollectionsApiServiceImpl
       }
 
       // Check that the collection exists.
-      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
+//       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
 
-      // Check that the Archival Unit exists.
-      validateAuId(collectionid, auid, parsedRequest);
+//       // Check that the Archival Unit exists.
+//       validateAuId(collectionid, auid, parsedRequest);
 
       Iterable<Artifact> artifactIterable = null;
       List<Artifact> artifacts = new ArrayList<>();

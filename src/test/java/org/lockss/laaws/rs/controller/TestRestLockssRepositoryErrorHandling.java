@@ -538,20 +538,20 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         LockssRestHttpException.ServerErrorType.NONE);
 
     //// Assert invalid collection ID
-    URL endpoint8 = new URL(String.format(
-        "http://localhost:%d/collections/collectionId/aus/auid/artifacts", port));
+//     URL endpoint8 = new URL(String.format(
+//         "http://localhost:%d/collections/collectionId/aus/auid/artifacts", port));
 
-    // Create a GET request
-    HttpUriRequest request8 = new HttpGet(endpoint8.toURI());
+//     // Create a GET request
+//     HttpUriRequest request8 = new HttpGet(endpoint8.toURI());
 
-    // Setup mock
-    when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
+//     // Setup mock
+//     when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
 
-    // Process request and assert response
-    assertLockssRestHttpException(
-        (Executable) () -> processRequest(request8),
-        "collection does not exist", HttpStatus.NOT_FOUND,
-        LockssRestHttpException.ServerErrorType.NONE);
+//     // Process request and assert response
+//     assertLockssRestHttpException(
+//         (Executable) () -> processRequest(request8),
+//         "collection does not exist", HttpStatus.NOT_FOUND,
+//         LockssRestHttpException.ServerErrorType.NONE);
 
     //// Assert invalid AUID
 //    URL endpoint6 =
