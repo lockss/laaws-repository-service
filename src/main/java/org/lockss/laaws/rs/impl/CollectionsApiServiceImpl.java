@@ -35,6 +35,7 @@ package org.lockss.laaws.rs.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.IterableUtils;
+import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.*;
@@ -110,6 +111,15 @@ public class CollectionsApiServiceImpl
   public static final int DEFAULT_MAX_ARTIFACT_PAGESIZE = 2000;
 
   /**
+   * Interval after which unused Artifact iterator continuations will
+   * be discarded.  Change requires restart to take effect.
+   */
+  public static final String PARAM_ARTIFACT_ITERATOR_TIMEOUT =
+    PREFIX + "artifact.iterator.timeout";
+  public static final long DEFAULT_ARTIFACT_ITERATOR_TIMEOUT =
+    48 * TimeUtil.HOUR;
+
+  /**
    * Default number of AUIDs that will be returned in a single (paged)
    * response
    */
@@ -124,6 +134,15 @@ public class CollectionsApiServiceImpl
   public static final String PARAM_MAX_AUID_PAGESIZE =
       PREFIX + "auid.pagesize.max";
   public static final int DEFAULT_MAX_AUID_PAGESIZE = 2000;
+
+  /**
+   * Interval after which unused AUID iterator continuations will
+   * be discarded.  Change requires restart to take effect.
+   */
+  public static final String PARAM_AUID_ITERATOR_TIMEOUT =
+    PREFIX + "auid.iterator.timeout";
+  public static final long DEFAULT_AUID_ITERATOR_TIMEOUT =
+    48 * TimeUtil.HOUR;
 
   /**
    * Largest Artifact content that will be included in a response to a
@@ -147,34 +166,40 @@ public class CollectionsApiServiceImpl
 
   private final HttpServletRequest request;
 
+  // These maps are initialized to normal maps just in case they're
+  // accessed before setConfig() is called and creates the official
+  // PassiveExpiringMaps.  I don't think the service methods here can
+  // be called before the config is loaded, but this is easy insurance
+  // that nothing seriously bad happen if they are.
+
   // The artifact iterators used in pagination.
   private Map<Integer, Iterator<Artifact>> artifactIterators =
       new ConcurrentHashMap<>();
 
-  // Timer callback for an artifact iterator timeout.
-  private TimerQueue.Callback artifactIteratorTimeoutCallback =
-      new TimerQueue.Callback() {
-        public void timerExpired(Object cookie) {
-          artifactIterators.remove((Integer) cookie);
-        }
-      };
-
-  // The archival unit identifier iterators used in pagination.
+  // The auid iterators used in pagination.
   private Map<Integer, Iterator<String>> auidIterators =
       new ConcurrentHashMap<>();
 
-  // Timer callback for an auid iterator timeout.
-  private TimerQueue.Callback auidIteratorTimeoutCallback =
-      new TimerQueue.Callback() {
-        public void timerExpired(Object cookie) {
-          auidIterators.remove((Integer) cookie);
-        }
-      };
+  // Timer callback for periodic removal of timed-out iterator continuations
+  private TimerQueue.Callback iteratorMapTimeout =
+    new TimerQueue.Callback() {
+      public void timerExpired(Object cookie) {
+        timeoutIterators(artifactIterators);
+        timeoutIterators(auidIterators);
+      }
+    };
+
+  private void timeoutIterators(Map map) {
+    // Call isEmpty() for effect - runs removeAllExpired()
+    map.isEmpty();
+  }
 
   private int maxArtifactPageSize = DEFAULT_MAX_ARTIFACT_PAGESIZE;
   private int defaultArtifactPageSize = DEFAULT_DEFAULT_ARTIFACT_PAGESIZE;
+  private long artifactIteratorTimeout = DEFAULT_ARTIFACT_ITERATOR_TIMEOUT;
   private int maxAuidPageSize = DEFAULT_MAX_AUID_PAGESIZE;
   private int defaultAuidPageSize = DEFAULT_DEFAULT_AUID_PAGESIZE;
+  private long auidIteratorTimeout = DEFAULT_AUID_ITERATOR_TIMEOUT;
   private long smallContentThreshold = DEFAULT_SMALL_CONTENT_THRESHOLD;
   private int bulkIndexBatchSize = DEFAULT_BULK_INDEX_BATCH_SIZE;
 
@@ -209,17 +234,38 @@ public class CollectionsApiServiceImpl
               DEFAULT_DEFAULT_ARTIFACT_PAGESIZE);
       maxArtifactPageSize = newConfig.getInt(PARAM_MAX_ARTIFACT_PAGESIZE,
           DEFAULT_MAX_ARTIFACT_PAGESIZE);
+      artifactIteratorTimeout =
+        newConfig.getTimeInterval(PARAM_ARTIFACT_ITERATOR_TIMEOUT,
+                                  DEFAULT_ARTIFACT_ITERATOR_TIMEOUT);
       defaultAuidPageSize = newConfig.getInt(PARAM_DEFAULT_AUID_PAGESIZE,
           DEFAULT_DEFAULT_AUID_PAGESIZE);
       maxAuidPageSize = newConfig.getInt(PARAM_MAX_AUID_PAGESIZE,
           DEFAULT_MAX_AUID_PAGESIZE);
+      auidIteratorTimeout =
+        newConfig.getTimeInterval(PARAM_AUID_ITERATOR_TIMEOUT,
+                                  DEFAULT_AUID_ITERATOR_TIMEOUT);
       smallContentThreshold =
           newConfig.getLong(PARAM_SMALL_CONTENT_THRESHOLD,
               DEFAULT_SMALL_CONTENT_THRESHOLD);
       bulkIndexBatchSize =
           newConfig.getInt(PARAM_BULK_INDEX_BATCH_SIZE,
               DEFAULT_BULK_INDEX_BATCH_SIZE);
+
+      // The first time setConfig() is called, replace the temporary
+      // iterator continuation maps
+      if (!(artifactIterators instanceof PassiveExpiringMap)) {
+        artifactIterators = makeIteratorContinuationMap();
+      }
+      if (!(auidIterators instanceof PassiveExpiringMap)) {
+        auidIterators = makeIteratorContinuationMap();
+      }
+      TimerQueue.schedule(Deadline.in(1 * TimeUtil.HOUR), 1 * TimeUtil.HOUR,
+                          iteratorMapTimeout, null);
     }
+  }
+
+  private Map makeIteratorContinuationMap() {
+    return Collections.synchronizedMap(new PassiveExpiringMap<>(artifactIteratorTimeout));
   }
 
   /**
@@ -964,10 +1010,6 @@ public class CollectionsApiServiceImpl
           // Yes: Get the iterator pointing to the first page of results.
           iterator = artifactIterable.iterator();
 
-          // Set up the iterator timeout.
-          TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
-              artifactIteratorTimeoutCallback, iterator.hashCode());
-
           // Check whether the artifacts provided in a previous response need to
           // be skipped.
           if (missingIterator) {
@@ -1235,10 +1277,6 @@ public class CollectionsApiServiceImpl
           // Yes: Get the iterator pointing to the first page of results.
           iterator = artifactIterable.iterator();
 
-          // Set up the iterator timeout.
-          TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
-              artifactIteratorTimeoutCallback, iterator.hashCode());
-
           // Check whether the artifacts provided in a previous response need to
           // be skipped.
           if (missingIterator) {
@@ -1481,9 +1519,6 @@ public class CollectionsApiServiceImpl
         // Yes: Get the iterator pointing to first page of results.
         iterator = repo.getAuIds(collectionid).iterator();
 
-        // Set up the iterator timeout.
-        TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
-            auidIteratorTimeoutCallback, iterator.hashCode());
       } else {
         // No: Get the iterator (if any) used to provide a previous page of
         // results.
@@ -1497,10 +1532,6 @@ public class CollectionsApiServiceImpl
 
           // Get the iterator pointing to first page of results.
           iterator = repo.getAuIds(collectionid).iterator();
-
-          // Set up the iterator timeout.
-          TimerQueue.schedule(Deadline.in(48 * TimeUtil.HOUR),
-              auidIteratorTimeoutCallback, iterator.hashCode());
 
           // Loop through the auids skipping those already returned through a
           // previous response.
