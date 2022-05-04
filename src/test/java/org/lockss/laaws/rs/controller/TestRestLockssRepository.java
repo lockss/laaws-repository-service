@@ -101,6 +101,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 //   protected static int MAX_RANDOM_FILE = 4000;
 //   protected static int MAX_INCR_FILE = 4000;
 
+  public static AuSize AUSIZE_ZERO = new AuSize();
+  static {
+    AUSIZE_ZERO.setTotalLatestVersions(0L);
+    AUSIZE_ZERO.setTotalAllVersions(0L);
+    AUSIZE_ZERO.setTotalWarcSize(0L);
+  }
+
 
   static boolean WRONG = false;
 
@@ -396,8 +403,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     assertNull(repository.getArtifact(coll, AUID1, URL1));
 
-    assertThrows(LockssRestHttpException.class,
-        (Executable) () -> repository.auSize(coll, AUID1));
+    assertEquals(AUSIZE_ZERO, repository.auSize(coll, AUID1));
 
     assertThrows(
         LockssNoSuchArtifactIdException.class,
@@ -729,8 +735,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 		      () -> {repository.auSize(COLL1, null);});
 
     // non-existent AU
-    assertThrows(LockssRestHttpException.class,
-        (Executable) () -> repository.auSize(NO_COLL, NO_AUID));
+    assertEquals(AUSIZE_ZERO, repository.auSize(NO_COLL, NO_AUID));
 
     // Calculate the expected size of each AU in each collection, compare with auSize()
     for (String coll : addedCollections()) {

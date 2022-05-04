@@ -917,12 +917,6 @@ public class CollectionsApiServiceImpl
         }
       }
 
-      // Check that the collection exists.
-//       ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-
-//       // Check that the Archival Unit exists.
-//       validateAuId(collectionid, auid, parsedRequest);
-
       Iterable<Artifact> artifactIterable = null;
       List<Artifact> artifacts = new ArrayList<>();
       Iterator<Artifact> iterator = null;
@@ -1240,9 +1234,6 @@ public class CollectionsApiServiceImpl
             errorMessage, parsedRequest);
       }
 
-      // Check that the collection exists.
-      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-
       Iterable<Artifact> artifactIterable = null;
       List<Artifact> artifacts = new ArrayList<>();
       Iterator<Artifact> iterator = null;
@@ -1438,8 +1429,6 @@ public class CollectionsApiServiceImpl
     try {
       // Validate request
       ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
-      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-      validateAuId(collectionid, auid, parsedRequest);
 
       // Get and return AU size from internal LOCKSS repository
       AuSize result = repo.auSize(collectionid, auid);
@@ -1503,9 +1492,6 @@ public class CollectionsApiServiceImpl
     }
 
     try {
-      // Check that the collection exists.
-      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-
       List<String> auids = new ArrayList<>();
       AuidContinuationToken responseAct = null;
       Iterator<String> iterator = null;
@@ -1644,33 +1630,6 @@ public class CollectionsApiServiceImpl
   private static Boolean isHttpResponseType(MediaType type) {
     return (APPLICATION_HTTP_RESPONSE.isCompatibleWith(type) && (type
         .getParameters().equals(APPLICATION_HTTP_RESPONSE.getParameters())));
-  }
-
-  private void validateAuId(String collectionid, String auid,
-                            String parsedRequest) throws IOException {
-
-    // XXX Disabled.  It's normal for clients to ask about AUs that haven't
-    // had any content stored in them.  Also, this is likely to trigger
-    // CMEs in VolatileArtifactIndex's iterators in tests and dev env.
-    if (true) return;
-
-    log.debug2("collectionid = '{}'", collectionid);
-    log.debug2("auid = '{}'", auid);
-    log.debug2("parsedRequest = '{}'", parsedRequest);
-
-    if (!StreamSupport.stream(repo.getAuIds(collectionid).spliterator(), false)
-        .anyMatch(name -> auid.equals(name))) {
-      String errorMessage = "The archival unit has no artifacts (possibly because it hasn't been collected yet)";
-      log.warn(errorMessage);
-      log.warn("Parsed request: {}", parsedRequest);
-
-      throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.DATA_ERROR,
-          HttpStatus.NOT_FOUND, errorMessage,
-          parsedRequest);
-    }
-
-    log.debug2("auid '{}' is valid.", auid);
   }
 
   private void validateUri(String uri, String parsedRequest) {

@@ -612,30 +612,6 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     // Setup mock
     when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
 
-    // Process request and assert response
-    assertLockssRestHttpException(
-        () -> processRequest(request),
-        "collection does not exist", HttpStatus.NOT_FOUND,
-        LockssRestHttpException.ServerErrorType.NONE);
-
-    //// Assert invalid AUID
-//    URL endpoint6 =
-//        new URL(
-//            String.format("http://localhost:%d/collections/collectionId/aus/auid/size", port));
-//
-//    // Create a GET request
-//    HttpUriRequest request6 = new HttpGet(endpoint6.toURI());
-//
-//    // Setup mock
-//    when(internalRepo.getCollectionIds()).thenReturn(ListUtil.list("collectionId"));
-//    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(Collections.emptyList());
-//
-//    // Process request and assert response
-//    assertLockssRestHttpException(
-//        (Executable) () -> processRequest(request6),
-//        "archival unit has no artifacts", HttpStatus.NOT_FOUND,
-//        LockssRestHttpException.ServerErrorType.DATA_ERROR);
-
     // Rest mock
     reset(internalRepo);
     initInternalLockssRepository();
@@ -677,19 +653,6 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     assertLockssRestHttpException(
         (Executable) () -> processRequest(request),
         "Invalid continuation token", HttpStatus.BAD_REQUEST,
-        LockssRestHttpException.ServerErrorType.NONE);
-
-    //// Assert non-existant collection ID results in a 404
-    URL endpoint3 =
-        new URL(String.format("http://localhost:%d/collections/collectionId/aus", port));
-
-    HttpUriRequest request3 = new HttpGet(endpoint3.toURI());
-
-    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(Collections.emptyList());
-
-    assertLockssRestHttpException(
-        (Executable) () -> processRequest(request3),
-        "collection does not exist", HttpStatus.NOT_FOUND,
         LockssRestHttpException.ServerErrorType.NONE);
 
     // Reset mock

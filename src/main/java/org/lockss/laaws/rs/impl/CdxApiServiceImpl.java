@@ -128,17 +128,6 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    // Check that the collection exists.
-    try {
-      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-    } catch (IOException e) {
-      String message =
-	  "Cannot validate the collectionid = '" + collectionid + "'";
-      log.error(message, e);
-      return getErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR, message,
-	  e);
-    }
-
     // Validate the pagination.
     ServiceImplUtil.validatePagination(count, startPage, parsedRequest);
 
@@ -252,17 +241,6 @@ public class CdxApiServiceImpl implements CdxApiDelegate {
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
-
-    // Check that the collection exists.
-    try {
-      ServiceImplUtil.validateCollectionId(repo, collectionid, parsedRequest);
-    } catch (Exception e) {
-      String message =
-	  "Cannot validate the collectionid = '" + collectionid + "'";
-      log.error(message, e);
-      return getErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR, message,
-	  e);
-    }
 
     try {
       // Initialize the results.

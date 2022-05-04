@@ -96,44 +96,6 @@ public class ServiceImplUtil {
   }
 
   /**
-   * Verifies that the collection exists.
-   * 
-   * @param repo
-   *          A LockssRepository with the repository.
-   * @param collectionid
-   *          A String with the identifier of the collection.
-   * @param parsedRequest
-   *          A String with the parsed request for diagnostic purposes.
-   * @exception IOException
-   *              if there are problems accessing the repository.
-   */
-  static void validateCollectionId(LockssRepository repo, String collectionid,
-      String parsedRequest) throws IOException {
-    log.debug2("repo = {}, collectionid = {}, parsedRequest = {}", repo,
-	collectionid, parsedRequest);
-
-    log.trace("repo.getCollectionIds().iterator().hasNext() = {}",
-	repo.getCollectionIds().iterator().hasNext());
-
-    for (String collectionInRepository : repo.getCollectionIds()) {
-      log.trace("collectionInRepository = {}", collectionInRepository);
-    }
-
-    if (!StreamSupport.stream(repo.getCollectionIds().spliterator(), false)
-	.anyMatch(name -> collectionid.equals(name))) {
-      String errorMessage = "The collection does not exist";
-      log.warn(errorMessage);
-      log.warn("Parsed request: {}", parsedRequest);
-
-      throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.NOT_FOUND,
-          errorMessage, parsedRequest);
-    }
-
-    log.debug2("collectionid '{}' is valid.", collectionid);
-  }
-
-  /**
    * Validates the pagination request parameters.
    * 
    * @param count
