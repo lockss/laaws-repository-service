@@ -44,7 +44,7 @@ public class DigestFileItemFactory extends DiskFileItemFactory {
    * The threshold above which uploads will be stored on disk.
    */
   private int sizeThreshold = DEFAULT_SIZE_THRESHOLD;
-  public static final int DEFAULT_SIZE_THRESHOLD = 10240;
+  public static final int DEFAULT_SIZE_THRESHOLD = FileUtils.ONE_MB;
 
   /**
    * The directory in which uploaded files will be stored, if stored on disk.
