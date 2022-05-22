@@ -74,6 +74,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.StreamSupport;
 
 /**
@@ -165,6 +166,8 @@ public class CollectionsApiServiceImpl
   private final ObjectMapper objectMapper;
 
   private final HttpServletRequest request;
+
+  private Set<String> bulkAuids = new CopyOnWriteArraySet<>();
 
   // These maps are initialized to normal maps just in case they're
   // accessed before setConfig() is called and creates the official
@@ -335,11 +338,13 @@ public class CollectionsApiServiceImpl
       switch (op) {
       case "start":
         log.debug("startBulkStore({}, {})", collectionid, auid);
+        bulkAuids.add(auid);
         index.startBulkStore(collectionid, auid);
         break;
 
       case "finish":
         log.debug("finishBulkStore({}, {})", collectionid, auid);
+        bulkAuids.remove(auid);
         index.finishBulkStore(collectionid, auid, bulkIndexBatchSize);
         break;
 
@@ -625,8 +630,12 @@ public class CollectionsApiServiceImpl
       // Commit the artifact
       Artifact updatedArtifact = repo.commitArtifact(collectionid, artifactid);
 
-      // Broadcast an cache invalidate signal for this artifact
-      sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit, artifactKey(collectionid, artifactid));
+      // Broadcast a cache invalidate signal for this artifact.
+      // (Unless in bulk mode, where it takes noticeable time and is
+      // unnecessary).
+      if (!bulkAuids.contains(updatedArtifact.getAuid())) {
+        sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit, artifactKey(collectionid, artifactid));
+      }
 
       // Return the updated Artifact
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
