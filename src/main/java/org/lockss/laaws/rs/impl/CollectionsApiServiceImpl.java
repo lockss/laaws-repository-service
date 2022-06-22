@@ -574,12 +574,12 @@ public class CollectionsApiServiceImpl
     if (ad.getArtifactRepositoryState() != null) {
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-          String.valueOf(ad.getArtifactRepositoryState().getCommitted())
+          String.valueOf(ad.getArtifactRepositoryState().isCommitted())
       );
 
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_DELETED,
-          String.valueOf(ad.getArtifactRepositoryState().getDeleted())
+          String.valueOf(ad.getArtifactRepositoryState().isDeleted())
       );
     }
 

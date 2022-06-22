@@ -29,6 +29,7 @@
  */
 package org.lockss.laaws.rs.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
@@ -39,14 +40,18 @@ import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.RestLockssRepository;
 import org.lockss.laaws.rs.impl.CollectionsApiServiceImpl;
-import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.io.storage.warc.ArtifactStateEntry;
+import org.lockss.laaws.rs.model.Artifact;
+import org.lockss.laaws.rs.model.ArtifactData;
+import org.lockss.laaws.rs.model.ArtifactIdentifier;
+import org.lockss.laaws.rs.model.AuSize;
 import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.LockssUncheckedException;
 import org.lockss.util.rest.RestUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
-import org.lockss.spring.test.SpringLockssTestCase4;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -57,7 +62,6 @@ import org.springframework.mock.http.MockHttpOutputMessage;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.ByteArrayInputStream;
@@ -78,6 +82,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
     private final static String BASEURL = "http://localhost:24610";
+    private final static ObjectMapper mapper = new ObjectMapper();
     protected RestLockssRepository repository;
     protected MockRestServiceServer mockServer;
 
@@ -228,6 +233,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	String testData = "hello world";
 
+        String js1 = "{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
+
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
             new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
@@ -235,9 +242,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
-            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"true\"," +
-                "\"deleted\":\"false\"}")
-        );
+            mapper.readValue(js1, ArtifactStateEntry.class));
 
         reference.setContentDigest("test");
         reference.setContentLength(testData.length());
@@ -285,6 +290,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	String testData = "hello world";
 
+        String js1 = "{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"false\",\"deleted\":\"false\"}";
+
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
             new ArtifactIdentifier("artifact1", "collection1", "auid1", "url1", 2),
@@ -292,9 +299,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(testData.getBytes()),
             new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
             new URI("storageUrl1"),
-            new ArtifactRepositoryState("{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"false\"," +
-                "\"deleted\":\"false\"}")
-        );
+            mapper.readValue(js1, ArtifactStateEntry.class));
 
         reference.setContentDigest("test");
         reference.setContentLength(testData.length());
@@ -405,6 +410,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         byte buf[] = new byte[]{};
 
+        String js1 = "{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
+
         Artifact result = repository.addArtifact(
             new ArtifactData(
                 new ArtifactIdentifier("1", "collection1", "auid1", "url1", 2),
@@ -413,10 +420,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 new BasicStatusLine(
                     new ProtocolVersion("protocol1", 4, 5), 3, null),
                 new URI("storageUrl1"),
-                new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
-                    "\"deleted\":\"false\"}")
-            )
-        );
+                mapper.readValue(js1, ArtifactStateEntry.class)));
 
         mockServer.verify();
 
@@ -431,6 +435,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withServerError());
 
+        String js1 = "{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
+
         try {
             repository.addArtifact(
                 new ArtifactData(
@@ -439,10 +445,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     new ByteArrayInputStream(new byte[]{}),
                     new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null),
                     new URI("storageUrl1"),
-                    new ArtifactRepositoryState("{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\"," +
-                        "\"deleted\":\"false\"}")
-                )
-            );
+                    mapper.readValue(js1, ArtifactStateEntry.class)));
 
             fail("Should have thrown IOException");
         } catch (IOException ioe) {}
@@ -506,6 +509,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         BasicStatusLine httpStatus = !isWebCrawl ?
             null : new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
 
+        String js1 = "{\"artifactId\":\"artifact\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
+
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
             new ArtifactIdentifier("artifact", "collection", "auid", "url", 1),
@@ -513,16 +518,14 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             new ByteArrayInputStream(content.getBytes()),
             httpStatus,
             new URI("storageUrl1"),
-            new ArtifactRepositoryState("{\"artifactId\":\"artifact\",\"entryDate\":0,\"committed\":\"true\"," +
-                "\"deleted\":\"false\"}")
-        );
+            mapper.readValue(js1, ArtifactStateEntry.class));
 
         reference.setContentLength(content.length());
         reference.setContentDigest("some made-up hash");
 
         // Convenience variables
         ArtifactIdentifier refId = reference.getIdentifier();
-        ArtifactRepositoryState refRepoMd = reference.getArtifactRepositoryState();
+        ArtifactStateEntry refArtifactState = reference.getArtifactRepositoryState();
 
         // Artifact is small if its size is less than or equal to the threshold
         long includeContentMaxSize = (isSmall == null || isSmall == true) ? content.length() : content.length() - 1;
@@ -576,9 +579,11 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         // Verify artifact repository state
         assertNotNull(result.getArtifactRepositoryState());
-        assertEquals(refRepoMd.getArtifactId(), result.getArtifactRepositoryState().getArtifactId());
-        assertEquals(refRepoMd.getCommitted(), result.getArtifactRepositoryState().getCommitted());
-        assertEquals(refRepoMd.getDeleted(), result.getArtifactRepositoryState().getDeleted());
+        assertEquals(refArtifactState.getArtifactId(), result.getArtifactRepositoryState().getArtifactId());
+
+        // FIXME: ArtifactStateEntry now records ArtifactState
+        assertEquals(refArtifactState.isCommitted(), result.getArtifactRepositoryState().isCommitted());
+        assertEquals(refArtifactState.isDeleted(), result.getArtifactRepositoryState().isDeleted());
 
         // Verify misc. artifact properties
         assertEquals(reference.getContentLength(), result.getContentLength());
