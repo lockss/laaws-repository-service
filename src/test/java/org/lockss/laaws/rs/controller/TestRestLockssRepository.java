@@ -841,13 +841,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 	assertNull(getArtifact(repository, spec, true));
 	delFromAll(spec);
 
-  AuSize auSize2  = repository.auSize(spec.getCollection(), spec.getAuid());
+  AuSize auSize2 = repository.auSize(spec.getCollection(), spec.getAuid());
 
   // Assert totalLatestVersions remains the same but totalAllVersions is different
 	assertEquals("Latest versions size changed after deleting non-highest version",
       auSize1.getTotalLatestVersions(), auSize2.getTotalLatestVersions());
   assertNotEquals("All versions size did NOT change after deleting non-highest version",
       auSize1.getTotalAllVersions(), auSize2.getTotalAllVersions());
+
   assertEquals(auSize1.getTotalWarcSize(), auSize2.getTotalWarcSize());
       }
     }

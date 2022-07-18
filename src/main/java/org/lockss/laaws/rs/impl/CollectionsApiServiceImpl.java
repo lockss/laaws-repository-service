@@ -691,8 +691,7 @@ public class CollectionsApiServiceImpl
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    log.debug(String.format("Adding artifact %s, %s, %s",
-        collectionid, auid, uri));
+    log.debug2("Adding artifact {}, {}, {}", collectionid, auid, uri);
 
     log.trace(String.format("MultipartFile: Type: ArtifactData, Content-type: %s",
         content.getContentType()));
@@ -753,7 +752,7 @@ public class CollectionsApiServiceImpl
       //// Add artifact to internal repository
       try {
         Artifact artifact = repo.addArtifact(artifactData);
-        log.debug("Wrote artifact to {}", artifact.getStorageUrl());
+        log.debug2("Wrote artifact to {}", artifact.getStorageUrl());
 
         long end = System.currentTimeMillis();
 

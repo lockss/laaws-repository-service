@@ -233,7 +233,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	String testData = "hello world";
 
-        String js1 = "{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
+        String js1 = "{\"artifactId\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
@@ -290,7 +290,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	String testData = "hello world";
 
-        String js1 = "{\"artifactId\":\"artifact1\",\"entryDate\":0,\"committed\":\"false\",\"deleted\":\"false\"}";
+        String js1 = "{\"artifactId\": \"test\", \"entryDate\": 1234, \"artifactState\": \"UNCOMMITTED\"}";
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
@@ -410,7 +410,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         byte buf[] = new byte[]{};
 
-        String js1 = "{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
+        String js1 = "{\"artifactId\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
 
         Artifact result = repository.addArtifact(
             new ArtifactData(
@@ -509,7 +509,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         BasicStatusLine httpStatus = !isWebCrawl ?
             null : new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
 
-        String js1 = "{\"artifactId\":\"artifact\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
+        String js1 = "{\"artifactId\": \"artifact\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
