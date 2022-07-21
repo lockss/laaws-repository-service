@@ -75,7 +75,6 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.stream.StreamSupport;
 
 /**
  * Service for accessing the repository artifacts.
@@ -571,15 +570,15 @@ public class CollectionsApiServiceImpl
     headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
 
     //// Artifact repository state information headers if present
-    if (ad.getArtifactRepositoryState() != null) {
+    if (ad.getArtifactState() != null) {
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-          String.valueOf(ad.getArtifactRepositoryState().isCommitted())
+          String.valueOf(ad.getArtifactState().isCommitted())
       );
 
       headers.set(
           ArtifactConstants.ARTIFACT_STATE_DELETED,
-          String.valueOf(ad.getArtifactRepositoryState().isDeleted())
+          String.valueOf(ad.getArtifactState().isDeleted())
       );
     }
 
