@@ -36,6 +36,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
+import org.archive.format.warc.WARCConstants;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.*;
@@ -1663,6 +1664,35 @@ public class CollectionsApiServiceImpl
   @Override
   public Optional<HttpServletRequest> getRequest() {
     return Optional.ofNullable(request);
+  }
+
+  /**
+   * Controller for {@code POST /collections/{collectionId}/archives}.
+   *
+   * Imports the artifacts from an archive into this LOCKSS Repository Service.
+   *
+   * @param collectionId A {@link String} containing the collection ID of the artifacts.
+   * @param auId         A {@link String} containing the AUID of the artifacts.
+   * @param archive A {@link MultipartFile} containing the archive.
+   * @return
+   */
+  @Override
+  public ResponseEntity<ImportStatusPage> addArtifacts(String collectionId, String auId, MultipartFile archive) {
+    log.debug("archive.name = {}", archive.getName());
+    log.debug("archive.origFileName = {}", archive.getOriginalFilename());
+    log.debug("archive.type = {}", archive.getContentType());
+
+    ImportStatusPage statusPage = new ImportStatusPage();
+
+    boolean isCompressed = archive.getOriginalFilename()
+        .endsWith(WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
+
+    try {
+      repo.addArtifacts(collectionId, auId, archive.getInputStream(), isCompressed);
+      return new ResponseEntity<>(statusPage, HttpStatus.OK);
+    } catch (IOException e) {
+      throw new LockssRestServiceException("Error in addArtifacts", e);
+    }
   }
 
   String artifactKey(String collectionid, String artifactid)

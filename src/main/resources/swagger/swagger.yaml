@@ -66,6 +66,43 @@ paths:
             type: "array"
             items:
               type: "string"
+  /collections/{collectionid}/archives:
+    post:
+      tags:
+        - collections
+      summary: "Imports artifacts from an archive"
+      operationId: addArtifacts
+      consumes:
+        - "multipart/form-data"
+      parameters:
+        - name: "collectionid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Collection containing the artifact"
+        - name: "auid"
+          in: "formData"
+          required: true
+          type: "string"
+          description: "Archival Unit ID (AUID) of new artifact"
+        - name: "archive"
+          in: "formData"
+          required: true
+          type: "file"
+          description: "Archive data containing artifacts"
+      responses:
+        201:
+          description: "Archive imported"
+          schema:
+            $ref: "#/definitions/importStatusPage"
+        400:
+          description: "Invalid input"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to create artifacts"
+        502:
+          description: "Internal error creating artifact"
   /collections/{collectionid}/artifacts:
     get:
       tags:
@@ -656,6 +693,34 @@ paths:
         '500':
           description: Internal Server Error
 definitions:
+  importStatusPage:
+    description: "A page of artifact import status information"
+    type: "object"
+    required:
+      - "pageInfo"
+      - "importStatus"
+    properties:
+      pageInfo:
+        $ref: "#/definitions/pageInfo"
+      page:
+        description: "Status of artifacts imported from the archive"
+        type: "array"
+        items:
+          $ref: "#/definitions/importStatus"
+  importStatus:
+    type: "object"
+    properties:
+      artifactId:
+        type: "string"
+      url:
+        type: "string"
+      version:
+        type: "integer"
+      status:
+        type: "string"
+        enum:
+          - "OK"
+          - "ERR"
   artifactPageInfo:
     type: "object"
     required:

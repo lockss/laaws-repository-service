@@ -42,9 +42,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
+import org.archive.format.warc.WARCConstants;
 import org.junit.*;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
+import org.lockss.laaws.rs.api.CollectionsApi;
 import org.lockss.laaws.rs.core.LocalLockssRepository;
 import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
 import org.lockss.laaws.rs.core.LockssRepository;
@@ -73,12 +75,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -262,6 +267,50 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact committed = commit(spec, artifact);
 
     spec.assertArtifact(repository, committed);
+  }
+
+  /**
+   * Test for {@link CollectionsApi#addArtifacts(String, String, MultipartFile)}.
+   */
+  @Test
+  public void testAddArtifacts() throws Exception {
+    String collectionId = "collectionId";
+    String auId = "auId";
+
+    {
+      final String WARC_BLOCK =
+          "HTTP/1.1 200 OK\n" +
+              "Date: Fri, 29 Jul 2022 21:08:40 GMT\n" +
+              "Server: Apache/2.0.54 (Ubuntu)\n" +
+              "Last-Modified: Mon, 16 Jun 2003 22:28:51 GMT\n" +
+              "Accept-Ranges: bytes\n" +
+              "Content-Length: 6\n" +
+              "Content-Type: text/plain\n" +
+              "\n" +
+              "hello";
+
+      final String WARC_RECORD = "WARC/1.0" + WARCConstants.CRLF +
+          "WARC-Record-ID: <urn:uuid:92283950-ef2f-4d72-b224-f54c6ec90bb0>" + WARCConstants.CRLF +
+          "WARC-Target-URI: http://www.lockss.org/example.txt" + WARCConstants.CRLF +
+          "Content-Length: " + WARC_BLOCK.length() + WARCConstants.CRLF +
+          "WARC-Date: 2022-07-29T21:08:40Z" + WARCConstants.CRLF +
+          "WARC-Type: response" + WARCConstants.CRLF +
+//          "WARC-Block-Digest: sha1:UZY6ND6CCHXETFVJD2MSS7ZENMWF7KQ2\n" +
+//          "WARC-Payload-Digest: sha1:CCHXETFVJD2MUZY6ND6SS7ZENMWF7KQ2\n" +
+          "Content-Type: application/http;msgtype=response" + WARCConstants.CRLF +
+          "WARC-Identified-Payload-Type: text/plain" + WARCConstants.CRLF +
+          WARCConstants.CRLF +
+          WARC_BLOCK +
+          WARCConstants.CRLF +
+          WARCConstants.CRLF;
+
+      final String WARC_FILE = WARC_RECORD + WARC_RECORD;
+
+      boolean isCompressed = false;
+      InputStream inputStream = new ByteArrayInputStream(WARC_FILE.getBytes(StandardCharsets.UTF_8));
+
+      repository.addArtifacts(collectionId, auId, inputStream, isCompressed);
+    }
   }
 
   @Test
