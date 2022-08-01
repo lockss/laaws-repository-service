@@ -310,6 +310,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       InputStream inputStream = new ByteArrayInputStream(WARC_FILE.getBytes(StandardCharsets.UTF_8));
 
       repository.addArtifacts(collectionId, auId, inputStream, isCompressed);
+
+      // TODO: Asserts
     }
   }
 

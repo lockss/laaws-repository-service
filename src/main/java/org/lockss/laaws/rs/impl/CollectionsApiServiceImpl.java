@@ -1684,6 +1684,9 @@ public class CollectionsApiServiceImpl
 
     ImportStatusPage statusPage = new ImportStatusPage();
 
+    // FIXME: Use archive.getContentType()
+
+    // FIXME: Use StringUtil.endsWithIgnoreCase()
     boolean isCompressed = archive.getOriginalFilename()
         .endsWith(WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
 
