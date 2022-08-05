@@ -62,6 +62,7 @@ import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MimeType;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.commons.CommonsMultipartFile;
@@ -1666,6 +1667,8 @@ public class CollectionsApiServiceImpl
     return Optional.ofNullable(request);
   }
 
+  private final MediaType APPLICATION_WARC = MediaType.valueOf("application/warc");
+
   /**
    * Controller for {@code POST /collections/{collectionId}/archives}.
    *
@@ -1684,17 +1687,21 @@ public class CollectionsApiServiceImpl
 
     ImportStatusPage statusPage = new ImportStatusPage();
 
-    // FIXME: Use archive.getContentType()
+    MimeType archiveType = MimeType.valueOf(archive.getContentType());
 
-    // FIXME: Use StringUtil.endsWithIgnoreCase()
-    boolean isCompressed = archive.getOriginalFilename()
-        .endsWith(WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
+    if (archiveType.equals(APPLICATION_WARC)) {
+      try {
+        boolean isCompressed = StringUtil.endsWithIgnoreCase(
+            archive.getOriginalFilename(), WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
 
-    try {
-      repo.addArtifacts(collectionId, auId, archive.getInputStream(), isCompressed);
-      return new ResponseEntity<>(statusPage, HttpStatus.OK);
-    } catch (IOException e) {
-      throw new LockssRestServiceException("Error in addArtifacts", e);
+        repo.addArtifacts(collectionId, auId, archive.getInputStream(), isCompressed);
+
+        return new ResponseEntity<>(statusPage, HttpStatus.OK);
+      } catch (IOException e) {
+        throw new LockssRestServiceException("Error adding artifacts from archive", e);
+      }
+    } else {
+      throw new LockssRestServiceException("Archive not supported");
     }
   }
 

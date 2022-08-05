@@ -720,8 +720,9 @@ definitions:
         type: "string"
         enum:
           - "OK"
-          - "ERR"
-      // TODO errMsg:
+          - "ERROR"
+      statusMessage:
+        type: "string"
   artifactPageInfo:
     type: "object"
     required:
