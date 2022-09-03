@@ -42,23 +42,6 @@ import java.io.File;
 
 public class DigestFileItemFactory extends DiskFileItemFactory {
   /**
-   * The threshold above which uploads will be stored on disk.
-   */
-  private int sizeThreshold = DEFAULT_SIZE_THRESHOLD;
-  public static final int DEFAULT_SIZE_THRESHOLD = (int)FileUtils.ONE_MB;
-
-  /**
-   * The directory in which uploaded files will be stored, if stored on disk.
-   */
-  private File repository;
-
-  /**
-   * Default content charset to be used when no explicit charset
-   * parameter is provided by the sender.
-   */
-  private String defaultCharset = DiskFileItem.DEFAULT_CHARSET;
-
-  /**
    * Constructs an unconfigured instance of this class. The resulting factory
    * may be configured by calling the appropriate setter methods.
    */
@@ -77,8 +60,7 @@ public class DigestFileItemFactory extends DiskFileItemFactory {
    *                      exceed the threshold.
    */
   public DigestFileItemFactory(int sizeThreshold, File repository) {
-    this.sizeThreshold = sizeThreshold;
-    this.repository = repository;
+    super(sizeThreshold, repository);
   }
 
   @Override
@@ -86,9 +68,9 @@ public class DigestFileItemFactory extends DiskFileItemFactory {
                              boolean isFormField, String fileName) {
 
     DigestFileItem result = new DigestFileItem(fieldName, contentType,
-        isFormField, fileName, sizeThreshold, repository);
+        isFormField, fileName, getSizeThreshold(), getRepository());
 
-    result.setDefaultCharset(defaultCharset);
+    result.setDefaultCharset(getDefaultCharset());
 
     FileCleaningTracker tracker = getFileCleaningTracker();
 

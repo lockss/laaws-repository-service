@@ -32,14 +32,18 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.impl;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
+import org.apache.commons.io.FileUtils;
 import org.archive.format.warc.WARCConstants;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.CollectionsApiDelegate;
 import org.lockss.laaws.rs.core.*;
+import org.lockss.laaws.rs.core.LockssRepository.ArchiveType;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.index.DispatchingArtifactIndex;
 import org.lockss.laaws.rs.model.*;
@@ -52,8 +56,9 @@ import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.StringUtil;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
+import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.jms.JmsUtil;
-import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.exception.LockssRestHttpException.ServerErrorType;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -147,6 +152,31 @@ public class CollectionsApiServiceImpl
     48 * TimeUtil.HOUR;
 
   /**
+   * Default number of archive import status entries that will be returned
+   * in a single (paged) response
+   */
+  public static final String PARAM_DEFAULT_ARCHIVEIMPORTSTATUS_PAGESIZE =
+      PREFIX + "archiveImportStatus.pagesize.default";
+  public static final int DEFAULT_DEFAULT_ARCHIVEIMPORTSTATUS_PAGESIZE = 1000;
+
+  /**
+   * Max number of archive import status entries that will be returned in a
+   * single (paged) response
+   */
+  public static final String PARAM_MAX_ARCHIVEIMPORTSTATUS_PAGESIZE =
+      PREFIX + "archiveImportStatus.pagesize.max";
+  public static final int DEFAULT_MAX_ARCHIVEIMPORTSTATUS_PAGESIZE = 2000;
+
+  /**
+   * Interval after which unused archive import status iterator continuations
+   * will be discarded.  Change requires restart to take effect.
+   */
+  public static final String PARAM_ARCHIVEIMPORTSTATUS_ITERATOR_TIMEOUT =
+      PREFIX + "archiveImportStatus.iterator.timeout";
+  public static final long DEFAULT_ARCHIVEIMPORTSTATUS_ITERATOR_TIMEOUT =
+      48 * TimeUtil.HOUR;
+
+  /**
    * Largest Artifact content that will be included in a response to a
    * getArtifactData call with includeContent == IF_SMALL
    */
@@ -184,12 +214,17 @@ public class CollectionsApiServiceImpl
   private Map<Integer, Iterator<String>> auidIterators =
       new ConcurrentHashMap<>();
 
+  // The archive import status iterators used in pagination
+  private Map<Integer, Iterator<String>> archiveImportStatusIterators =
+      new ConcurrentHashMap<>();
+
   // Timer callback for periodic removal of timed-out iterator continuations
   private TimerQueue.Callback iteratorMapTimeout =
     new TimerQueue.Callback() {
       public void timerExpired(Object cookie) {
         timeoutIterators(artifactIterators);
         timeoutIterators(auidIterators);
+        timeoutIterators(archiveImportStatusIterators);
       }
     };
 
@@ -204,6 +239,9 @@ public class CollectionsApiServiceImpl
   private int maxAuidPageSize = DEFAULT_MAX_AUID_PAGESIZE;
   private int defaultAuidPageSize = DEFAULT_DEFAULT_AUID_PAGESIZE;
   private long auidIteratorTimeout = DEFAULT_AUID_ITERATOR_TIMEOUT;
+  private int maxArchiveImportStatusPageSize = DEFAULT_MAX_ARCHIVEIMPORTSTATUS_PAGESIZE;
+  private int defaultArchiveImportStatusPageSize = DEFAULT_DEFAULT_ARCHIVEIMPORTSTATUS_PAGESIZE;
+  private long archiveImportStatusIteratorTimeout = DEFAULT_ARCHIVEIMPORTSTATUS_ITERATOR_TIMEOUT;
   private long smallContentThreshold = DEFAULT_SMALL_CONTENT_THRESHOLD;
   private int bulkIndexBatchSize = DEFAULT_BULK_INDEX_BATCH_SIZE;
 
@@ -263,6 +301,9 @@ public class CollectionsApiServiceImpl
       if (!(auidIterators instanceof PassiveExpiringMap)) {
         auidIterators = makeIteratorContinuationMap();
       }
+      if (!(archiveImportStatusIterators instanceof PassiveExpiringMap)) {
+        archiveImportStatusIterators = makeIteratorContinuationMap();
+      }
       TimerQueue.schedule(Deadline.in(1 * TimeUtil.HOUR), 1 * TimeUtil.HOUR,
                           iteratorMapTimeout, null);
     }
@@ -311,7 +352,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          ServerErrorType.DATA_ERROR,
           HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
@@ -351,7 +392,7 @@ public class CollectionsApiServiceImpl
 
       default:
         throw new LockssRestServiceException("Unknown bulk operation")
-          .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+          .setServerErrorType(ServerErrorType.NONE)
           .setHttpStatus(HttpStatus.BAD_REQUEST)
           .setServletPath(request.getServletPath())
           .setParsedRequest(parsedRequest);
@@ -362,7 +403,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          ServerErrorType.APPLICATION_ERROR,
           HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
@@ -400,7 +441,7 @@ public class CollectionsApiServiceImpl
           .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
           .setHttpStatus(HttpStatus.NOT_FOUND)
           .setServletPath(request.getServletPath())
-          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setServerErrorType(ServerErrorType.DATA_ERROR)
           .setParsedRequest(parsedRequest);
 
     } catch (IOException e) {
@@ -412,7 +453,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          ServerErrorType.APPLICATION_ERROR,
           HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
@@ -461,7 +502,7 @@ public class CollectionsApiServiceImpl
           .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
           .setHttpStatus(HttpStatus.NOT_FOUND)
           .setServletPath(request.getServletPath())
-          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setServerErrorType(ServerErrorType.DATA_ERROR)
           .setParsedRequest(parsedRequest);
 
     } catch (IOException e) {
@@ -474,7 +515,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          ServerErrorType.DATA_ERROR,
           HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
@@ -620,7 +661,7 @@ public class CollectionsApiServiceImpl
       if (committed == false) {
         // Not possible to uncommit an artifact
         throw new LockssRestServiceException("Cannot uncommit")
-            .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+            .setServerErrorType(ServerErrorType.NONE)
             .setHttpStatus(HttpStatus.BAD_REQUEST)
             .setServletPath(request.getServletPath())
             .setParsedRequest(parsedRequest);
@@ -647,7 +688,7 @@ public class CollectionsApiServiceImpl
           .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
           .setHttpStatus(HttpStatus.NOT_FOUND)
           .setServletPath(request.getServletPath())
-          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setServerErrorType(ServerErrorType.DATA_ERROR)
           .setParsedRequest(parsedRequest);
 
     } catch (IOException e) {
@@ -659,7 +700,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          ServerErrorType.APPLICATION_ERROR,
           HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
@@ -715,7 +756,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(errorMessage)
-          .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+          .setServerErrorType(ServerErrorType.NONE)
           .setHttpStatus(HttpStatus.BAD_REQUEST)
           .setParsedRequest(parsedRequest);
     }
@@ -772,7 +813,7 @@ public class CollectionsApiServiceImpl
         log.warn("Parsed request: {}", parsedRequest);
 
         throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.DATA_ERROR,
+            ServerErrorType.DATA_ERROR,
             HttpStatus.INTERNAL_SERVER_ERROR,
             errorMessage, e, parsedRequest);
       }
@@ -836,7 +877,7 @@ public class CollectionsApiServiceImpl
       log.warn(message);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.NONE,
+          ServerErrorType.NONE,
           HttpStatus.BAD_REQUEST,
           message, parsedRequest);
     }
@@ -858,7 +899,7 @@ public class CollectionsApiServiceImpl
         log.warn("Parsed request: {}", parsedRequest);
 
         throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -875,7 +916,7 @@ public class CollectionsApiServiceImpl
         log.warn("Parsed request: {}", parsedRequest);
 
         throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -891,7 +932,7 @@ public class CollectionsApiServiceImpl
         log.warn("Parsed request: {}", parsedRequest);
 
         throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -910,7 +951,7 @@ public class CollectionsApiServiceImpl
             log.warn("Parsed request: {}", parsedRequest);
 
             throw new LockssRestServiceException(
-                LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+                ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
                 errorMessage, parsedRequest);
           }
         } catch (NumberFormatException nfe) {
@@ -921,7 +962,7 @@ public class CollectionsApiServiceImpl
           log.warn("Parsed request: {}", parsedRequest);
 
           throw new LockssRestServiceException(
-              LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+              ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
               errorMessage, parsedRequest);
         }
       }
@@ -1000,7 +1041,7 @@ public class CollectionsApiServiceImpl
         log.warn("Parsed request: {}", parsedRequest);
 
         throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1173,7 +1214,7 @@ public class CollectionsApiServiceImpl
 
     } catch (IOException e) {
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+          ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
           "IOException", e, parsedRequest);
     }
   }
@@ -1225,7 +1266,7 @@ public class CollectionsApiServiceImpl
       log.warn(message);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.NONE,
+          ServerErrorType.NONE,
           HttpStatus.BAD_REQUEST,
           message, parsedRequest);
     }
@@ -1239,7 +1280,7 @@ public class CollectionsApiServiceImpl
         log.warn("Parsed request: {}", parsedRequest);
 
         throw new LockssRestServiceException(
-            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
             errorMessage, parsedRequest);
       }
 
@@ -1414,7 +1455,7 @@ public class CollectionsApiServiceImpl
 
     } catch (IOException e) {
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+          ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
           "IOException", e, parsedRequest);
     }
   }
@@ -1451,7 +1492,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+          ServerErrorType.APPLICATION_ERROR,
           HttpStatus.INTERNAL_SERVER_ERROR,
           errorMessage, e, parsedRequest);
     }
@@ -1494,7 +1535,7 @@ public class CollectionsApiServiceImpl
       log.warn(message);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.NONE,
+          ServerErrorType.NONE,
           HttpStatus.BAD_REQUEST,
           message,
           parsedRequest);
@@ -1650,7 +1691,7 @@ public class CollectionsApiServiceImpl
       log.warn("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
           errorMessage, parsedRequest);
     }
 
@@ -1670,22 +1711,60 @@ public class CollectionsApiServiceImpl
   private final MediaType APPLICATION_WARC = MediaType.valueOf("application/warc");
 
   /**
-   * Controller for {@code POST /collections/{collectionId}/archives}.
+   * Controller for {@code GET /collections/{collectionId}/archives}.
    *
+   * @param collectionId A {@link String} containing the collection ID of the artifacts.
+   * @param archive A {@link String} containing the archive name.
+   * @param continuationToken A String with the continuation token of the next
+   *                          page of archive import status information to be returned.
+   * @return A {@link ImportStatusPage} containing a page of archive import status information.
+   */
+  public ResponseEntity<ImportStatusPage> getArchiveImportStatus(String collectionId, String archive,
+                                                                 String continuationToken) {
+
+    PageInfo pageInfo = new PageInfo();
+    // TODO pageInfo.setResultsPerPage();
+
+    // Get the current link.
+    StringBuffer curLinkBuffer = request.getRequestURL();
+
+    if (request.getQueryString() != null
+        && !request.getQueryString().trim().isEmpty()) {
+      curLinkBuffer.append("?").append(request.getQueryString());
+    }
+
+    String curLink = curLinkBuffer.toString();
+    log.trace("curLink = {}", curLink);
+
+    pageInfo.setCurLink(curLink);
+
+    ImportStatusPage page = new ImportStatusPage();
+    page.setPageInfo(pageInfo);
+//    page.setPage(importStatusEntries);
+
+    return new ResponseEntity<>(page, HttpStatus.OK);
+  }
+
+  /**
+   * Controller for {@code POST /collections/{collectionId}/archives}.
+   * <p>
    * Imports the artifacts from an archive into this LOCKSS Repository Service.
    *
    * @param collectionId A {@link String} containing the collection ID of the artifacts.
    * @param auId         A {@link String} containing the AUID of the artifacts.
-   * @param archive A {@link MultipartFile} containing the archive.
+   * @param archive      A {@link MultipartFile} containing the archive.
    * @return
    */
   @Override
-  public ResponseEntity<ImportStatusPage> addArtifacts(String collectionId, String auId, MultipartFile archive) {
+  public ResponseEntity<Resource> addArtifacts(String collectionId, String auId, MultipartFile archive) {
     log.debug("archive.name = {}", archive.getName());
     log.debug("archive.origFileName = {}", archive.getOriginalFilename());
     log.debug("archive.type = {}", archive.getContentType());
 
-    ImportStatusPage statusPage = new ImportStatusPage();
+    String parsedRequest = String.format("collectionId: %s, auId: %s, requestUrl: %s",
+        collectionId, auId, ServiceImplUtil.getFullRequestUrl(request));
+
+    log.debug2("Parsed request: {}", parsedRequest);
 
     MimeType archiveType = MimeType.valueOf(archive.getContentType());
 
@@ -1694,14 +1773,41 @@ public class CollectionsApiServiceImpl
         boolean isCompressed = StringUtil.endsWithIgnoreCase(
             archive.getOriginalFilename(), WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
 
-        repo.addArtifacts(collectionId, auId, archive.getInputStream(), isCompressed);
+        Iterable<ImportStatus> result =
+            repo.addArtifacts(collectionId, auId, archive.getInputStream(),
+                ArchiveType.WARC, isCompressed);
 
-        return new ResponseEntity<>(statusPage, HttpStatus.OK);
+        try (DeferredTempFileOutputStream out =
+                 new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
+
+          ObjectMapper objMapper = new ObjectMapper();
+          objMapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+          ObjectWriter objWriter = objMapper.writerFor(ImportStatus.class);
+
+          // Write result to temporary file
+          for (ImportStatus status : result) {
+            objWriter.writeValue(out, status);
+          }
+
+          out.flush();
+
+          // Set Content-Length of file
+          HttpHeaders headers = new HttpHeaders();
+          headers.setContentLength(out.getByteCount());
+
+          // Return result as a Resource
+          Resource jsonResult = new NamedInputStreamResource("result", out.getDeleteOnCloseInputStream());
+          return new ResponseEntity<>(jsonResult, headers, HttpStatus.OK);
+        }
       } catch (IOException e) {
-        throw new LockssRestServiceException("Error adding artifacts from archive", e);
+        String errorMessage = "Error adding artifacts from archive";
+        throw new LockssRestServiceException(ServerErrorType.APPLICATION_ERROR,
+            HttpStatus.INTERNAL_SERVER_ERROR, errorMessage, parsedRequest);
       }
     } else {
-      throw new LockssRestServiceException("Archive not supported");
+      String errorMessage = "Archive not supported";
+      throw new LockssRestServiceException(ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST, errorMessage, parsedRequest);
     }
   }
 
@@ -1814,7 +1920,7 @@ public class CollectionsApiServiceImpl
       log.warn(message);
 
       throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
           message, parsedRequest);
     }
 

@@ -36,6 +36,7 @@ import org.apache.commons.io.FileUtils;
 import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.multipart.DigestMultipartResolver;
 import org.lockss.log.L4JLogger;
+import org.lockss.util.io.FileUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,6 +59,12 @@ public class RepositoryServiceSpringConfig {
   /** Max size of in-memory buffering of multipart requests */
   public static String PARAM_MULTIPART_MAX_IN_MEMORY_SIZE =
     org.lockss.config.Configuration.PREFIX + "spring.multipart.maxInMemorySize";
+
+  public static String DEFAULT_MULTIPART_UPLOAD_DIR = "repo-server";
+
+  public static String PARAM_MULTIPART_UPLOAD_DIR =
+      org.lockss.config.Configuration.PREFIX + "spring.multipart.uploadDir";
+
   public static final int DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE =
     4 * (int)FileUtils.ONE_MB;
 
@@ -89,8 +96,13 @@ public class RepositoryServiceSpringConfig {
     public void configurationChanged(org.lockss.config.Configuration newConfig,
 				     org.lockss.config.Configuration oldConfig,
 				     org.lockss.config.Configuration.Differences changedKeys) {
-      if (changedKeys.contains(ConfigManager.PARAM_TMPDIR)) {
-	File tmpdir = ConfigManager.getConfigManager().getTmpDir();
+
+      if (changedKeys.contains(ConfigManager.PARAM_TMPDIR) ||
+          changedKeys.contains(PARAM_MULTIPART_UPLOAD_DIR)) {
+
+        String uploadDir = newConfig.get(PARAM_MULTIPART_UPLOAD_DIR, DEFAULT_MULTIPART_UPLOAD_DIR);
+        File tmpdir = new File(ConfigManager.getConfigManager().getTmpDir(), uploadDir);
+
 	try {
 	  log.debug("Setting CommonsMultipartResolver tmpdir to {}", tmpdir);
 	  cmResolver.setUploadTempDir(new FileSystemResource(tmpdir));

@@ -66,6 +66,39 @@ paths:
             type: "array"
             items:
               type: "string"
+  /collections/{collectionid}/archives/{archive}:
+    get:
+      tags:
+        - collections
+      summary: "Returns the import status of artifacts from an archive"
+      operationId: getArchiveImportStatus
+      parameters:
+        - name: "collectionId"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Collection containing the artifact"
+        - name: "archive"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Name of the archive"
+        - name: "continuationToken"
+          in: "query"
+          required: false
+          type: "string"
+          description: "The continuation token for next page of artifacts to"
+      responses:
+        200:
+          description: "A page of archive import status information"
+          schema:
+            $ref: "#/definitions/importStatusPage"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to view archive import status"
+        500:
+          description: "Internal error"
   /collections/{collectionid}/archives:
     post:
       tags:
@@ -94,7 +127,7 @@ paths:
         201:
           description: "Archive imported"
           schema:
-            $ref: "#/definitions/importStatusPage"
+            type: file
         400:
           description: "Invalid input"
         401:
@@ -710,12 +743,15 @@ definitions:
   importStatus:
     type: "object"
     properties:
-      artifactId:
+      warcId:
         type: "string"
+      offset:
+        type: "integer"
+        format: "int64"
       url:
         type: "string"
-      version:
-        type: "integer"
+      artifactId:
+        type: "string"
       status:
         type: "string"
         enum:
