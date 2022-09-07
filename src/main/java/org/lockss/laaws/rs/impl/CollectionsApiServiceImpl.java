@@ -77,6 +77,7 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -1773,31 +1774,32 @@ public class CollectionsApiServiceImpl
         boolean isCompressed = StringUtil.endsWithIgnoreCase(
             archive.getOriginalFilename(), WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
 
-        Iterable<ImportStatus> result =
-            repo.addArtifacts(collectionId, auId, archive.getInputStream(),
-                ArchiveType.WARC, isCompressed);
+        try (InputStream input = archive.getInputStream()) {
+          Iterable<ImportStatus> result =
+              repo.addArtifacts(collectionId, auId, input, ArchiveType.WARC, isCompressed);
 
-        try (DeferredTempFileOutputStream out =
-                 new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
+          try (DeferredTempFileOutputStream out =
+                   new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
 
-          ObjectMapper objMapper = new ObjectMapper();
-          objMapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
-          ObjectWriter objWriter = objMapper.writerFor(ImportStatus.class);
+            ObjectMapper objMapper = new ObjectMapper();
+            objMapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
+            ObjectWriter objWriter = objMapper.writerFor(ImportStatus.class);
 
-          // Write result to temporary file
-          for (ImportStatus status : result) {
-            objWriter.writeValue(out, status);
+            // Write result to temporary file
+            for (ImportStatus status : result) {
+              objWriter.writeValue(out, status);
+            }
+
+            out.flush();
+
+            // Set Content-Length of file
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentLength(out.getByteCount());
+
+            // Return result as a Resource
+            Resource jsonResult = new NamedInputStreamResource("result", out.getDeleteOnCloseInputStream());
+            return new ResponseEntity<>(jsonResult, headers, HttpStatus.OK);
           }
-
-          out.flush();
-
-          // Set Content-Length of file
-          HttpHeaders headers = new HttpHeaders();
-          headers.setContentLength(out.getByteCount());
-
-          // Return result as a Resource
-          Resource jsonResult = new NamedInputStreamResource("result", out.getDeleteOnCloseInputStream());
-          return new ResponseEntity<>(jsonResult, headers, HttpStatus.OK);
         }
       } catch (IOException e) {
         String errorMessage = "Error adding artifacts from archive";
