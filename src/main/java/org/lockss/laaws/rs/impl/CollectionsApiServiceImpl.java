@@ -1712,41 +1712,6 @@ public class CollectionsApiServiceImpl
   private final MediaType APPLICATION_WARC = MediaType.valueOf("application/warc");
 
   /**
-   * Controller for {@code GET /collections/{collectionId}/archives}.
-   *
-   * @param collectionId A {@link String} containing the collection ID of the artifacts.
-   * @param archive A {@link String} containing the archive name.
-   * @param continuationToken A String with the continuation token of the next
-   *                          page of archive import status information to be returned.
-   * @return A {@link ImportStatusPage} containing a page of archive import status information.
-   */
-  public ResponseEntity<ImportStatusPage> getArchiveImportStatus(String collectionId, String archive,
-                                                                 String continuationToken) {
-
-    PageInfo pageInfo = new PageInfo();
-    // TODO pageInfo.setResultsPerPage();
-
-    // Get the current link.
-    StringBuffer curLinkBuffer = request.getRequestURL();
-
-    if (request.getQueryString() != null
-        && !request.getQueryString().trim().isEmpty()) {
-      curLinkBuffer.append("?").append(request.getQueryString());
-    }
-
-    String curLink = curLinkBuffer.toString();
-    log.trace("curLink = {}", curLink);
-
-    pageInfo.setCurLink(curLink);
-
-    ImportStatusPage page = new ImportStatusPage();
-    page.setPageInfo(pageInfo);
-//    page.setPage(importStatusEntries);
-
-    return new ResponseEntity<>(page, HttpStatus.OK);
-  }
-
-  /**
    * Controller for {@code POST /collections/{collectionId}/archives}.
    * <p>
    * Imports the artifacts from an archive into this LOCKSS Repository Service.

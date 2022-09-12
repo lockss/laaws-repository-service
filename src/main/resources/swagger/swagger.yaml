@@ -66,39 +66,6 @@ paths:
             type: "array"
             items:
               type: "string"
-  /collections/{collectionid}/archives/{archive}:
-    get:
-      tags:
-        - collections
-      summary: "Returns the import status of artifacts from an archive"
-      operationId: getArchiveImportStatus
-      parameters:
-        - name: "collectionId"
-          in: "path"
-          required: true
-          type: "string"
-          description: "Collection containing the artifact"
-        - name: "archive"
-          in: "path"
-          required: true
-          type: "string"
-          description: "Name of the archive"
-        - name: "continuationToken"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The continuation token for next page of artifacts to"
-      responses:
-        200:
-          description: "A page of archive import status information"
-          schema:
-            $ref: "#/definitions/importStatusPage"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to view archive import status"
-        500:
-          description: "Internal error"
   /collections/{collectionid}/archives:
     post:
       tags:
@@ -726,20 +693,6 @@ paths:
         '500':
           description: Internal Server Error
 definitions:
-  importStatusPage:
-    description: "A page of artifact import status information"
-    type: "object"
-    required:
-      - "pageInfo"
-      - "importStatus"
-    properties:
-      pageInfo:
-        $ref: "#/definitions/pageInfo"
-      page:
-        description: "Status of artifacts imported from the archive"
-        type: "array"
-        items:
-          $ref: "#/definitions/importStatus"
   importStatus:
     type: "object"
     properties:
