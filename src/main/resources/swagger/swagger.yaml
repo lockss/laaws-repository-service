@@ -705,6 +705,8 @@ definitions:
         type: "string"
       artifactId:
         type: "string"
+      version:
+        type: "integer"
       status:
         type: "string"
         enum:
