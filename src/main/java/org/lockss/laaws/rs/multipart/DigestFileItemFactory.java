@@ -33,10 +33,8 @@ POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.multipart;
 
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileCleaningTracker;
-import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 

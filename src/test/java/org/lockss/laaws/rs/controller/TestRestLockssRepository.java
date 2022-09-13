@@ -511,7 +511,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   private String formatWarcRecordId(String uuid) {
     return "<urn:uuid:" + uuid + ">";
-
   }
 
   private String formatWarcDate(long warcDate) {
