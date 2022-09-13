@@ -1703,9 +1703,9 @@ public class CollectionsApiServiceImpl
         boolean isCompressed = StringUtil.endsWithIgnoreCase(
             archive.getOriginalFilename(), WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
 
-        try (InputStream input = archive.getInputStream()) {
-          Iterable<ImportStatus> result =
-              repo.addArtifacts(collectionId, auId, input, ArchiveType.WARC, isCompressed);
+        try (InputStream input = archive.getInputStream();
+            ImportStatusIterable result =
+                repo.addArtifacts(collectionId, auId, input, ArchiveType.WARC, isCompressed)) {
 
           try (DeferredTempFileOutputStream out =
                    new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
