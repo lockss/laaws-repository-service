@@ -153,31 +153,6 @@ public class CollectionsApiServiceImpl
     48 * TimeUtil.HOUR;
 
   /**
-   * Default number of archive import status entries that will be returned
-   * in a single (paged) response
-   */
-  public static final String PARAM_DEFAULT_ARCHIVEIMPORTSTATUS_PAGESIZE =
-      PREFIX + "archiveImportStatus.pagesize.default";
-  public static final int DEFAULT_DEFAULT_ARCHIVEIMPORTSTATUS_PAGESIZE = 1000;
-
-  /**
-   * Max number of archive import status entries that will be returned in a
-   * single (paged) response
-   */
-  public static final String PARAM_MAX_ARCHIVEIMPORTSTATUS_PAGESIZE =
-      PREFIX + "archiveImportStatus.pagesize.max";
-  public static final int DEFAULT_MAX_ARCHIVEIMPORTSTATUS_PAGESIZE = 2000;
-
-  /**
-   * Interval after which unused archive import status iterator continuations
-   * will be discarded.  Change requires restart to take effect.
-   */
-  public static final String PARAM_ARCHIVEIMPORTSTATUS_ITERATOR_TIMEOUT =
-      PREFIX + "archiveImportStatus.iterator.timeout";
-  public static final long DEFAULT_ARCHIVEIMPORTSTATUS_ITERATOR_TIMEOUT =
-      48 * TimeUtil.HOUR;
-
-  /**
    * Largest Artifact content that will be included in a response to a
    * getArtifactData call with includeContent == IF_SMALL
    */
@@ -215,17 +190,12 @@ public class CollectionsApiServiceImpl
   private Map<Integer, Iterator<String>> auidIterators =
       new ConcurrentHashMap<>();
 
-  // The archive import status iterators used in pagination
-  private Map<Integer, Iterator<String>> archiveImportStatusIterators =
-      new ConcurrentHashMap<>();
-
   // Timer callback for periodic removal of timed-out iterator continuations
   private TimerQueue.Callback iteratorMapTimeout =
     new TimerQueue.Callback() {
       public void timerExpired(Object cookie) {
         timeoutIterators(artifactIterators);
         timeoutIterators(auidIterators);
-        timeoutIterators(archiveImportStatusIterators);
       }
     };
 
@@ -240,9 +210,6 @@ public class CollectionsApiServiceImpl
   private int maxAuidPageSize = DEFAULT_MAX_AUID_PAGESIZE;
   private int defaultAuidPageSize = DEFAULT_DEFAULT_AUID_PAGESIZE;
   private long auidIteratorTimeout = DEFAULT_AUID_ITERATOR_TIMEOUT;
-  private int maxArchiveImportStatusPageSize = DEFAULT_MAX_ARCHIVEIMPORTSTATUS_PAGESIZE;
-  private int defaultArchiveImportStatusPageSize = DEFAULT_DEFAULT_ARCHIVEIMPORTSTATUS_PAGESIZE;
-  private long archiveImportStatusIteratorTimeout = DEFAULT_ARCHIVEIMPORTSTATUS_ITERATOR_TIMEOUT;
   private long smallContentThreshold = DEFAULT_SMALL_CONTENT_THRESHOLD;
   private int bulkIndexBatchSize = DEFAULT_BULK_INDEX_BATCH_SIZE;
 
@@ -301,9 +268,6 @@ public class CollectionsApiServiceImpl
       }
       if (!(auidIterators instanceof PassiveExpiringMap)) {
         auidIterators = makeIteratorContinuationMap();
-      }
-      if (!(archiveImportStatusIterators instanceof PassiveExpiringMap)) {
-        archiveImportStatusIterators = makeIteratorContinuationMap();
       }
       TimerQueue.schedule(Deadline.in(1 * TimeUtil.HOUR), 1 * TimeUtil.HOUR,
                           iteratorMapTimeout, null);
