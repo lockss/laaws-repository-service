@@ -105,6 +105,7 @@ import static java.nio.file.StandardOpenOption.APPEND;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
+import java.util.stream.StreamSupport;
 
 /**
  * Tests an embedded LOCKSS Repository Service instance configured with an internal {@link LocalLockssRepository}.
@@ -840,6 +841,36 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertReceivesNoContent(art_larger_c, IncludeContent.IF_SMALL);
     assertReceivesContent(art_larger_c, IncludeContent.ALWAYS);
 
+  }
+
+  // Ensure artifact names can be arbitrary strings (not nec. URL).
+  @Test
+  public void testNonUrlName() throws IOException {
+    // Pairs of (name, content).
+    Pair[] nameContPairs =
+      { Pair.of("bilbo.zip", "lots of round things"),
+        Pair.of("who uses names like this?", "windows users"),
+        Pair.of("  ", "might as well be pathological"),
+        Pair.of("   ", "might as well be even more pathological")};
+    List<String> names = new ArrayList<>();
+    // Create and check Artifact for each pair
+    for (Pair<String,String> pair : nameContPairs) {
+      names.add(pair.getLeft());
+      ArtifactSpec spec = new ArtifactSpec()
+        .setUrl(pair.getLeft())
+        .setContent(pair.getRight())
+        .setCollectionDate(0);
+      Artifact newArt = addUncommitted(spec);
+      Artifact commArt = commit(spec, newArt);
+      spec.assertArtifact(repository, commArt);
+      spec.assertArtifact(repository, getArtifact(repository, spec, false));
+    }
+    // Enumerate the Artifacts, check that names are as expected
+    Collections.sort(names);
+    assertIterableEquals(names,
+                         StreamSupport.stream(repository.getArtifacts(COLL1, AUID1).spliterator(), false)
+                         .map(x -> x.getUri())
+                         .collect(Collectors.toList()));
   }
 
   /**
