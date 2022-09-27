@@ -99,13 +99,13 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import java.util.zip.GZIPOutputStream;
 
 import static java.nio.file.StandardOpenOption.APPEND;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
-import java.util.stream.StreamSupport;
 
 /**
  * Tests an embedded LOCKSS Repository Service instance configured with an internal {@link LocalLockssRepository}.
