@@ -706,6 +706,8 @@ definitions:
         type: "string"
       artifactId:
         type: "string"
+      digest:
+        type: "string"
       version:
         type: "integer"
       status:

@@ -353,11 +353,16 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
         assertEquals(formatWarcRecordId(spec.getArtifactId()), status.getWarcId());
         assertEquals(spec.getUrl(), status.getUrl());
+        assertEquals(spec.getContentDigest(), status.getDigest());
         assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
         assertNull(status.getStatusMessage());
 
         Artifact artifact =
             repository.getArtifactVersion(collectionId, auId, spec.getUrl(), i+1, true);
+
+        assertEquals(artifact.getId(), status.getArtifactId());
+        assertEquals(artifact.getVersion(), status.getVersion());
+        assertEquals(spec.getContentDigest(), artifact.getContentDigest());
 
         spec.assertArtifact(repository, artifact);
       }
@@ -419,11 +424,16 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
           assertEquals(formatWarcRecordId(spec.getArtifactId()), status.getWarcId());
           assertEquals(spec.getUrl(), status.getUrl());
+          assertEquals(spec.getContentDigest(), status.getDigest());
           assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
           assertNull(status.getStatusMessage());
 
           Artifact artifact =
               repository.getArtifactVersion(collectionId, auId, spec.getUrl(), i + 1, true);
+
+          assertEquals(artifact.getId(), status.getArtifactId());
+          assertEquals(artifact.getVersion(), status.getVersion());
+          assertEquals(spec.getContentDigest(), artifact.getContentDigest());
 
           spec.assertArtifact(repository, artifact);
         }
@@ -492,18 +502,23 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         if (i % 2 == 0) {
           assertEquals(ImportStatus.StatusEnum.ERROR, status.getStatus());
         } else {
+          assertEquals(spec.getContentDigest(), status.getDigest());
           assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
           assertNull(status.getStatusMessage());
         }
       }
 
       // Assert successfully added artifacts
-      for (int i = 1; i <= 5; i++) {
-        ImportStatus status = result.get(i*2-1);
-        ArtifactSpec spec = specs.get(i*2-1);
+      for (int version = 1; version <= 5; version++) {
+        ImportStatus status = result.get(version*2-1);
+        ArtifactSpec spec = specs.get(version*2-1);
 
         Artifact artifact =
-            repository.getArtifactVersion(collectionId, auId, spec.getUrl(), i, true);
+            repository.getArtifactVersion(collectionId, auId, spec.getUrl(), version, true);
+
+        assertEquals(artifact.getId(), status.getArtifactId());
+        assertEquals(artifact.getVersion(), status.getVersion());
+        assertEquals(spec.getContentDigest(), artifact.getContentDigest());
 
         spec.assertArtifact(repository, artifact);
       }
