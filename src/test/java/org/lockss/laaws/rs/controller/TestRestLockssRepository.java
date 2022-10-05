@@ -1995,6 +1995,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         }
       }
       break;
+      case "unicode":
+        res.add(ArtifactSpec.forCollAuUrl("c", "a", "111").thenCommit());
+        res.add(ArtifactSpec.forCollAuUrl("c", "a", "ZZZ").thenCommit());
+        res.add(ArtifactSpec.forCollAuUrl("c", "a", "zzz").thenCommit());
+        res.add(ArtifactSpec.forCollAuUrl("c", "a", "\u03BA\u1F79\u03C3\u03BC\u03B5").thenCommit());
+        res.add(ArtifactSpec.forCollAuUrl("c", "a", "Heiz\u00F6lr\u00FCcksto\u00DFabd\u00E4mpfung").thenCommit());
+        break;
       default:
         fail("getVariantSpecs called with unknown variant name: " + variant);
     }
