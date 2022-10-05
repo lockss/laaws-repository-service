@@ -33,14 +33,15 @@ package org.lockss.laaws.rs.impl;
 
 import org.json.JSONObject;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.springframework.http.HttpStatus;
 
 import javax.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.util.stream.StreamSupport;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Utility method used in the service controllers.
@@ -227,5 +228,62 @@ public class ServiceImplUtil {
     JSONObject responseBody = new JSONObject();
     responseBody.put("error", errorElement);
     return responseBody.toString();
+  }
+
+  /**
+   * Validates the page size specified in the request.
+   *
+   * @param requestLimit An Integer with the page size specified in the request.
+   * @param defaultValue An int with the value to be used when no page size is
+   *                     specified in the request.
+   * @param maxValue     An int with the maximum allowed value for the page
+   *                     size.
+   * @return an int with the validated value for the page size.
+   */
+  static int validateLimit(Integer requestLimit, int defaultValue, int maxValue,
+                           String parsedRequest) {
+    log.debug2("requestLimit = {}, defaultValue = {}, maxValue = {}",
+        requestLimit, defaultValue, maxValue);
+
+    // Check whether it's not a positive integer.
+    if (requestLimit != null && requestLimit.intValue() <= 0) {
+      // Yes: Report the problem.
+      String message =
+          "Limit of requested items must be a positive integer; it was '"
+              + requestLimit + "'";
+      log.warn(message);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
+    }
+
+    // No: Get the result.
+    int result = requestLimit == null ?
+        Math.min(defaultValue, maxValue) : Math.min(requestLimit, maxValue);
+    log.debug2("result = {}", result);
+    return result;
+  }
+
+  /**
+   * Populates the artifacts to be included in the response.
+   *
+   * @param iterator  An Iterator<Artifact> with the artifact source iterator.
+   * @param limit     An Integer with the maximum number of artifacts to be
+   *                  included in the response.
+   * @param artifacts A List<Artifact> with the artifacts to be included in the
+   *                  response.
+   */
+  static public void populateArtifacts(Iterator<Artifact> iterator, Integer limit,
+                                 List<Artifact> artifacts) {
+    log.debug2("limit = {}, artifacts = {}", limit, artifacts);
+    int artifactCount = artifacts.size();
+
+    // Loop through as many artifacts that exist and are requested.
+    while (artifactCount < limit && iterator.hasNext()) {
+      // Add this artifact to the results.
+      artifacts.add(iterator.next());
+      artifactCount++;
+    }
   }
 }
