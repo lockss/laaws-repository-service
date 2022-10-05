@@ -134,28 +134,28 @@ public class ServiceImplUtil {
    * 
    * If no extension is provided, one is added automatically  at the other end.
    * 
-   * @param collectionid
-   *          A String with the identifier of the collection.
+   * @param namespace
+   *          A String with the namespace of the artifact.
    * @param artifactId
    *          A String with the identifier of the artifact.
    * @return a String with the artifact archive name.
    */
-  static String getArtifactArchiveName(String collectionid, String artifactId) {
-   return collectionid + archiveFileSeparator + artifactId
+  static String getArtifactArchiveName(String namespace, String artifactId) {
+   return namespace + archiveFileSeparator + artifactId
        + archiveFileExtension; 
   }
 
   /**
-   * Provides the collection identifier embedded in the archive file name.
+   * Provides the namespace embedded in the archive file name.
    * 
    * @param fileName
    *          A String with the file name.
    * @param parsedRequest
    *          A String with the parsed request for diagnostic purposes.
-   * @return a String with the collection identifier.
+   * @return a String with the namespace
    */
-  static String getArchiveFilenameCollectionId(String fileName,
-      String parsedRequest) {
+  static String getArchiveFilenameNamespace(String fileName,
+                                            String parsedRequest) {
     int separatorLocation =
 	getArchiveFilenameSeparator(fileName, parsedRequest);
 
@@ -181,7 +181,7 @@ public class ServiceImplUtil {
   }
 
   /**
-   * Provides the location of the separator between the collection and artifact
+   * Provides the location of the separator between the namespace and artifact
    * identifiers embedded in the archive file name.
    * 
    * @param fileName

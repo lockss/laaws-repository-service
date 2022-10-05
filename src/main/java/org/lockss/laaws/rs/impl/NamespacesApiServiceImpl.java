@@ -10,11 +10,13 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;
 
+@Service
 public class NamespacesApiServiceImpl extends BaseSpringApiServiceImpl implements NamespacesApiDelegate {
   private static L4JLogger log = L4JLogger.getLogger();
 
@@ -29,10 +31,10 @@ public class NamespacesApiServiceImpl extends BaseSpringApiServiceImpl implement
   }
 
   /**
-   * GET /collections:
-   * Returns a list of collection names managed by this repository.
+   * GET /namespaces:
+   * Returns a list of namespaces managed by this repository.
    *
-   * @return a List<String> with the collection names.
+   * @return a List<String> with the namespaces.
    */
   @Override
   public ResponseEntity<List<String>> getNamespaces() {
@@ -44,11 +46,11 @@ public class NamespacesApiServiceImpl extends BaseSpringApiServiceImpl implement
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      List<String> collectionIds = IterableUtils.toList(repo.getCollectionIds());
-      log.debug2("collectionIds = {}", collectionIds);
-      return new ResponseEntity<>(collectionIds, HttpStatus.OK);
+      List<String> namespaces = IterableUtils.toList(repo.getNamespaces());
+      log.debug2("namespaces = {}", namespaces);
+      return new ResponseEntity<>(namespaces, HttpStatus.OK);
     } catch (IOException e) {
-      String errorMessage = "Could not enumerate collection IDs";
+      String errorMessage = "Could not enumerate namespaces";
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);

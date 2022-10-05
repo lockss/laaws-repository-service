@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,6 +47,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.populateArtifacts;
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.validateLimit;
 
+@Service
 public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     implements ArtifactsApiDelegate, LockssConfigurableService {
   private static L4JLogger log = L4JLogger.getLogger();
@@ -166,14 +168,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   ////////////////////////////////////////////////////////////////////////////////
 
   /**
-   * POST /collections/{collectionid}/artifacts:
+   * POST /artifacts:
    * Adds artifacts to the repository
    *
    * @param auid         A String with the Archival Unit ID (AUID) of new artifact.
    * @param uri          A String with the URI represented by this artifact.
    * @param content      A MultipartFile with the artifact content.
-   * @param namespace A String with the name of the collection containing the artifact.
-   * @param collectionDate A String with the name of the collection containing the artifact.
+   * @param namespace    A String with the namespace of the artifact.
+   * @param collectionDate A Long representing the date this artifact was collected.
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
@@ -280,16 +282,16 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   }
 
   /**
-   * DELETE /collections/{collectionid}/artifacts/{artifactid}:
-   * Deletes an artifact from a collection managed by this repository.
+   * DELETE /artifacts/{artifactid}:
+   * Deletes an artifact from this repository.
    *
    * @param artifactid   A String with the Identifier of the artifact.
-   * @param namespace A String with the name of the collection containing the artifact.
+   * @param namespace A String with the namespace of the artifact.
    * @return a {@code ResponseEntity<Void>}.
    */
   @Override
-  public ResponseEntity<Void> deleteArtifact(String artifactid,
-                                             String namespace) {
+  public ResponseEntity<Void> deleteArtifact(String artifactid, String namespace) {
+
     String parsedRequest = String.format(
         "namespace: %s, artifactid: %s, requestUrl: %s",
         namespace, artifactid, ServiceImplUtil.getFullRequestUrl(request));
@@ -330,11 +332,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   }
 
   /**
-   * GET /collections/{collectionid}/artifacts/{artifactid}:
+   * GET /artifacts/{artifactid}:
    * Retrieves an artifact from the repository.
    *
    * @param artifactid     A String with the Identifier of the artifact.
-   * @param namespace      A String with the name of the collection containing the artifact.
+   * @param namespace      A String with the namespace of the artifact.
    * @param includeContent A {@link Boolean} indicating whether the artifact content part should be included in the
    *                       multipart response.
    * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
@@ -389,11 +391,10 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   }
 
   /**
-   * GET /collections/{collectionid}/artifacts: Returns the committed artifacts of all versions
-   * of a given URL, from a specified collection.
+   * GET /artifacts: Returns the committed artifacts of all versions
+   * of a given URL, from a specified namespace.
    *
-   * @param namespace A String with the name of the collection
-   *                           containing the artifact.
+   * @param namespace          A String with the namespace of the artifact.
    * @param url                A String with the URL contained by the artifacts.
    * @param urlPrefix          A String with the prefix to be matched by the
    *                           artifact URLs.
@@ -493,7 +494,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             // Yes: Initialize an artifact with properties from the last one
             // already returned in the previous page of results.
             Artifact lastArtifact = new Artifact();
-            lastArtifact.setCollection(requestAct.getCollectionId());
+            lastArtifact.setNamespace(requestAct.getCollectionId());
             lastArtifact.setAuid(requestAct.getAuid());
             lastArtifact.setUri(requestAct.getUri());
             lastArtifact.setVersion(requestAct.getVersion());
@@ -531,7 +532,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           // Create the response continuation token.
           Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
           responseAct = new ArtifactContinuationToken(
-              lastArtifact.getCollection(), lastArtifact.getAuid(),
+              lastArtifact.getNamespace(), lastArtifact.getAuid(),
               lastArtifact.getUri(), lastArtifact.getVersion(),
               iteratorHashCode);
           log.trace("responseAct = {}", responseAct);
@@ -630,14 +631,13 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   }
 
   /**
-   * PUT /collections/{collectionid}/artifacts/{artifactid}:
-   * Updates an artifact's properties
+   * PUT /artifacts/{artifactid}: Updates an artifact's properties
    * <p>
    * Currently limited to updating an artifact's committed status.
    *
    * @param artifactid   A String with the Identifier of the artifact.
    * @param committed    A Boolean with the artifact committed status.
-   * @param namespace A String with the name of the collection containing the artifact.
+   * @param namespace A String with the namespace of the artifact.
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
@@ -789,7 +789,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     //// Artifact repository ID information headers
     ArtifactIdentifier id = ad.getIdentifier();
     headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
-    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getCollection());
+    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getNamespace());
     headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
     headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
     headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
@@ -817,7 +817,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     return headers;
   }
 
-  String artifactKey(String collectionid, String artifactid)
+  String artifactKey(String namespace, String artifactid)
       throws IOException {
     Artifact art = repo.getArtifactFromId(artifactid);
     if (art != null) {

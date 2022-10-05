@@ -52,10 +52,9 @@ import static org.mockito.Mockito.*;
  * Exercises and tests error communication between a LOCKSS Repository Service and its REST client,
  * {@link RestLockssRepository}.
  * <p>
- * This is done by mocking the {@link LockssRepository} used internally by a LOCKSS repository service (see
- * {@link org.lockss.laaws.rs.impl.CollectionsApiServiceImpl}) running in an embedded servlet. A real
- * {@link RestLockssRepository} client is provided to tests to make requests and allow testing of its behavior. The
- * network traffic between the servlet and client can be observed with Wireshark or similar tool.
+ * This is done by mocking the {@link LockssRepository} used internally by a LOCKSS Repository Service (running in an
+ * embedded servlet). A real {@link RestLockssRepository} client is provided to tests to make requests and allow testing
+ * of its behavior. The network traffic between the servlet and client can be observed with Wireshark or similar tool.
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -255,22 +254,22 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert a 503 Service Unavailable response
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getCollectionIds(), // FIXME: Implement isReady()?
+        (Executable) () -> clientRepo.getNamespaces(), // FIXME: Implement isReady()?
         "LOCKSS repository is not ready", HttpStatus.SERVICE_UNAVAILABLE,
         LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
   }
 
   @Test
-  public void testGetCollections() throws Exception {
+  public void testGetNamespaces() throws Exception {
     // Initialize the internal mock LOCKSS repository
     initInternalLockssRepository();
 
     //// Assert 500 Internal Server Error if IOException is thrown
-    when(internalRepo.getCollectionIds())
+    when(internalRepo.getNamespaces())
         .thenThrow(new IOException("Test error message"));
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getCollectionIds(),
+        (Executable) () -> clientRepo.getNamespaces(),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
 
@@ -279,11 +278,11 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert unspecified 500 Internal Server Error if generic RuntimeException is thrown
-    when(internalRepo.getCollectionIds())
+    when(internalRepo.getNamespaces())
         .thenThrow(new RuntimeException("surprise!"));
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getCollectionIds(),
+        (Executable) () -> clientRepo.getNamespaces(),
         "surprise!", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.UNSPECIFIED_ERROR);
   }
@@ -297,10 +296,10 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     String artifactId = "artifact";
 
     doThrow(new LockssNoSuchArtifactIdException("Non-existent artifact ID: " + artifactId))
-        .when(internalRepo).deleteArtifact("collection", "artifact");
+        .when(internalRepo).deleteArtifact("namespace", "artifact");
 
     assertThrowsMatch(LockssNoSuchArtifactIdException.class, "Could not remove artifact", () ->
-        clientRepo.deleteArtifact("collection", "artifact"));
+        clientRepo.deleteArtifact("namespace", "artifact"));
 
     // Reset mock
     reset(internalRepo);
@@ -308,10 +307,10 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 500 Internal Server Error if IOException is thrown
     doThrow(new IOException("Test error message"))
-        .when(internalRepo).deleteArtifact("collection", "artifact");
+        .when(internalRepo).deleteArtifact("namespace", "artifact");
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.deleteArtifact("collection", "artifact"),
+        (Executable) () -> clientRepo.deleteArtifact("namespace", "artifact"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
   }
@@ -325,23 +324,23 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     String artifactId = "artifact";
     Exception e = new LockssNoSuchArtifactIdException("Non-existent artifact ID: " + artifactId);
 
-    when(internalRepo.getArtifactData("collection", "artifact"))
+    when(internalRepo.getArtifactData("namespace", "artifact"))
         .thenThrow(e);
 
     assertThrowsMatch(LockssNoSuchArtifactIdException.class, "Artifact not found", () ->
-        clientRepo.getArtifactData("collection", "artifact"));
+        clientRepo.getArtifactData("namespace", "artifact"));
 
     // Reset mock
     reset(internalRepo);
     initInternalLockssRepository();
 
     //// Generic LockssRestServiceException
-    when(internalRepo.getArtifactData("collection", "artifact"))
+    when(internalRepo.getArtifactData("namespace", "artifact"))
         .thenThrow(new LockssRestServiceException(
             HttpStatus.INTERNAL_SERVER_ERROR, "Test error message", null, "/test/path"));
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getArtifactData("collection", "artifact"),
+        (Executable) () -> clientRepo.getArtifactData("namespace", "artifact"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.UNSPECIFIED_ERROR);
 
@@ -350,11 +349,11 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// IOException
-    when(internalRepo.getArtifactData("collection", "artifact"))
+    when(internalRepo.getArtifactData("namespace", "artifact"))
         .thenThrow(new IOException("Test error message"));
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getArtifactData("collection", "artifact"),
+        (Executable) () -> clientRepo.getArtifactData("namespace", "artifact"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
   }
@@ -367,7 +366,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     //// Assert 400 Bad request if attempting uncommit an artifact
     URL testEndpoint =
         new URL(
-            String.format("http://localhost:%d/collections/collectionId/artifacts/artifactId?committed=false", port));
+            String.format("http://localhost:%d/artifacts/artifactId?committed=false&namespace=namespace1", port));
 
     // Create a PUT request
     HttpUriRequest request = new HttpPut(testEndpoint.toURI());
@@ -384,22 +383,22 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert 404 if LockssNoSuchArtifactIdException is thrown
-    when(internalRepo.commitArtifact("collection", "artifact"))
+    when(internalRepo.commitArtifact("namespace", "artifact"))
         .thenThrow(new LockssNoSuchArtifactIdException());
 
     assertThrowsMatch(LockssNoSuchArtifactIdException.class, "non-existent artifact", () ->
-        clientRepo.commitArtifact("collection", "artifact"));
+        clientRepo.commitArtifact("namespace", "artifact"));
 
     // Reset mocks
     reset(internalRepo);
     initInternalLockssRepository();
 
     //// Assert 500 Internal Server Error if IOException is thrown
-    when(internalRepo.commitArtifact("collection", "artifact"))
+    when(internalRepo.commitArtifact("namespace", "artifact"))
         .thenThrow(new IOException("Test error message"));
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.commitArtifact("collection", "artifact"),
+        (Executable) () -> clientRepo.commitArtifact("namespace", "artifact"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
   }
@@ -451,7 +450,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert invalid paging limit results in a 400
     URL endpoint1 =
-        new URL(String.format("http://localhost:%d/collections/collectionId/aus/auid/artifacts?limit=-1", port));
+        new URL(String.format("http://localhost:%d/aus/auid/artifacts?limit=-1&namespace=namespace1", port));
 
     HttpUriRequest request1 = new HttpGet(endpoint1.toURI());
 
@@ -462,7 +461,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad Request if invalid continuation token
     URL endpoint2 =
-        new URL(String.format("http://localhost:%d/collections/collectionId/aus/auid/artifacts?continuationToken=test",
+        new URL(String.format("http://localhost:%d/aus/auid/artifacts?continuationToken=test&namespace=namespace1",
             port));
 
     HttpUriRequest request2 = new HttpGet(endpoint2.toURI());
@@ -474,7 +473,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if urlPrefix and url provided (should be mutually exclusive)
     URL endpoint3 =
-        new URL(String.format("http://localhost:%d/collections/collectionId/aus/auid/artifacts?urlPrefix=a&url=b", port));
+        new URL(String.format("http://localhost:%d/aus/auid/artifacts?urlPrefix=a&url=b&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request3 = new HttpGet(endpoint3.toURI());
@@ -487,7 +486,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if version specified without url or urlPrefix
     URL endpoint4 =
-        new URL(String.format("http://localhost:%d/collections/collectionId/aus/auid/artifacts?version=1", port));
+        new URL(String.format("http://localhost:%d/aus/auid/artifacts?version=1&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request4 = new HttpGet(endpoint4.toURI());
@@ -500,7 +499,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if includeCommitted without url or urlPrefix
     URL endpoint5 = new URL(String.format(
-        "http://localhost:%d/collections/collectionId/aus/auid/artifacts?includeUncommitted=true", port));
+        "http://localhost:%d/aus/auid/artifacts?includeUncommitted=true&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request5 = new HttpGet(endpoint5.toURI());
@@ -513,7 +512,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if negative version number
     URL endpoint6 = new URL(String.format(
-        "http://localhost:%d/collections/collectionId/aus/auid/artifacts?version=-1&url=test", port));
+        "http://localhost:%d/aus/auid/artifacts?version=-1&url=test&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request6 = new HttpGet(endpoint6.toURI());
@@ -526,7 +525,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if invalid version number
     URL endpoint7 = new URL(String.format(
-        "http://localhost:%d/collections/collectionId/aus/auid/artifacts?version=NaN&url=test", port));
+        "http://localhost:%d/aus/auid/artifacts?version=NaN&url=test&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request7 = new HttpGet(endpoint7.toURI());
@@ -537,32 +536,32 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         "The 'version' argument is invalid", HttpStatus.BAD_REQUEST,
         LockssRestHttpException.ServerErrorType.NONE);
 
-    //// Assert invalid collection ID
+    //// Assert invalid namespace
 //     URL endpoint8 = new URL(String.format(
-//         "http://localhost:%d/collections/collectionId/aus/auid/artifacts", port));
+//         "http://localhost:%d/aus/auid/artifacts?namespace=namespace1", port));
 
 //     // Create a GET request
 //     HttpUriRequest request8 = new HttpGet(endpoint8.toURI());
 
 //     // Setup mock
-//     when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
+//     when(internalRepo.getNamespaces()).thenReturn(Collections.emptyList());
 
 //     // Process request and assert response
 //     assertLockssRestHttpException(
 //         (Executable) () -> processRequest(request8),
-//         "collection does not exist", HttpStatus.NOT_FOUND,
+//         "namespace does not exist", HttpStatus.NOT_FOUND,
 //         LockssRestHttpException.ServerErrorType.NONE);
 
     //// Assert invalid AUID
 //    URL endpoint6 =
 //        new URL(
-//            String.format("http://localhost:%d/collections/collectionId/aus/auid/size", port));
+//            String.format("http://localhost:%d/aus/auid/size", port));
 //
 //    // Create a GET request
 //    HttpUriRequest request6 = new HttpGet(endpoint6.toURI());
 //
 //    // Setup mock
-//    when(internalRepo.getCollectionIds()).thenReturn(ListUtil.list("collectionId"));
+//    when(internalRepo.getNamespaces()).thenReturn(ListUtil.list("namespace"));
 //    when(internalRepo.getAuIds(ArgumentMatchers.anyString())).thenReturn(Collections.emptyList());
 //
 //    // Process request and assert response
@@ -579,14 +578,14 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 500 Internal Server Error if IOException is thrown
     URL endpoint9 = new URL(String.format(
-        "http://localhost:%d/collections/collectionId/aus/auid/artifacts?version=all", port));
+        "http://localhost:%d/aus/auid/artifacts?version=all&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request9 = new HttpGet(endpoint9.toURI());
 
     // Setup mock
-    when(internalRepo.getCollectionIds()).thenReturn(ListUtil.list("collectionId"));
-    when(internalRepo.getArtifactsAllVersions("collectionId", "auid"))
+    when(internalRepo.getNamespaces()).thenReturn(ListUtil.list("namespace1"));
+    when(internalRepo.getArtifactsAllVersions("namespace1", "auid"))
         .thenThrow(new IOException("Test error message"));
 
     // Process request and assert response
@@ -601,30 +600,30 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     // Initialize the internal LOCKSS repository
     initInternalLockssRepository();
 
-    //// Assert invalid collection ID
+    //// Assert invalid namespace
     URL endpoint =
         new URL(
-            String.format("http://localhost:%d/collections/collectionId/aus/auid/size", port));
+            String.format("http://localhost:%d/aus/auid/size?namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request = new HttpGet(endpoint.toURI());
 
     // Setup mock
-    when(internalRepo.getCollectionIds()).thenReturn(Collections.emptyList());
+    when(internalRepo.getNamespaces()).thenReturn(Collections.emptyList());
 
     // Rest mock
     reset(internalRepo);
     initInternalLockssRepository();
 
     //// Assert 500 Internal Server Error if IOException is thrown
-    when(internalRepo.getCollectionIds())
-        .thenReturn(ListUtil.list("collection"));
-    when(internalRepo.auSize("collection", "auid"))
+    when(internalRepo.getNamespaces())
+        .thenReturn(ListUtil.list("namespace"));
+    when(internalRepo.auSize("namespace", "auid"))
         .thenThrow(new IOException("Test error message"));
 
     // Process request and assert response
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.auSize("collection", "auid"),
+        (Executable) () -> clientRepo.auSize("namespace", "auid"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
   }
@@ -635,7 +634,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert invalid paging limit results in a 400
-    URL endpoint1 = new URL(String.format("http://localhost:%d/collections/collectionId/aus?limit=-1", port));
+    URL endpoint1 = new URL(String.format("http://localhost:%d/aus?limit=-1&namespace=namespace1", port));
 
     HttpUriRequest request1 = new HttpGet(endpoint1.toURI());
 
@@ -646,7 +645,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert invalid AuidContinuationToken results in a 400
     URL endpoint2 =
-        new URL(String.format("http://localhost:%d/collections/collectionId/aus?continuationToken=test", port));
+        new URL(String.format("http://localhost:%d/aus?continuationToken=test&namespace=namespace1", port));
 
     HttpUriRequest request = new HttpGet(endpoint2.toURI());
 
@@ -660,14 +659,14 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert IOException
-    when(internalRepo.getCollectionIds())
-        .thenReturn(ListUtil.list("collectionId"));
-    when(internalRepo.getAuIds("collectionId"))
+    when(internalRepo.getNamespaces())
+        .thenReturn(ListUtil.list("namespace1"));
+    when(internalRepo.getAuIds("namespace1"))
         .thenThrow(new IOException("Test error message"));
 
     // Assert response
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getAuIds("collectionId"),
+        (Executable) () -> clientRepo.getAuIds("namespace1"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.UNSPECIFIED_ERROR);
   }

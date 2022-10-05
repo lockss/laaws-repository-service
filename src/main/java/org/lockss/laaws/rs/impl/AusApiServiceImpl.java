@@ -21,6 +21,7 @@ import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.populateArtifacts;
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.validateLimit;
 
+@Service
 public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusApiDelegate, LockssConfigurableService {
   private static L4JLogger log = L4JLogger.getLogger();
 
@@ -177,14 +179,13 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
   ////////////////////////////////////////////////////////////////////////////////
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/artifacts: Get a list with all
-   * the artifacts in a collection and Archival Unit or a pageful of the list
+   * GET /aus/{auid}/artifacts:
+   * Get a list with all the artifacts in a namespace and Archival Unit or a pageful of the list
    * defined by the continuation token and size.
    *
    * @param auid               A String with the Archival Unit ID (AUID) of
    *                           artifact.
-   * @param namespace          A String with the name of the collection
-   *                           containing the artifact.
+   * @param namespace          A String with the namespace of the artifact.
    * @param url                A String with the URL contained by the artifacts.
    * @param urlPrefix          A String with the prefix to be matched by the
    *                           artifact URLs.
@@ -373,7 +374,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
         }
       } else if (url != null && numericVersion > 0) {
         log.trace("Given version of a URL");
-        log.trace("collectionid = {}", namespace);
+        log.trace("namespace = {}", namespace);
         log.trace("auid = {}", auid);
         log.trace("url = {}", url);
         log.trace("numericVersion = {}", numericVersion);
@@ -411,7 +412,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
             // Yes: Initialize an artifact with properties from the last one
             // already returned in the previous page of results.
             Artifact lastArtifact = new Artifact();
-            lastArtifact.setCollection(requestAct.getCollectionId());
+            lastArtifact.setNamespace(requestAct.getCollectionId());
             lastArtifact.setAuid(requestAct.getAuid());
             lastArtifact.setUri(requestAct.getUri());
             lastArtifact.setVersion(requestAct.getVersion());
@@ -449,7 +450,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
           // Create the response continuation token.
           Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
           responseAct = new ArtifactContinuationToken(
-              lastArtifact.getCollection(), lastArtifact.getAuid(),
+              lastArtifact.getNamespace(), lastArtifact.getAuid(),
               lastArtifact.getUri(), lastArtifact.getVersion(),
               iteratorHashCode);
           log.trace("responseAct = {}", responseAct);
@@ -571,11 +572,11 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
   }
 
   /**
-   * GET /collections/{collectionid}/aus/{auid}/size:
-   * Get the size of Archival Unit artifacts in a collection.
+   * GET /aus/{auid}/size:
+   * Get the size of Archival Unit artifacts in a namespace.
    *
    * @param auid         A String with the Archival Unit ID (AUID).
-   * @param namespace    A String with the name of the collection containing the Archival Unit.
+   * @param namespace    A String with the namespace of the Archival Unit.
    * @return a {@link ResponseEntity< AuSize >}.
    */
   @Override
@@ -608,12 +609,11 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
   }
 
   /**
-   * GET /collections/{collectionid}/aus: Get all Archival Unit IDs (AUIDs) in a
-   * collection or a pageful of the list defined by the continuation token and
-   * size.
+   * GET /aus:
+   * Get all Archival Unit IDs (AUIDs) in a namespace or a pageful of the list
+   * defined by the continuation token and size.
    *
-   * @param namespace A String with the name of the collection
-   *                          containing the archival units.
+   * @param namespace A String with the namespace of the Archival Units.
    * @param limit             An Integer with the maximum number of archival
    *                          unit identifiers to be returned.
    * @param continuationToken A String with the continuation token of the next
@@ -789,18 +789,18 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
   }
 
   /**
-   * Handles bulk transfer operations for an AUID in a collection. Possible operations are {@code start} and {@code
+   * Handles bulk transfer operations for an AUID in a namespace. Possible operations are {@code start} and {@code
    * finish}.
    *
-   * @param namespace A {@link String} containing the collection ID of the AUID to operate on.
    * @param auid A {@link String} containing the AUID to operate on.
    * @param op A {@link String} with the operation to perform. Must be either {@code start} or {@code finish}.
+   * @param namespace A {@link String} containing the namespace of the AUID to operate on.
    * @return TBD
    */
   @Override
   public ResponseEntity<Void> handleBulkAuOp(String auid, String op, String namespace) {
 
-    String parsedRequest = String.format("collectionid: %s, auid: %s, op: %s, requestUrl: %s",
+    String parsedRequest = String.format("namespace: %s, auid: %s, op: %s, requestUrl: %s",
         namespace, auid, op, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);

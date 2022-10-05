@@ -17,6 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.*;
@@ -24,6 +25,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+@Service
 public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements WaybackApiDelegate {
   private static L4JLogger log = L4JLogger.getLogger();
 
@@ -45,10 +47,10 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   ////////////////////////////////////////////////////////////////////////////////
 
   /**
-   * Provides the OpenWayback CDX records of a URL in a collection.
+   * Provides the OpenWayback CDX records of a URL in a namespace.
    *
    * @param namespace
-   *          A String with the identifier of the collection.
+   *          A String with the namespace.
    * @param q
    *          A String with the query string. Supported fields are url, type
    *          (urlquery/prefixquery), offset, limit, request.anchordate,
@@ -146,9 +148,9 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   }
 
   /**
-   * Provides the PyWayback CDX records of a URL in a collection.
+   * Provides the PyWayback CDX records of a URL in a namespace.
    *
-   * @param namespace      A String with the identifier of the collection.
+   * @param namespace      A String with of the namespace.
    * @param url            A String with the URL for which the CDX records are requested.
    * @param limit          An Integer with the limit.
    * @param matchType      A String with the type of match requested.
@@ -300,18 +302,18 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      String collectionId = ServiceImplUtil.getArchiveFilenameCollectionId(
+      String namespace = ServiceImplUtil.getArchiveFilenameNamespace(
           fileName, parsedRequest);
-      log.trace("collectionId = {}", collectionId);
+      log.trace("namespace = {}", namespace);
 
       // Get the artifact identifier.
       String artifactId = ServiceImplUtil.getArchiveFilenameArtifactId(
           fileName, parsedRequest);
       log.trace("artifactId = {}", artifactId);
 
-      // Get the data for the artifact in this collection, if it exists.
+      // Get the data for the artifact in this namespace, if it exists.
       ArtifactData artifactData =
-          repo.getArtifactData(collectionId, artifactId);
+          repo.getArtifactData(namespace, artifactId);
       log.trace("artifactData = {}", artifactData);
 
       // Handle a missing artifact.
@@ -378,8 +380,8 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   /**
    * Provides the requested CDX records.
    *
-   * @param collectionid
-   *          A String with the identifier of the collection.
+   * @param namespace
+   *          A String with the namespace.
    * @param url
    *          A String with the URL of the artifacts for which the CDX records
    *          are requested.
@@ -400,11 +402,11 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
    * @throws IOException
    *           if there are I/O problems.
    */
-  void getCdxRecords(String collectionid, String url, LockssRepository repo,
+  void getCdxRecords(String namespace, String url, LockssRepository repo,
                      boolean isPrefix, Integer count, Integer startPage, String closest,
                      CdxRecords records) throws IOException {
 
-    log.debug2("collectionid = {}", collectionid);
+    log.debug2("namespace = {}", namespace);
     log.debug2("url = {}", url);
     log.debug2("isPrefix = {}", isPrefix);
     log.debug2("count = {}", count);
@@ -415,10 +417,10 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     if (isPrefix) {
       // Yes: Get from the repository the artifacts for URLs with the passed prefix.
-      iterable = repo.getArtifactsWithUrlPrefixFromAllAus(collectionid, url, ArtifactVersions.ALL);
+      iterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, url, ArtifactVersions.ALL);
     } else {
       // No: Get from the repository the artifacts for the passed URL.
-      iterable = repo.getArtifactsWithUrlFromAllAus(collectionid, url, ArtifactVersions.ALL);
+      iterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, ArtifactVersions.ALL);
     }
 
     // Initialize the iterator on the collection of artifacts to be returned.
@@ -434,7 +436,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   }
 
   /**
-   * Provides the requested CDX records for a collection of artifacts.
+   * Provides the requested CDX records for artifacts in a namespace.
    *
    * @param artIterator
    *          An Iterator<Artifact> to the artifacts for which the CDX records
@@ -484,7 +486,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
         // Create the result for this artifact.
         CdxRecord record = getCdxRecord(
-            repo.getArtifactData(artifact.getCollection(), artifactId));
+            repo.getArtifactData(artifact.getNamespace(), artifactId));
         log.trace("record = {}", record);
 
         // Add this artifact to the results.
@@ -555,7 +557,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Set the artifact archive name.
     record.setArchiveName(ServiceImplUtil.getArtifactArchiveName(
-        artifactIdentifier.getCollection(), artifactIdentifier.getId()));
+        artifactIdentifier.getNamespace(), artifactIdentifier.getId()));
 
     log.debug2("record = {}", record);
     return record;
@@ -621,13 +623,13 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
    *
    * @param request
    *          An HttpServletRequest with the HTTP request.
-   * @param collectionid
-   *          A String with the identifier of the collection.
+   * @param namespace
+   *          A String with the namespace.
    * @return a String with the parsed request.
    */
   private String getParsedRequest(HttpServletRequest request,
-                                  String collectionid) {
-    return String.format("collectionid: %s, requestUrl: %s", collectionid,
+                                  String namespace) {
+    return String.format("namespace: %s, requestUrl: %s", namespace,
         ServiceImplUtil.getFullRequestUrl(request));
   }
 

@@ -37,7 +37,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.core.VolatileLockssRepository;
-import org.lockss.laaws.rs.impl.CdxApiServiceImpl.ClosestArtifact;
+import org.lockss.laaws.rs.impl.WaybackApiServiceImpl.ClosestArtifact;
 import org.lockss.laaws.rs.model.*;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
@@ -52,9 +52,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Test class for org.lockss.laaws.rs.impl.CdxApiServiceImpl.
+ * Test class for org.lockss.laaws.rs.impl.WaybackApiServiceImpl.
  */
-public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
+public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
   private static L4JLogger log = L4JLogger.getLogger();
 
   private LockssRepository repository;
@@ -131,7 +131,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     ad.setContentDigest("cd1");
     ad.setContentLength(9876);
 
-    CdxRecord cdxRecord = new CdxApiServiceImpl(null).getCdxRecord(ad);
+    CdxRecord cdxRecord = new WaybackApiServiceImpl(null).getCdxRecord(ad);
 
     String expected = "(com,example,url1,)/ 19700102000000 url1.example.com"
 	+ " text/html 200 cd1 - - 9876 0 coll1:id1.warc\n";
@@ -180,7 +180,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 	MediaType.TEXT_HTML, 12345 + 16 * 60 * 60 * 1000));
 
     // Test closest to date earlier than all artifacts.
-    List<Artifact> sortedArtifacts = new CdxApiServiceImpl(null)
+    List<Artifact> sortedArtifacts = new WaybackApiServiceImpl(null)
 	.getArtifactsSortedByTemporalGap(artifacts.iterator(),
 	    "19700101000001");
 
@@ -189,7 +189,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(3, sortedArtifacts.get(2).getVersion().intValue());
 
     // Test closest to date immediately after the first artifact.
-    sortedArtifacts = new CdxApiServiceImpl(null)
+    sortedArtifacts = new WaybackApiServiceImpl(null)
 	.getArtifactsSortedByTemporalGap(artifacts.iterator(),
 	    "19700101020000");
 
@@ -198,7 +198,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(3, sortedArtifacts.get(2).getVersion().intValue());
 
     // Test closest to date immediately before the second artifact.
-    sortedArtifacts = new CdxApiServiceImpl(null)
+    sortedArtifacts = new WaybackApiServiceImpl(null)
 	.getArtifactsSortedByTemporalGap(artifacts.iterator(),
 	    "19700101070000");
 
@@ -207,7 +207,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(3, sortedArtifacts.get(2).getVersion().intValue());
 
     // Test closest to date immediately after the second artifact.
-    sortedArtifacts = new CdxApiServiceImpl(null)
+    sortedArtifacts = new WaybackApiServiceImpl(null)
 	.getArtifactsSortedByTemporalGap(artifacts.iterator(),
 	    "19700101090000");
 
@@ -216,7 +216,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(1, sortedArtifacts.get(2).getVersion().intValue());
 
     // Test closest to date immediately before the third artifact.
-    sortedArtifacts = new CdxApiServiceImpl(null)
+    sortedArtifacts = new WaybackApiServiceImpl(null)
 	.getArtifactsSortedByTemporalGap(artifacts.iterator(),
 	    "19700101120000");
 
@@ -225,7 +225,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(1, sortedArtifacts.get(2).getVersion().intValue());
 
     // Test closest to date immediately after all artifacts.
-    sortedArtifacts = new CdxApiServiceImpl(null)
+    sortedArtifacts = new WaybackApiServiceImpl(null)
 	.getArtifactsSortedByTemporalGap(artifacts.iterator(),
 	    "19700101180000");
 
@@ -266,7 +266,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 
     // Get all CDX records.
     CdxRecords records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, null, null, records);
 
     assertEquals(artifacts.size(), records.getCdxRecordCount());
@@ -279,28 +279,28 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 
     // Get sets of CDX records that include all of them.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, null, 1, records);
     assertIterableEquals(allCdxRecords, records.getCdxRecords());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, null, 2, records);
     assertIterableEquals(allCdxRecords, records.getCdxRecords());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 10000, 1, records);
     assertIterableEquals(allCdxRecords, records.getCdxRecords());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, artifacts.size(), 1, records);
     assertIterableEquals(allCdxRecords, records.getCdxRecords());
 
     // Get sets of CDX records with a page size of 8.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 8, 1, records);
 
     assertEquals(8, records.getCdxRecordCount());
@@ -310,7 +310,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     }
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 8, 2, records);
 
     assertEquals(1, records.getCdxRecordCount());
@@ -321,7 +321,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 
     // Get sets of CDX records with a page size of 4.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 4, 1, records);
 
     assertEquals(4, records.getCdxRecordCount());
@@ -331,7 +331,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     }
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 4, 2, records);
 
     assertEquals(4, records.getCdxRecordCount());
@@ -341,7 +341,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     }
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 4, 3, records);
 
     assertEquals(1, records.getCdxRecordCount());
@@ -352,7 +352,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 
     // Get sets of CDX records with a page size of 3.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 3, 1, records);
 
     assertEquals(3, records.getCdxRecordCount());
@@ -362,7 +362,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     }
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 3, 2, records);
 
     assertEquals(3, records.getCdxRecordCount());
@@ -372,7 +372,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     }
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 3, 3, records);
 
     assertEquals(3, records.getCdxRecordCount());
@@ -384,7 +384,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Get sets of CDX records with a page size of 1.
     for (int pageIdx = 0; pageIdx < 9; pageIdx++) {
       records = new CdxRecords();
-      new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+      new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	  repository, 1, pageIdx + 1, records);
 
       assertEquals(1, records.getCdxRecordCount());
@@ -394,32 +394,32 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 
     // Get empty results beyond the last CDX record.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 10000, 2, records);
     assertEquals(0, records.getCdxRecordCount());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, artifacts.size(), 2, records);
     assertEquals(0, records.getCdxRecordCount());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 8, 3, records);
     assertEquals(0, records.getCdxRecordCount());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 4, 4, records);
     assertEquals(0, records.getCdxRecordCount());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 3, 4, records);
     assertEquals(0, records.getCdxRecordCount());
 
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
+    new WaybackApiServiceImpl(null).getArtifactsCdxRecords(artifacts.iterator(),
 	repository, 1, 10, records);
     assertEquals(0, records.getCdxRecordCount());
   }
@@ -457,7 +457,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 
     CdxRecords records = new CdxRecords();
 
-    new CdxApiServiceImpl(null)
+    new WaybackApiServiceImpl(null)
         .getCdxRecords(collId, url, repository, false, null, null, null, records);
 
     // Validate count.
@@ -476,7 +476,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
       Artifact artifact = artifacts.get(8 - i);
 
       // Validate collection.
-      assertEquals(collId, artifact.getCollection());
+      assertEquals(collId, artifact.getNamespace());
 
       // Validate version.
       assertEquals(4 - i, artifact.getVersion().intValue());
@@ -505,7 +505,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.url2.example.com";
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, null, records);
 
     // Validate count.
@@ -524,7 +524,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
       Artifact artifact = artifacts.get(4 - i);
 
       // Validate collection.
-      assertEquals(collId, artifact.getCollection());
+      assertEquals(collId, artifact.getNamespace());
 
       // Validate version.
       assertEquals(3 - i, artifact.getVersion().intValue());
@@ -548,7 +548,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.url3.example.com";
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, null, records);
 
     // Validate count.
@@ -561,7 +561,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     Artifact artifact = artifacts.get(1);
 
     // Validate collection.
-    assertEquals(collId, artifact.getCollection());
+    assertEquals(collId, artifact.getNamespace());
 
     // Validate URL.
     assertEquals(url, artifact.getUri());
@@ -575,7 +575,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.";
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, true,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, true,
 	null, null, null, records);
 
     // Validate count.
@@ -590,7 +590,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
       artifact = artifacts.get(8 - i);
 
       // Validate collection.
-      assertEquals(collId, artifact.getCollection());
+      assertEquals(collId, artifact.getNamespace());
 
       // Validate URL.
       assertEquals(artifact.getUri(), cdxRecord.getUrl());
@@ -606,7 +606,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.url2.example.com";
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, "19700101000000", records);
 
     // Validate count.
@@ -621,7 +621,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
       artifact = artifacts.get(4 - i);
 
       // Validate collection.
-      assertEquals(collId, artifact.getCollection());
+      assertEquals(collId, artifact.getNamespace());
 
       // Validate URL.
       assertEquals(artifact.getUri(), cdxRecord.getUrl());
@@ -637,7 +637,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the first chronological record.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, "19700101000150", records);
 
     // Validate count.
@@ -649,7 +649,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the first chronological record.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, "19700101000154", records);
 
     // Validate count.
@@ -661,7 +661,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the second chronological record.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, "19700101000201", records);
 
     // Validate count.
@@ -675,7 +675,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the second chronological record.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, "19700101000205", records);
 
     // Validate count.
@@ -689,7 +689,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the third chronological record.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, "19700101000212", records);
 
     // Validate count.
@@ -703,7 +703,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the third chronological record.
     records = new CdxRecords();
-    new CdxApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
 	null, null, "19700101000216", records);
 
     // Validate count.
@@ -744,7 +744,7 @@ public class TestCdxApiServiceImpl extends SpringLockssTestCase4 {
 
     ArtifactSpec spec = new ArtifactSpec()
         .setArtifactId(id)
-        .setCollection(collection)
+        .setNamespace(collection)
         .setAuid(auid)
         .setUrl(url)
         .setVersion(version)

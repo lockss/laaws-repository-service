@@ -22,6 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,6 +30,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
 
+@Service
 public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements ArchivesApiDelegate {
   private static L4JLogger log = L4JLogger.getLogger();
   private final MediaType APPLICATION_WARC = MediaType.valueOf("application/warc");
@@ -44,23 +46,23 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
   }
 
   /**
-   * Controller for {@code POST /collections/{collectionId}/archives}.
+   * Controller for {@code POST /archives}.
    * <p>
    * Imports the artifacts from an archive into this LOCKSS Repository Service.
    *
-   * @param namespaces A {@link String} containing the collection ID of the artifacts.
    * @param auId         A {@link String} containing the AUID of the artifacts.
    * @param archive      A {@link MultipartFile} containing the archive.
+   * @param namespace    A {@link String} containing the namespace of the artifacts.
    * @return
    */
   @Override
-  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespaces) {
+  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace) {
     log.debug("archive.name = {}", archive.getName());
     log.debug("archive.origFileName = {}", archive.getOriginalFilename());
     log.debug("archive.type = {}", archive.getContentType());
 
-    String parsedRequest = String.format("collectionId: %s, auId: %s, requestUrl: %s",
-        namespaces, auId, ServiceImplUtil.getFullRequestUrl(request));
+    String parsedRequest = String.format("namespace: %s, auId: %s, requestUrl: %s",
+        namespace, auId, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -73,7 +75,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
         try (InputStream input = archive.getInputStream();
              ImportStatusIterable result =
-                 repo.addArtifacts(namespaces, auId, input, LockssRepository.ArchiveType.WARC, isCompressed)) {
+                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, isCompressed)) {
 
           try (DeferredTempFileOutputStream out =
                    new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {

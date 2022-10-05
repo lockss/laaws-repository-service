@@ -42,7 +42,7 @@ import java.util.List;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.api.CollectionsApiController;
+import org.lockss.laaws.rs.api.RepoinfoApiController;
 import org.lockss.laaws.rs.core.LockssRepository;
 import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.laaws.rs.model.ArtifactPageInfo;
@@ -50,7 +50,6 @@ import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.UrlUtil;
-import org.lockss.test.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -61,7 +60,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @RunWith(SpringRunner.class)
-@WebMvcTest(CollectionsApiController.class)
+@WebMvcTest(RepoinfoApiController.class)
 @AutoConfigureMockMvc(secure = false)
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
@@ -99,42 +98,42 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //    }
 
     @Test
-    public void getCollections() throws Exception {
+    public void getNamespaces() throws Exception {
         log.debug2("Invoked");
 
         // Perform tests against a repository service that is not ready (should expect 503)
         given(this.repo.isReady()).willReturn(false);
         assertFalse(repo.isReady());
 
-        this.controller.perform(getAuthBuilder(get("/collections")))
+        this.controller.perform(getAuthBuilder(get("/namespaces")))
         .andExpect(status().isServiceUnavailable());
 
         // Perform tests against a ready repository service
         given(this.repo.isReady()).willReturn(true);
 
-        // Set of collections IDs; start empty
-        List<String> collectionIds = new ArrayList<>();
+        // Set of namespaces; start empty
+        List<String> namespaces = new ArrayList<>();
 
-        // Assert that we get an empty set of collection IDs from the controller if repository returns empty set
-        given(this.repo.getCollectionIds()).willReturn(collectionIds);
-        this.controller.perform(getAuthBuilder(get("/collections")))
+        // Assert that we get an empty set of namespaces from the controller if repository returns empty set
+        given(this.repo.getNamespaces()).willReturn(namespaces);
+        this.controller.perform(getAuthBuilder(get("/namespaces")))
         .andExpect(status().isOk()).andExpect(content().string("[]"));
 
-        // Add collection IDs our set
-        collectionIds.add("test1");
-        collectionIds.add("test2");
+        // Add namespaces to our set
+        namespaces.add("test1");
+        namespaces.add("test2");
 
-        // Assert that we get back the same set of collection IDs
-        given(this.repo.getCollectionIds()).willReturn(collectionIds);
-        this.controller.perform(getAuthBuilder(get("/collections")))
+        // Assert that we get back the same set of namespaces
+        given(this.repo.getNamespaces()).willReturn(namespaces);
+        this.controller.perform(getAuthBuilder(get("/namespaces")))
         .andExpect(status().isOk())
         .andExpect(content().string("[\"test1\",\"test2\"]"));
         log.debug2("Done");
     }
 
     /**
-     * Tests the endpoint used to get the auids for a given collection.
-     * 
+     * Tests the endpoint used to get the auids for a given namespace.
+     *
      * @throws Exception if there are problems.
      */
     @Test
@@ -145,9 +144,8 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
 	  false);
 
-      String collId = "coll/Id:ABC";
-      URI endpointUri =
-	  new URI("/collections/" + UrlUtil.encodeUrl(collId) + "/aus");
+      String namespace = "ns/Id:ABC";
+      URI endpointUri = new URI("/aus?namespace=" + namespace);
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -160,16 +158,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Perform tests against a ready repository service.
       given(repo.isReady()).willReturn(true);
 
-      // Set up the collection.
-      List<String> collectionIds = new ArrayList<>();
-      collectionIds.add(collId);
-      given(repo.getCollectionIds()).willReturn(collectionIds);
+      // Set up the namespaces.
+      List<String> namespaces = new ArrayList<>();
+      namespaces.add(namespace);
+      given(repo.getNamespaces()).willReturn(namespaces);
 
       // Set of auids - Start empty.
       List<String> auids = new ArrayList<>();
 
       // The repository will return an empty set.
-      given(repo.getAuIds(collId)).willReturn(auids);
+      given(repo.getAuIds(namespace)).willReturn(auids);
 
       // Perform the request and get the response.
       String content =  controller.perform(getAuthBuilder(get(endpointUri)))
@@ -182,7 +180,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Assert that we get an empty set of auids from the controller.
       assertEquals(0, api.getAuids().size());
 
-      // Add auids to the collection that the repository will return.
+      // Add auids to the namespace that the repository will return.
       auids.add("test01");
       auids.add("test02");
 
@@ -194,7 +192,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the auids included in the response.
       List<String> auidBuffer =
 	  mapper.readValue(content, AuidPageInfo.class).getAuids();
-      
+
       // Assert that we get back the same set of auids.
       assertEquals(2, auidBuffer.size());
       assertEquals("test01", auidBuffer.get(0));
@@ -204,7 +202,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       assertNull(api.getPageInfo().getContinuationToken());
       assertNull(api.getPageInfo().getNextLink());
 
-      // Add more auids to the collection that the repository will return.
+      // Add more auids to the namespace that the repository will return.
       auids.add("test03");
       auids.add("test04");
       auids.add("test05");
@@ -216,7 +214,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
       // Request the first page containing just three auid.
       endpointUri =
-	  new URI("/collections/" + UrlUtil.encodeUrl(collId) + "/aus?limit=3");
+	  new URI("/aus?namespace" + namespace + "&limit=3");
       content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
@@ -243,7 +241,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -270,7 +268,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Remove the last digit of the next page link, resulting in the
       // specification of a different iterator hash code.
       nextLink = nextLink.substring(0, nextLink.length() - 1);
@@ -301,7 +299,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -335,24 +333,23 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
     /**
      * Tests the endpoint used to get the artifacts for a given AU in a given
-     * collection.
-     * 
+     * namespace.
+     *
      * @throws Exception if there are problems.
      */
     @Test
     public void reposRepositoryArtifactsGet() throws Exception {
       log.debug2("Invoked");
- 
+
       // The mapper of received content text to a page information object.
       ObjectMapper mapper = new ObjectMapper();
       mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
 	  false);
 
-      String collId = "coll/Id:ABC";
+      String namespace = "ns/Id:ABC";
       String auId = "org|lockss|plugin|TestPlugin&"
 	  + "base_url~http://test.com/&journal_issn~1234-5678&volume_name~987";
-      URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
-      	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=9");
+      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+namespace+"&version=all&limit=9");
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -365,21 +362,21 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Perform tests against a ready repository service.
       given(repo.isReady()).willReturn(true);
 
-      // Set up the collection.
-      List<String> collectionIds = new ArrayList<>();
-      collectionIds.add(collId);
-      given(repo.getCollectionIds()).willReturn(collectionIds);
+      // Set up the namespace.
+      List<String> namespaces = new ArrayList<>();
+      namespaces.add(namespace);
+      given(repo.getNamespaces()).willReturn(namespaces);
 
       // Set up the AU.
       List<String> auIds = new ArrayList<>();
       auIds.add(auId);
-      given(repo.getAuIds(collId)).willReturn(auIds);
+      given(repo.getAuIds(namespace)).willReturn(auIds);
 
       // Set of artifacts - Start empty.
       List<Artifact> artifacts = new ArrayList<>();
 
       // The repository will return an empty set.
-      given(repo.getArtifactsAllVersions(collId, auId)).willReturn(artifacts);
+      given(repo.getArtifactsAllVersions(namespace, auId)).willReturn(artifacts);
 
       // Perform the request and get the response.
       String content =  controller.perform(getAuthBuilder(get(endpointUri)))
@@ -392,32 +389,32 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Assert that we get an empty set of artifacts from the controller.
       assertEquals(0, api.getArtifacts().size());
 
-      // Add artifacts to the collection that the repository will return.
-      Artifact art1 = new Artifact("test01", collId, auId, "http://u1", 1, true,
+      // Add artifacts to the namespace that the repository will return.
+      Artifact art1 = new Artifact("test01", namespace, auId, "http://u1", 1, true,
 	  "surl", 1, null);
       artifacts.add(art1);
-      Artifact art2 = new Artifact("test02", collId, auId, "http://u2", 1, true,
+      Artifact art2 = new Artifact("test02", namespace, auId, "http://u2", 1, true,
 	  "surl", 1, null);
       artifacts.add(art2);
-      Artifact art3 = new Artifact("test03", collId, auId, "http://u2/b", 1,
+      Artifact art3 = new Artifact("test03", namespace, auId, "http://u2/b", 1,
 	  true, "surl", 1, null);
       artifacts.add(art3);
-      Artifact art4 = new Artifact("test04", collId, auId, "http://u2,a", 1,
+      Artifact art4 = new Artifact("test04", namespace, auId, "http://u2,a", 1,
 	  true, "surl", 1, null);
       artifacts.add(art4);
-      Artifact art5 = new Artifact("test05", collId, auId, "http://u3", 3, true,
+      Artifact art5 = new Artifact("test05", namespace, auId, "http://u3", 3, true,
 	  "surl", 1, null);
       artifacts.add(art5);
-      Artifact art6 = new Artifact("test06", collId, auId, "http://u3", 2, true,
+      Artifact art6 = new Artifact("test06", namespace, auId, "http://u3", 2, true,
 	  "surl", 1, null);
       artifacts.add(art6);
-      Artifact art7 = new Artifact("test07", collId, auId, "http://u4", 8, true,
+      Artifact art7 = new Artifact("test07", namespace, auId, "http://u4", 8, true,
 	  "surl", 1, null);
       artifacts.add(art7);
-      Artifact art8 = new Artifact("test08", collId, auId, "http://u4", 4, true,
+      Artifact art8 = new Artifact("test08", namespace, auId, "http://u4", 4, true,
 	  "surl", 1, null);
       artifacts.add(art8);
-      Artifact art9 = new Artifact("test09", collId, auId, "http://u4", 1, true,
+      Artifact art9 = new Artifact("test09", namespace, auId, "http://u4", 1, true,
 	  "surl", 1, null);
       artifacts.add(art9);
 
@@ -447,19 +444,18 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       assertNull(api.getPageInfo().getNextLink());
 
       // Test the pagination for all versions.
-      runAllVersionsPaginationTest(collId, auId, artifacts, mapper);
+      runAllVersionsPaginationTest(namespace, auId, artifacts, mapper);
 
       // Test the pagination for all versions with a prefix.
-      runUrlPrefixPaginationTest(collId, auId, "http://u", artifacts, mapper);
+      runUrlPrefixPaginationTest(namespace, auId, "http://u", artifacts, mapper);
       log.debug2("Done");
     }
 
-    private void runAllVersionsPaginationTest(String collId, String auId,
+    private void runAllVersionsPaginationTest(String namespace, String auId,
 	List<Artifact> artifacts, ObjectMapper mapper) throws Exception {
       log.debug2("Invoked");
       // Request the first page containing just two artifacts.
-      URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
-    	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=2");
+      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+namespace+"&version=all&limit=2");
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
@@ -485,7 +481,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -511,7 +507,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Remove the last digit of the next page link, resulting in the
       // specification of a different iterator hash code.
       nextLink = nextLink.substring(0, nextLink.length() - 1);
@@ -545,7 +541,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-      
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -571,7 +567,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -591,17 +587,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       log.debug2("Done");
     }
 
-    private void runUrlPrefixPaginationTest(String collId, String auId,
+    private void runUrlPrefixPaginationTest(String namespace, String auId,
 	String urlPrefix, List<Artifact> artifacts, ObjectMapper mapper)
 	    throws Exception {
       log.debug2("Invoked");
       // The repository will return the set of artifacts with the URL prefix.
-      given(repo.getArtifactsWithPrefixAllVersions(collId, auId, urlPrefix))
+      given(repo.getArtifactsWithPrefixAllVersions(namespace, auId, urlPrefix))
       .willReturn(artifacts);
 
       // Request the first page containing just two artifacts by prefix.
-      URI endpointUri = new URI("/collections/" + UrlUtil.encodeUrl(collId)
-    	+ "/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?version=all&limit=2"
+      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+namespace+"version=all&limit=2"
     	+ "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -628,7 +623,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -654,7 +649,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Remove the last digit of the next page link, resulting in the
       // specification of a different iterator hash code.
       nextLink = nextLink.substring(0, nextLink.length() - 1);
@@ -688,7 +683,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-      
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -714,7 +709,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
-  
+
       // Request the next page.
       content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -811,19 +806,19 @@ public class TestReposApiController extends SpringLockssTestCase4 {
   @Test
   public void testValidateLimit() {
     log.debug2("Invoked");
-    assertEquals(1, CollectionsApiServiceImpl.validateLimit(null, 1, 10, ""));
-    assertEquals(1, CollectionsApiServiceImpl.validateLimit(null, 10, 1, ""));
-    assertEquals(1, CollectionsApiServiceImpl.validateLimit(1, 1, 10, ""));
-    assertEquals(5, CollectionsApiServiceImpl.validateLimit(5, 1, 10, ""));
-    assertEquals(10, CollectionsApiServiceImpl.validateLimit(10, 1, 10, ""));
-    assertEquals(10, CollectionsApiServiceImpl.validateLimit(100, 1, 10, ""));
-    assertEquals(10, CollectionsApiServiceImpl.validateLimit(100, 50, 10, ""));
+    assertEquals(1, ServiceImplUtil.validateLimit(null, 1, 10, ""));
+    assertEquals(1, ServiceImplUtil.validateLimit(null, 10, 1, ""));
+    assertEquals(1, ServiceImplUtil.validateLimit(1, 1, 10, ""));
+    assertEquals(5, ServiceImplUtil.validateLimit(5, 1, 10, ""));
+    assertEquals(10, ServiceImplUtil.validateLimit(10, 1, 10, ""));
+    assertEquals(10, ServiceImplUtil.validateLimit(100, 1, 10, ""));
+    assertEquals(10, ServiceImplUtil.validateLimit(100, 50, 10, ""));
     log.debug2("Done");
   }
 
   /**
    * Provides an authenticated version of a mock request builder, if necessary.
-   * 
+   *
    * @param builder A MockHttpServletRequestBuilder with the unauthenticated
    *                version of the builder.
    * @return a MockHttpServletRequestBuilder with the Authorization header, if

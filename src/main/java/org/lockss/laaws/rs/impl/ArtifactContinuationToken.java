@@ -31,10 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.impl;
 
-import java.util.List;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.StringUtil;
 import org.lockss.util.UrlUtil;
+
+import java.util.List;
 
 /**
  * The continuation token used to paginate through a list of artifacts.
@@ -45,7 +46,7 @@ public class ArtifactContinuationToken {
   private final static L4JLogger log = L4JLogger.getLogger();
   private static final String separator = ":";
 
-  private String collectionId = null;
+  private String namespace = null;
   private String auid = null;
   private String uri = null;
   private Integer version = null;
@@ -77,8 +78,8 @@ public class ArtifactContinuationToken {
 	    StringUtil.breakAt(webRequestContinuationToken.trim(), separator);
 	log.trace("tokenItems = {}", tokenItems);
 
-	collectionId = UrlUtil.decodeUrl(tokenItems.get(0).trim());
-	log.trace("collectionId = {}", collectionId);
+	namespace = UrlUtil.decodeUrl(tokenItems.get(0).trim());
+	log.trace("namespace = {}", namespace);
 
 	auid = UrlUtil.decodeUrl(tokenItems.get(1).trim());
 	log.trace("auid = {}", auid);
@@ -109,7 +110,7 @@ public class ArtifactContinuationToken {
   /**
    * Constructor from members.
    * 
-   * @param collectionId     A String with the collection identifier of the last
+   * @param namespace     A String with the namespace of the last
    *                         artifact transferred.
    * @param auid             A String with the archival unit identifier of the
    *                         last artifact transferred.
@@ -119,9 +120,9 @@ public class ArtifactContinuationToken {
    *                         transferred.
    * @param iteratorHashCode An Integer with the hash code of the iterator used.
    */
-  public ArtifactContinuationToken(String collectionId, String auid, String uri,
+  public ArtifactContinuationToken(String namespace, String auid, String uri,
       Integer version, Integer iteratorHashCode) {
-    this.collectionId = collectionId;
+    this.namespace = namespace;
     this.auid = auid;
     this.uri = uri;
     this.version = version;
@@ -131,13 +132,13 @@ public class ArtifactContinuationToken {
   }
 
   /**
-   * Provides the collection identifier of the last artifact transferred.
+   * Provides the namespace of the last artifact transferred.
    * 
-   * @return a String with the collection identifier of the last artifact
+   * @return a String with the namespace of the last artifact
    *         transferred.
    */
   public String getCollectionId() {
-    return collectionId;
+    return namespace;
   }
 
   /**
@@ -184,9 +185,9 @@ public class ArtifactContinuationToken {
    *         continuation token.
    */
   public String toWebResponseContinuationToken() {
-    if (collectionId != null && auid != null && uri != null && version != null
+    if (namespace != null && auid != null && uri != null && version != null
 	&& iteratorHashCode != null) {
-      String encodedToken = UrlUtil.encodeUrl(collectionId) + separator
+      String encodedToken = UrlUtil.encodeUrl(namespace) + separator
 	  + UrlUtil.encodeUrl(auid) + separator + UrlUtil.encodeUrl(uri)
 	  + separator + version + separator + iteratorHashCode;
       log.trace("encodedToken = {}", encodedToken);
@@ -200,7 +201,7 @@ public class ArtifactContinuationToken {
 
   @Override
   public String toString() {
-    return "[ArtifactContinuationToken collectionId=" + collectionId
+    return "[ArtifactContinuationToken namespace=" + namespace
 	+ ", auid=" + auid + ", uri=" + uri + ", version=" + version
 	+ ", iteratorHashCode=" + iteratorHashCode + "]";
   }
@@ -210,21 +211,21 @@ public class ArtifactContinuationToken {
    */
   private void validateMembers() {
     // Validate that all members are null or all non-null. 
-    if ((collectionId == null && auid == null && uri == null && version == null
+    if ((namespace == null && auid == null && uri == null && version == null
 	 && iteratorHashCode != null)
-	|| (collectionId != null && auid != null && uri != null
+	|| (namespace != null && auid != null && uri != null
 	    && version != null && iteratorHashCode == null)) {
-      String message = "Invalid member combination: collectionId = '"
-	  + collectionId + "', auid = '" + auid + "', uri = '" + uri
+      String message = "Invalid member combination: namespace = '"
+	  + namespace + "', auid = '" + auid + "', uri = '" + uri
 	  + "', version = '" + version + "', iteratorHashCode = '"
 	  + iteratorHashCode + "'";
       log.warn(message);
       throw new IllegalArgumentException(message);
     }
 
-    // Validate that the collection identifier is not empty.
-    if (collectionId != null && collectionId.isEmpty()) {
-      String message = "Invalid member: collectionId = '" + collectionId + "'";
+    // Validate that the namespace is not empty.
+    if (namespace != null && namespace.isEmpty()) {
+      String message = "Invalid member: namespace = '" + namespace + "'";
       log.warn(message);
       throw new IllegalArgumentException(message);
     }
