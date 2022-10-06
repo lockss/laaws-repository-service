@@ -789,7 +789,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     //// Artifact repository ID information headers
     ArtifactIdentifier id = ad.getIdentifier();
     headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
-    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_KEY, id.getNamespace());
+    headers.set(ArtifactConstants.ARTIFACT_NAMESPACE_KEY, id.getNamespace());
     headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
     headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
     headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));

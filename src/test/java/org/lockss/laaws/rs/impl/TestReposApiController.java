@@ -145,7 +145,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 	  false);
 
       String namespace = "ns/Id:ABC";
-      URI endpointUri = new URI("/aus?namespace=" + namespace);
+      URI endpointUri = new URI("/aus?namespace=" + UrlUtil.encodeUrl(namespace));
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -214,7 +214,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
       // Request the first page containing just three auid.
       endpointUri =
-	  new URI("/aus?namespace" + namespace + "&limit=3");
+	  new URI("/aus?namespace=" + UrlUtil.encodeUrl(namespace) + "&limit=3");
       content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
@@ -349,7 +349,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String namespace = "ns/Id:ABC";
       String auId = "org|lockss|plugin|TestPlugin&"
 	  + "base_url~http://test.com/&journal_issn~1234-5678&volume_name~987";
-      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+namespace+"&version=all&limit=9");
+      URI endpointUri =
+          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          "&version" +
+          "=all&limit=9");
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -455,7 +458,8 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 	List<Artifact> artifacts, ObjectMapper mapper) throws Exception {
       log.debug2("Invoked");
       // Request the first page containing just two artifacts.
-      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+namespace+"&version=all&limit=2");
+      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          "&version=all&limit=2");
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
@@ -596,7 +600,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       .willReturn(artifacts);
 
       // Request the first page containing just two artifacts by prefix.
-      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+namespace+"version=all&limit=2"
+      URI endpointUri =
+          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          "version" +
+          "=all&limit=2"
     	+ "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
