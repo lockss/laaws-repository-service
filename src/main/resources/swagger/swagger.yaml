@@ -54,7 +54,7 @@ paths:
   /namespaces:
     get:
       tags:
-        - namespaces
+        - repo
       summary: "Get namespaces of the committed artifacts in the repository"
       operationId: getNamespaces
       parameters: []
@@ -105,18 +105,19 @@ paths:
         502:
           description: "Internal error creating artifact"
   /artifacts:
+    parameters:
+      - name: "namespace"
+        description: "Namespace of the artifacts"
+        in: "query"
+        type: "string"
+        required: false
+        default: "lockss"
     get:
       tags:
         - artifacts
       summary: "Returns all artifacts that match a given a URL or URL prefix and/or version."
       operationId: getArtifactsFromAllAus
       parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "query"
-          type: "string"
-          required: false
-          default: "lockss"
         - name: "url"
           in: "query"
           required: false
@@ -207,13 +208,6 @@ paths:
           description: "Client not authorized to create artifacts"
         502:
           description: "Internal error creating artifact"
-    parameters:
-    - name: "namespace"
-      description: "Namespace of the artifacts"
-      in: "query"
-      type: "string"
-      required: false
-      default: "lockss"
   /artifacts/{artifactid}:
     parameters:
       - name: "namespace"
