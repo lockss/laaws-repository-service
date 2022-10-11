@@ -494,7 +494,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             // Yes: Initialize an artifact with properties from the last one
             // already returned in the previous page of results.
             Artifact lastArtifact = new Artifact();
-            lastArtifact.setNamespace(requestAct.getCollectionId());
+            lastArtifact.setNamespace(requestAct.getNamespace());
             lastArtifact.setAuid(requestAct.getAuid());
             lastArtifact.setUri(requestAct.getUri());
             lastArtifact.setVersion(requestAct.getVersion());

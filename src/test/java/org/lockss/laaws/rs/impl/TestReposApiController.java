@@ -58,6 +58,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(RepoinfoApiController.class)
@@ -145,7 +146,9 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 	  false);
 
       String namespace = "ns/Id:ABC";
-      URI endpointUri = new URI("/aus?namespace=" + UrlUtil.encodeUrl(namespace));
+      URI endpointUri = UriComponentsBuilder.fromUriString("/aus")
+          .queryParam("namespace", namespace)
+          .build().toUri();
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -213,8 +216,11 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       auids.add("test10");
 
       // Request the first page containing just three auid.
-      endpointUri =
-	  new URI("/aus?namespace=" + UrlUtil.encodeUrl(namespace) + "&limit=3");
+      endpointUri = UriComponentsBuilder.fromUriString("/aus")
+          .queryParam("namespace", namespace)
+          .queryParam("limit", 3)
+          .build().toUri();
+
       content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
@@ -269,12 +275,15 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
-      // Remove the last digit of the next page link, resulting in the
+      // Remove the last digit of the continuation token, resulting in the
       // specification of a different iterator hash code.
-      nextLink = nextLink.substring(0, nextLink.length() - 1);
+      URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
+          .replaceQueryParam("continuationToken",
+              UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
+          .build(true).toUri();
 
       // Request the next page.
-      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
+      content = controller.perform(getAuthBuilder(get(nextLinkUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -350,9 +359,11 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String auId = "org|lockss|plugin|TestPlugin&"
 	  + "base_url~http://test.com/&journal_issn~1234-5678&volume_name~987";
       URI endpointUri =
-          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
-          "&version" +
-          "=all&limit=9");
+          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
+              .queryParam("namespace", namespace)
+              .queryParam("version", "all")
+              .queryParam("limit", 9)
+              .build().toUri();
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -458,8 +469,13 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 	List<Artifact> artifacts, ObjectMapper mapper) throws Exception {
       log.debug2("Invoked");
       // Request the first page containing just two artifacts.
-      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
-          "&version=all&limit=2");
+      URI endpointUri =
+          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
+              .queryParam("namespace", namespace)
+              .queryParam("version", "all")
+              .queryParam("limit", 2)
+              .build().toUri();
+
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
@@ -512,12 +528,15 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
-      // Remove the last digit of the next page link, resulting in the
+      // Remove the last digit of the continuation token, resulting in the
       // specification of a different iterator hash code.
-      nextLink = nextLink.substring(0, nextLink.length() - 1);
+      URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
+          .replaceQueryParam("continuationToken",
+              UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
+          .build(true).toUri();
 
       // Request the next page.
-      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
+      content = controller.perform(getAuthBuilder(get(nextLinkUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 
@@ -601,10 +620,13 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
       // Request the first page containing just two artifacts by prefix.
       URI endpointUri =
-          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
-          "version" +
-          "=all&limit=2"
-    	+ "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));
+          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
+              .queryParam("namespace", namespace)
+              .queryParam("version", "all")
+              .queryParam("limit", 2)
+              .queryParam("urlPrefix", urlPrefix)
+              .build().toUri();
+
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
@@ -657,12 +679,15 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
-      // Remove the last digit of the next page link, resulting in the
+      // Remove the last digit of the continuation token, resulting in the
       // specification of a different iterator hash code.
-      nextLink = nextLink.substring(0, nextLink.length() - 1);
+      URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
+          .replaceQueryParam("continuationToken",
+              UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
+          .build(true).toUri();
 
       // Request the next page.
-      content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
+      content = controller.perform(getAuthBuilder(get(nextLinkUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
 	  .getContentAsString();
 

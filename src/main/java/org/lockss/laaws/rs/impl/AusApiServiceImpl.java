@@ -412,7 +412,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
             // Yes: Initialize an artifact with properties from the last one
             // already returned in the previous page of results.
             Artifact lastArtifact = new Artifact();
-            lastArtifact.setNamespace(requestAct.getCollectionId());
+            lastArtifact.setNamespace(requestAct.getNamespace());
             lastArtifact.setAuid(requestAct.getAuid());
             lastArtifact.setUri(requestAct.getUri());
             lastArtifact.setVersion(requestAct.getVersion());
@@ -549,6 +549,8 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
           nextLinkBuffer.append("continuationToken=")
               .append(UrlUtil.encodeUrl(continuationToken));
         }
+
+        nextLinkBuffer.append("&namespace=").append(UrlUtil.encodeUrl(namespace));
 
         String nextLink = nextLinkBuffer.toString();
         log.trace("nextLink = {}", nextLink);
@@ -759,6 +761,8 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
           nextLinkBuffer.append("continuationToken=")
               .append(UrlUtil.encodeUrl(continuationToken));
         }
+
+        nextLinkBuffer.append("&namespace=").append(UrlUtil.encodeUrl(namespace));
 
         String nextLink = nextLinkBuffer.toString();
         log.trace("nextLink = {}", nextLink);

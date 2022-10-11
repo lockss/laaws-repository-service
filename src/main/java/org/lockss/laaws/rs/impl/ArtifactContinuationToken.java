@@ -137,7 +137,7 @@ public class ArtifactContinuationToken {
    * @return a String with the namespace of the last artifact
    *         transferred.
    */
-  public String getCollectionId() {
+  public String getNamespace() {
     return namespace;
   }
 
