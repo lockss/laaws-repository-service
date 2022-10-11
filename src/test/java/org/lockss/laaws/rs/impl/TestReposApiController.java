@@ -279,7 +279,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       // specification of a different iterator hash code.
       URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
           .replaceQueryParam("continuationToken",
-              UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
+              continuationToken.substring(0, continuationToken.length() - 1))
           .build(true).toUri();
 
       // Request the next page.
