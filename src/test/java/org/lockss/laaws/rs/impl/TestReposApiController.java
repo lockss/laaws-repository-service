@@ -30,16 +30,8 @@
 
 package org.lockss.laaws.rs.impl;
 
-import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.RepoinfoApiController;
@@ -59,6 +51,15 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(RepoinfoApiController.class)
@@ -358,12 +359,17 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String namespace = "ns/Id:ABC";
       String auId = "org|lockss|plugin|TestPlugin&"
 	  + "base_url~http://test.com/&journal_issn~1234-5678&volume_name~987";
+//      URI endpointUri =
+//          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
+//              .queryParam("namespace", namespace)
+//              .queryParam("version", "all")
+//              .queryParam("limit", 9)
+//              .build().toUri();
+
       URI endpointUri =
-          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
-              .queryParam("namespace", namespace)
-              .queryParam("version", "all")
-              .queryParam("limit", 9)
-              .build().toUri();
+          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+              "&version" +
+              "=all&limit=9");
 
       // Perform tests against a repository service that is not ready (should
       // expect 503).
@@ -469,12 +475,15 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 	List<Artifact> artifacts, ObjectMapper mapper) throws Exception {
       log.debug2("Invoked");
       // Request the first page containing just two artifacts.
-      URI endpointUri =
-          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
-              .queryParam("namespace", namespace)
-              .queryParam("version", "all")
-              .queryParam("limit", 2)
-              .build().toUri();
+//      URI endpointUri =
+//          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
+//              .queryParam("namespace", namespace)
+//              .queryParam("version", "all")
+//              .queryParam("limit", 2)
+//              .build().toUri();
+
+      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          "&version=all&limit=2");
 
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
@@ -618,14 +627,23 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       given(repo.getArtifactsWithPrefixAllVersions(namespace, auId, urlPrefix))
       .willReturn(artifacts);
 
-      // Request the first page containing just two artifacts by prefix.
+//      Map<String, Object> uriVars = new HashMap<>();
+//      uriVars.put("auId", UrlUtil.encodeUrl(auId));
+//
+//      // Request the first page containing just two artifacts by prefix.
+//      URI newEndpoint =
+//          UriComponentsBuilder.fromPath("/aus/{auId}/artifacts")
+//              .queryParam("namespace", UrlUtil.encodeQueryArg(namespace))
+//              .queryParam("version", "all")
+//              .queryParam("limit", 2)
+//              .queryParam("urlPrefix", urlPrefix)
+//              .buildAndExpand(uriVars).toUri();
+
       URI endpointUri =
-          UriComponentsBuilder.fromUriString("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts")
-              .queryParam("namespace", namespace)
-              .queryParam("version", "all")
-              .queryParam("limit", 2)
-              .queryParam("urlPrefix", urlPrefix)
-              .build().toUri();
+          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+              "&version" +
+              "=all&limit=2"
+              + "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));
 
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
 	  .andExpect(status().isOk()).andReturn().getResponse()
