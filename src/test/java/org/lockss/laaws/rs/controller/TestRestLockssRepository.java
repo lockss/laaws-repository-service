@@ -908,22 +908,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetArtifact() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifact(null, null, null);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifact(null, AUID1, URL1);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.getArtifact(NS1, null, URL1);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "url",
+        "Null AUID or URL",
         () -> {
           repository.getArtifact(NS1, AUID1, null);
         });
@@ -949,19 +939,21 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetArtifactData() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null",
+        "Null artifact ID",
         () -> {
           repository.getArtifactData((String) null, (String) null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null",
-        () -> {
-          repository.getArtifactData(null, ARTID1);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "Null",
+        "Null artifact ID",
         () -> {
           repository.getArtifactData(NS1, null);
+        });
+
+    // Artifact not found in default namespace
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+        "Artifact not found",
+        () -> {
+          repository.getArtifactData(null, ARTID1);
         });
 
     // Artifact ID not found
@@ -1016,42 +1008,32 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetArtifactVersion() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
+        "Null AUID",
         () -> {
           repository.getArtifactVersion(null, null, null, null, false);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
+        "Null AUID",
         () -> {
           repository.getArtifactVersion(null, null, null, null, true);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactVersion(null, AUID1, URL1, 1, false);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactVersion(null, AUID1, URL1, 1, true);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.getArtifactVersion(NS1, null, URL1, 1, false);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.getArtifactVersion(NS1, null, URL1, 1, true);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "url",
+        "URL",
         () -> {
           repository.getArtifactVersion(NS1, AUID1, null, 1, false);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "url",
+        "URL",
         () -> {
           repository.getArtifactVersion(NS1, AUID1, null, 1, true);
         });
@@ -1128,17 +1110,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testAuSize() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
+        "Null AUID",
         () -> {
           repository.auSize(null, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.auSize(null, AUID1);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.auSize(NS1, null);
         });
@@ -1182,11 +1159,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         });
     assertThrows(IllegalArgumentException.class,
         (Executable) () -> {
-          repository.commitArtifact(null, ARTID1);
-        });
-    assertThrows(IllegalArgumentException.class,
-        (Executable) () -> {
           repository.commitArtifact(NS1, null);
+        });
+
+    // Artifact not found in default namespace
+    assertThrows(LockssNoSuchArtifactIdException.class,
+        (Executable) () -> {
+          repository.commitArtifact(null, ARTID1);
         });
 
     // Commit already committed artifact
@@ -1219,7 +1198,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testDeleteArtifact() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or artifact id",
+        "Null artifact ID",
         () -> {
           repository.deleteArtifact(null, null);
         });
@@ -1228,10 +1207,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         () -> {
           repository.deleteArtifact(NS1, null);
         });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
+
+    // Artifact not found in default namespace
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
+        "Could not remove artifact id: " + NO_ARTID,
         () -> {
-          repository.deleteArtifact(null, AUID1);
+          repository.deleteArtifact(null, NO_ARTID);
         });
 
     // Delete non-existent artifact
@@ -1400,19 +1381,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetAllArtifacts() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or au id",
+        "Null AUID",
         () -> {
           repository.getArtifacts(null, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.getArtifacts(NS1, null);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifacts(null, AUID1);
         });
 
     // Non-existent namespace & auid
@@ -1452,7 +1428,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetAllArtifactsWithPrefix() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace, au id or prefix",
+        "Null AUID or URL prefix",
         () -> {
           repository.getArtifactsWithPrefix(null, null, null);
         });
@@ -1462,14 +1438,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           repository.getArtifactsWithPrefix(NS1, AUID1, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.getArtifactsWithPrefix(NS1, null, PREFIX1);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactsWithPrefix(null, AUID1, PREFIX1);
         });
 
     // Non-existent namespace & auid
@@ -1499,19 +1470,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetAllArtifactsAllVersions() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or au id",
+        "Null AUID",
         () -> {
           repository.getArtifactsAllVersions(null, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.getArtifactsAllVersions(NS1, null);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactsAllVersions(null, AUID1);
         });
 
     // Non-existent namespace & auid
@@ -1547,7 +1513,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetAllArtifactsWithPrefixAllVersions() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace, au id or prefix",
+        "Null AUID or URL prefix",
         () -> {
           repository.getArtifactsWithPrefixAllVersions(null, null, null);
         });
@@ -1557,14 +1523,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           repository.getArtifactsWithPrefixAllVersions(NS1, AUID1, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "Null AUID",
         () -> {
           repository.getArtifactsWithPrefixAllVersions(NS1, null, PREFIX1);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactsWithPrefixAllVersions(null, AUID1, PREFIX1);
         });
 
     // Non-existent namespace & auid
@@ -1593,24 +1554,19 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetArtifactAllVersions() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace, au id or url",
+        "Null AUID or URL",
         () -> {
           repository.getArtifactsAllVersions(null, null, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "url",
+        "URL",
         () -> {
           repository.getArtifactsAllVersions(NS1, AUID1, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "au",
+        "AUID",
         () -> {
           repository.getArtifactsAllVersions(NS1, null, URL1);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactsAllVersions(null, AUID1, URL1);
         });
 
     // Non-existent namespace, auid or url
@@ -1634,35 +1590,25 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetArtifactsWithUrlFromAllAus() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or url",
+        "Null URL",
         () -> {
           repository.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.ALL);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "url",
+        "Null URL",
         () -> {
           repository.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.ALL);
         });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactsWithUrlFromAllAus(null, URL1, ArtifactVersions.ALL);
-        });
 
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or url",
+        "Null URL",
         () -> {
           repository.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.LATEST);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "url",
+        "Null URL",
         () -> {
           repository.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.LATEST);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.getArtifactsWithUrlFromAllAus(null, URL1, ArtifactVersions.LATEST);
         });
 
     // Non-existent namespace or url
@@ -1712,36 +1658,26 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetArtifactsWithUrlPrefixFromAllAus() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or prefix",
+        "Null URL prefix",
         () -> {
           repository.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.ALL);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or prefix",
+        "Null URL prefix",
         () -> {
           repository.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.ALL);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or prefix",
-        () -> {
-          repository.getArtifactsWithUrlPrefixFromAllAus(null, URL1, ArtifactVersions.ALL);
         });
 
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or prefix",
+        "Null URL prefix",
         () -> {
           repository.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.LATEST);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or prefix",
+        "Null URL prefix",
         () -> {
           repository.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.LATEST);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or prefix",
-        () -> {
-          repository.getArtifactsWithUrlPrefixFromAllAus(null, URL1, ArtifactVersions.LATEST);
         });
 
     // Non-existent namespace or url
@@ -1808,13 +1744,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   public void testGetAuIds() throws IOException {
-    // Illegal args
-    assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace",
-        () -> {
-          repository.getAuIds(null);
-        });
-
     // Non-existent namespace
     assertEmpty(repository.getAuIds(NO_NAMESPACE));
 
@@ -1849,19 +1778,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testIsArtifactCommitted() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null namespace or artifact id",
+        "Null artifact ID",
         () -> {
           repository.isArtifactCommitted(null, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "artifact",
+        "Null artifact ID",
         () -> {
           repository.isArtifactCommitted(NS1, null);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "namespace",
-        () -> {
-          repository.isArtifactCommitted(null, ARTID1);
         });
 
     // non-existent namespace, artifact id
@@ -1993,6 +1917,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           }
         }
       }
+      break;
+      case "unicode":
+        res.add(ArtifactSpec.forNsAuUrl("c", "a", "111").thenCommit());
+        res.add(ArtifactSpec.forNsAuUrl("c", "a", "ZZZ").thenCommit());
+        res.add(ArtifactSpec.forNsAuUrl("c", "a", "zzz").thenCommit());
+        res.add(ArtifactSpec.forNsAuUrl("c", "a", "\u03BA\u1F79\u03C3\u03BC\u03B5").thenCommit());
+        res.add(ArtifactSpec.forNsAuUrl("c", "a", "Heiz\u00F6lr\u00FCcksto\u00DFabd\u00E4mpfung").thenCommit());
       break;
       default:
         fail("getVariantSpecs called with unknown variant name: " + variant);
