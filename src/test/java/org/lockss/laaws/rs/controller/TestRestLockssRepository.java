@@ -1924,7 +1924,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         res.add(ArtifactSpec.forNsAuUrl("c", "a", "zzz").thenCommit());
         res.add(ArtifactSpec.forNsAuUrl("c", "a", "\u03BA\u1F79\u03C3\u03BC\u03B5").thenCommit());
         res.add(ArtifactSpec.forNsAuUrl("c", "a", "Heiz\u00F6lr\u00FCcksto\u00DFabd\u00E4mpfung").thenCommit());
-      break;
+        break;
       default:
         fail("getVariantSpecs called with unknown variant name: " + variant);
     }
