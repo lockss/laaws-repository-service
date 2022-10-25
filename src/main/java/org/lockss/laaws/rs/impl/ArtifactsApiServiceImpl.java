@@ -471,7 +471,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         missingIterator = iterator == null;
       }
 
-      ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions);
+      ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions.toUpperCase());
 
       if (url != null) {
         artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, artifactVersions);
