@@ -155,10 +155,16 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
         auidIterators =
             Collections.synchronizedMap(new PassiveExpiringMap<>(auidIteratorTimeout));
       }
-      TimerQueue.schedule(Deadline.in(1 * TimeUtil.HOUR), 1 * TimeUtil.HOUR,
-          iteratorMapTimeout, null);
+
+      if (iteratorMapTimer != null) {
+        TimerQueue.cancel(iteratorMapTimer);
+      }
+      iteratorMapTimer = TimerQueue.schedule(Deadline.in(
+          1 * TimeUtil.HOUR), 1 * TimeUtil.HOUR, iteratorMapTimeout, null);
     }
   }
+
+  TimerQueue.Request iteratorMapTimer;
 
   // Timer callback for periodic removal of timed-out iterator continuations
   private TimerQueue.Callback iteratorMapTimeout =

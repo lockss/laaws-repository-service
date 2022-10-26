@@ -145,10 +145,16 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         artifactIterators =
             Collections.synchronizedMap(new PassiveExpiringMap<>(artifactIteratorTimeout));
       }
+
+      if (iteratorMapTimer != null) {
+        TimerQueue.cancel(iteratorMapTimer);
+      }
       TimerQueue.schedule(Deadline.in(1 * TimeUtil.HOUR), 1 * TimeUtil.HOUR,
           iteratorMapTimeout, null);
     }
   }
+
+  TimerQueue.Request iteratorMapTimer;
 
   // Timer callback for periodic removal of timed-out iterator continuations
   private TimerQueue.Callback iteratorMapTimeout =
