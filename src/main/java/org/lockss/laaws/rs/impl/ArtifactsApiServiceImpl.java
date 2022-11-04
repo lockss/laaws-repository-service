@@ -2,6 +2,8 @@ package org.lockss.laaws.rs.impl;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
+import org.apache.http.ProtocolVersion;
+import org.apache.http.message.BasicStatusLine;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -189,13 +191,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
                                                  String uri,
                                                  MultipartFile content,
                                                  String namespace,
-                                                 Long collectionDate) {
+                                                 Long collectionDate,
+                                                 Boolean asHttpResponse) {
 
     long start = System.currentTimeMillis();
 
     String parsedRequest = String.format(
-        "namespace: %s, auid: %s, uri: %s, collectionDate: %s, requestUrl: %s",
-        namespace, auid, uri, collectionDate, ServiceImplUtil.getFullRequestUrl(request));
+        "namespace: %s, auid: %s, uri: %s, collectionDate: %s, asHttpResponse: %s, requestUrl: %s",
+        namespace, auid, uri, collectionDate, asHttpResponse, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -204,41 +207,21 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     // Check URI.
     validateUri(uri, parsedRequest);
 
-    // Content-Type of the content part
-    MediaType contentType = MediaType.parseMediaType(content.getContentType());
-
-    // Only accept artifact encoded within an HTTP response. This is enforced by checking that
-    // the artifact content part is of type "application/http;msgtype=response".
-    if (!isHttpResponseType(contentType)) {
-      String errorMessage = String.format(
-          "Failed to add artifact; expected %s but got %s",
-          APPLICATION_HTTP_RESPONSE,
-          contentType);
-
-      log.warn(errorMessage);
-      log.warn("Parsed request: {}", parsedRequest);
-
-      throw new LockssRestServiceException(errorMessage)
-          .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
-          .setHttpStatus(HttpStatus.BAD_REQUEST)
-          .setParsedRequest(parsedRequest);
-    }
-
     try {
-      //// Convert multipart stream to ArtifactData
-      ArtifactData artifactData =
-          ArtifactDataFactory.fromHttpResponseStream(content.getInputStream());
+      // Transform multipart stream to ArtifactData
+      ArtifactData ad = asHttpResponse ?
+          ArtifactDataFactory.fromHttpResponseStream(content.getInputStream()) :
+          ArtifactDataFactory.fromResource(content.getInputStream());
 
-      //// Set ArtifactData properties from the POST request
+      // Set artifact identifier
+      ad.setIdentifier(new ArtifactIdentifier(namespace, auid, uri, 0));
 
-      //TODO: FIX THIS CALL
-      ArtifactIdentifier id =
-          new ArtifactIdentifier(namespace, auid, uri, 0);
-      artifactData.setIdentifier(id);
+      long len = asHttpResponse ?
+          content.getSize() - ArtifactDataUtil.getHttpResponseHeader(ad).length :
+          content.getSize();
 
-      // Set artifact data content-length
-      byte[] headers = ArtifactDataUtil.getHttpResponseHeader(artifactData);
-      artifactData.setContentLength(content.getSize() - headers.length);
+      // Set artifact data content-length (bytes)
+      ad.setContentLength(len);
 
       // Set artifact data digest
       DigestFileItem item = ((DigestFileItem)((CommonsMultipartFile)content).getFileItem());
@@ -247,23 +230,29 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           item.getDigest().getAlgorithm(),
           new String(Hex.encodeHex(item.getDigest().digest())));
 
-      artifactData.setContentDigest(contentDigest);
+      ad.setContentDigest(contentDigest);
 
       // Set artifact collection date if provided
       if (collectionDate != null) {
-        artifactData.setCollectionDate(collectionDate);
+        ad.setCollectionDate(collectionDate);
+      }
+
+      // Set artifact's content-type to content-type of content part iff
+      // it is not to be processed as an HTTP response
+      MediaType type = MediaType.valueOf(content.getContentType());
+      if (!asHttpResponse) {
+        ad.getMetadata().setContentType(type);
       }
 
       //// Add artifact to internal repository
       try {
-        Artifact artifact = repo.addArtifact(artifactData);
-        log.debug2("Wrote artifact to {}", artifact.getStorageUrl());
+        Artifact artifact = repo.addArtifact(ad);
 
         long end = System.currentTimeMillis();
 
-        log.debug2("artifactId: {}, duration: {}, length: {}",
+        log.debug2("Added new artifact [artifactId: {}, duration: {} ms, length: {}]",
             artifact.getId(),
-            TimeUtil.timeIntervalToString(end-start),
+            TimeUtil.timeIntervalToString(end - start),
             StringUtil.sizeToString(content.getSize()));
 
         return new ResponseEntity<>(artifact, HttpStatus.OK);
@@ -348,10 +337,12 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifact(String artifactid, String namespace, String includeContent) {
+  public ResponseEntity getArtifact(String artifactid, String namespace, String includeContent,
+                                    Boolean asHttpResponse) {
+
     String parsedRequest = String.format(
-        "namespace: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
-        namespace, artifactid, includeContent, ServiceImplUtil.getFullRequestUrl(request));
+        "namespace: %s, artifactid: %s, includeContent: %s, asHttpResponse: {}, requestUrl: %s",
+        namespace, artifactid, includeContent, asHttpResponse, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -362,6 +353,13 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData = repo.getArtifactData(namespace, artifactid);
+
+      // Force the multipart response to look like one for an artifact with HTTP
+      if (!artifactData.hasHttpStatus() && asHttpResponse) {
+        log.debug2("Forcing default HTTP status (asHttpResponse = true)");
+        artifactData.setHttpStatus(
+            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"));
+      }
 
       // Break ArtifactData into multiparts
       MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
@@ -713,8 +711,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       ArtifactData artifactData, LockssRepository.IncludeContent includeContent, long smallContentThreshold)
       throws IOException {
 
-    // Get artifact ID
-    String artifactid = artifactData.getIdentifier().getId();
+    String artifactId = artifactData.getIdentifier().getId();
 
     // Holds multipart response parts
     MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
@@ -747,14 +744,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     }
 
     //// Add artifact HTTP status multipart if present
-    if (artifactData.getHttpStatus() != null) {
+    if (artifactData.hasHttpStatus()) {
       // Part's headers
       HttpHeaders partHeaders = new HttpHeaders();
       partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
 
       // Create resource containing HTTP status byte array
       Resource resource = new NamedByteArrayResource(
-          artifactid,
+          artifactId,
           ArtifactDataUtil.getHttpStatusByteArray(artifactData.getHttpStatus())
       );
 
@@ -776,7 +773,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       partHeaders.setContentLength(artifactData.getContentLength());
 
       // Artifact content
-      Resource resource = new NamedInputStreamResource(artifactid, artifactData.getInputStream());
+      Resource resource = new NamedInputStreamResource(artifactId, artifactData.getInputStream());
 
       // Assemble content part and add to multiparts map
       parts.add(

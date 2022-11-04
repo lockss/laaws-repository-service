@@ -89,11 +89,10 @@ public class HttpBodyDigestOutputStream extends ProxyOutputStream {
     return dos != null;
   }
 
-  private void switchToDigest() {
+  public void switchToDigest() {
     try {
       // Create new DigestOutputStream
       dos = new DigestOutputStream(this.out, MessageDigest.getInstance(DEFAULT_DIGEST_ALGORITHM));
-
 
     } catch (NoSuchAlgorithmException e) {
       // This should never happen

@@ -58,6 +58,13 @@ public class DigestFileItem extends DiskFileItem {
   @Override
   public OutputStream getOutputStream() throws IOException {
     output = new HttpBodyDigestOutputStream(super.getOutputStream());
+
+    // FIXME: There is a pretty severe problem here with the digest when asHttpResponse=false
+    //  but Content-Type is application/http
+    if (!getContentType().startsWith("application/http")) {
+      output.switchToDigest();
+    }
+
     return output;
   }
 

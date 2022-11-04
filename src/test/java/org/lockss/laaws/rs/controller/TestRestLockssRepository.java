@@ -57,6 +57,7 @@ import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
 import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
 import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.ConfigurationUtil;
@@ -337,7 +338,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       while (true) {
         Artifact artifact = repository.getArtifact(namespace, auId, last.getUrl());
-        if (!artifact.getStorageUrl().contains("tempwarc")) break;
+        if (!artifact.getStorageUrl().contains("tmp/warc")) break;
         Thread.sleep(100);
       }
 
@@ -408,7 +409,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
         while (true) {
           Artifact artifact = repository.getArtifact(namespace, auId, url);
-          if (!artifact.getStorageUrl().contains("tempwarc")) break;
+          if (!artifact.getStorageUrl().contains("tmp/warc")) break;
           Thread.sleep(100);
         }
 
@@ -482,7 +483,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       while (true) {
         Artifact artifact = repository.getArtifact(namespace, auId, url);
-        if (!artifact.getStorageUrl().contains("tempwarc")) break;
+        if (!artifact.getStorageUrl().contains("tmp/warc")) break;
         Thread.sleep(100);
       }
 
@@ -575,7 +576,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 //          "WARC-Block-Digest: sha1:UZY6ND6CCHXETFVJD2MSS7ZENMWF7KQ2\n" +
 //          "WARC-Payload-Digest: sha1:CCHXETFVJD2MUZY6ND6SS7ZENMWF7KQ2\n" +
         "Content-Type: application/http;msgtype=response" + WARCConstants.CRLF +
+        // FIXME: Content-Type is hard coded
         "WARC-Identified-Payload-Type: text/plain" + WARCConstants.CRLF +
+        // These two fields avoid WarcArtifactDataStore#writeArtifactData() from exhausting the InputStream
+        // to determine the value of these properties
+        ArtifactConstants.ARTIFACT_LENGTH_KEY + ": " + spec.getContentLength() + WARCConstants.CRLF +
+        ArtifactConstants.ARTIFACT_DIGEST_KEY + ": " + spec.getContentDigest() + WARCConstants.CRLF +
         WARCConstants.CRLF;
 
     out.write(WARC_HEADER.getBytes(StandardCharsets.UTF_8));
@@ -589,6 +595,20 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     out.write(WARCConstants.CRLF.getBytes());
 
     out.flush();
+  }
+
+  @Test
+  public void testAddArtifactResource() throws Exception {
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace("namespace")
+        .setAuid("auid")
+        .setUrl("url")
+        .setStatusLine(null)
+        .generateContent();
+
+    Artifact artifact = repository.addArtifact(spec.getArtifactData());
+
+    spec.assertArtifact(repository, artifact);
   }
 
   @Test

@@ -184,6 +184,12 @@ paths:
         type: "integer"
         format: "int64"
         description: "Artifact collection/crawl date (milliseconds since epoch; UTC)"
+      - name: "asHttpResponse"
+        in: "query"
+        type: boolean
+        required: false
+        default: false
+        description: "Instructs the Repository Service to handle and parse the artifact data as an HTTP response"
       - name: "artifact"
         in: "formData"
         required: true
@@ -234,6 +240,12 @@ paths:
         description: "Controls whether to include the artifact content part in multipart response"
         required: false
         default: "ALWAYS"
+      - name: "asHttpResponse"
+        in: "query"
+        type: boolean
+        required: false
+        default: false
+        description: "Instructs the Repository Service to return the artifact data as an HTTP response"
       produces:
         - "multipart/form-data"
       responses:
