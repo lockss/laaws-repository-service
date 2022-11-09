@@ -33,6 +33,7 @@ POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.multipart;
 
 import org.apache.commons.fileupload.disk.DiskFileItem;
+import org.lockss.laaws.rs.core.RestLockssRepository;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,9 +60,7 @@ public class DigestFileItem extends DiskFileItem {
   public OutputStream getOutputStream() throws IOException {
     output = new HttpBodyDigestOutputStream(super.getOutputStream());
 
-    // FIXME: There is a pretty severe problem here with the digest when asHttpResponse=false
-    //  but Content-Type is application/http
-    if (!getContentType().startsWith("application/http")) {
+    if (getFieldName().equals(RestLockssRepository.MULTIPART_ARTIFACT_PAYLOAD)) {
       output.switchToDigest();
     }
 
