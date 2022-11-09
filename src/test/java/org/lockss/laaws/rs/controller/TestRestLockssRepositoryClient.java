@@ -73,7 +73,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 
-import static org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl.generateMultipartResponseFromArtifactData;
+import static org.lockss.laaws.rs.util.ArtifactDataUtil.generateMultipartMapFromArtifactData;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
@@ -198,7 +198,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         reference.setContentLength(testData.length());
 
         // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
+        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
             reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
         );
 
@@ -257,7 +257,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         reference.setContentLength(testData.length());
 
         // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
+        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
             reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
         );
 
@@ -314,7 +314,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         reference.setContentLength(testData.length());
 
         // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
+        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
             reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
         );
 
@@ -554,7 +554,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         long includeContentMaxSize = (isSmall == null || isSmall == true) ? content.length() : content.length() - 1;
 
         // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
+        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
             reference, includeContent, includeContentMaxSize
         );
 
@@ -613,8 +613,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals(reference.getContentDigest(), result.getContentDigest());
 
         // Verify artifact header set equality
-        assertTrue(referenceHeaders.entrySet().containsAll(result.getMetadata().entrySet())
-            && result.getMetadata().entrySet().containsAll(referenceHeaders.entrySet()));
+        assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
+            && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
 
         // Verify artifact HTTP status is present if expected
         if (isWebCrawl) {

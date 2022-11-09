@@ -603,7 +603,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         .setNamespace("namespace")
         .setAuid("auid")
         .setUrl("url")
-        .setStatusLine(null)
+//        .setStatusLine(null)
         .generateContent();
 
     Artifact artifact = repository.addArtifact(spec.getArtifactData());

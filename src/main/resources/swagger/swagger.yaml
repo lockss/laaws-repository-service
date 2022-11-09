@@ -168,33 +168,29 @@ paths:
       consumes:
       - "multipart/form-data"
       parameters:
-      - name: "auid"
+      - name: "props"
         in: "formData"
         required: true
         type: "string"
-        description: "Archival Unit ID (AUID) of new artifact"
-      - name: "uri"
+        format: "byte"
+        description: "Artifact properties (JSON)"
+      - name: "httpStatus"
         in: "formData"
-        required: true
+        required: false
         type: "string"
-        description: "URI represented by this artifact"
-      - name: "collectionDate"
+        format: "byte"
+        description: "HTTP status (optional)"
+      - name: "httpHeaders"
         in: "formData"
         required: false
-        type: "integer"
-        format: "int64"
-        description: "Artifact collection/crawl date (milliseconds since epoch; UTC)"
-      - name: "asHttpResponse"
-        in: "query"
-        type: boolean
-        required: false
-        default: false
-        description: "Instructs the Repository Service to handle and parse the artifact data as an HTTP response"
-      - name: "artifact"
+        type: "string"
+        format: "byte"
+        description: "HTTP headers (optional)"
+      - name: "payload"
         in: "formData"
         required: true
         type: "file"
-        description: "Artifact data"
+        description: "Artifact payload data"
       responses:
         201:
           description: "Artifact created"
@@ -240,23 +236,15 @@ paths:
         description: "Controls whether to include the artifact content part in multipart response"
         required: false
         default: "ALWAYS"
-      - name: "asHttpResponse"
-        in: "query"
-        type: boolean
-        required: false
-        default: false
-        description: "Instructs the Repository Service to return the artifact data as an HTTP response"
       produces:
         - "multipart/form-data"
       responses:
         200:
-          description: "Artifact found"
+          description: "Multipart/form-data containing the following parts: The artifact properties, HTTP 
+          status and headers if present, and the artifact's payload if requested. See POST /artifacts for 
+          more information."
           schema:
             type: file
-#          schema:
-#            type: object
-#            additionalProperties:
-#              type: object
         401:
           description: "Unauthorized request"
         403:

@@ -1,9 +1,11 @@
 package org.lockss.laaws.rs.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
-import org.apache.http.ProtocolVersion;
-import org.apache.http.message.BasicStatusLine;
+import org.apache.http.impl.io.HttpTransportMetricsImpl;
+import org.apache.http.impl.io.SessionInputBufferImpl;
+import org.apache.http.message.BasicLineParser;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
 import org.lockss.laaws.rs.core.ArtifactCache;
@@ -26,11 +28,9 @@ import org.lockss.util.rest.multipart.MultipartResponse;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.commons.CommonsMultipartFile;
@@ -39,6 +39,7 @@ import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -48,6 +49,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.populateArtifacts;
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.validateLimit;
+import static org.lockss.laaws.rs.util.ArtifactDataFactory.buildArtifactIdentifier;
 
 @Service
 public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
@@ -62,6 +64,9 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
   @Autowired
   LockssRepository repo;
+
+  @Autowired
+  ObjectMapper objMapper;
 
   private final HttpServletRequest request;
 
@@ -179,52 +184,60 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * POST /artifacts:
    * Adds artifacts to the repository
    *
-   * @param auid         A String with the Archival Unit ID (AUID) of new artifact.
-   * @param uri          A String with the URI represented by this artifact.
-   * @param content      A MultipartFile with the artifact content.
+   * @param properties
+   * @param payload
    * @param namespace    A String with the namespace of the artifact.
-   * @param collectionDate A Long representing the date this artifact was collected.
+   * @param httpStatus
+   * @param httpHeaders
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity<Artifact> createArtifact(String auid,
-                                                 String uri,
-                                                 MultipartFile content,
-                                                 String namespace,
-                                                 Long collectionDate,
-                                                 Boolean asHttpResponse) {
+  public ResponseEntity<Artifact> createArtifact(byte[] properties,
+                                                 MultipartFile payload,
+                                                 String  namespace,
+                                                 byte[] httpStatus,
+                                                 byte[] httpHeaders) {
 
     long start = System.currentTimeMillis();
 
     String parsedRequest = String.format(
-        "namespace: %s, auid: %s, uri: %s, collectionDate: %s, asHttpResponse: %s, requestUrl: %s",
-        namespace, auid, uri, collectionDate, asHttpResponse, ServiceImplUtil.getFullRequestUrl(request));
+        "properties: %s, payload: %s, namespace: %s, httpStatus: %s, httpHeaders: %s: requestUrl: %s",
+        properties, payload, namespace, httpStatus, httpHeaders,
+        ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
-    // Check URI.
-    validateUri(uri, parsedRequest);
-
     try {
-      // Transform multipart stream to ArtifactData
-      ArtifactData ad = asHttpResponse ?
-          ArtifactDataFactory.fromHttpResponseStream(content.getInputStream()) :
-          ArtifactDataFactory.fromResource(content.getInputStream());
+      boolean asHttpResponse = (httpStatus != null);
+
+      // Read artifact properties part
+      HttpHeaders props = new HttpHeaders();
+      props.setAll(objMapper.readValue(properties, Map.class));
+
+      ArtifactIdentifier artifactId = buildArtifactIdentifier(props);
+
+      // Check URI
+      validateUri(artifactId.getUri(), parsedRequest);
+
+      // Construct ArtifactData from payload part
+      ArtifactData ad = ArtifactDataFactory.fromResource(payload.getInputStream());
 
       // Set artifact identifier
-      ad.setIdentifier(new ArtifactIdentifier(namespace, auid, uri, 0));
+      ad.setIdentifier(artifactId);
 
-      long len = asHttpResponse ?
-          content.getSize() - ArtifactDataUtil.getHttpResponseHeader(ad).length :
-          content.getSize();
+      // Set payload length
+//      String lenVal = props.getFirst(ArtifactConstants.ARTIFACT_LENGTH_KEY);
+//      long len = StringUtil.isNullString(lenVal) ?
+//          props.getContentLength() : Long.parseLong(lenVal);
+//      assert payload.getSize() == len;
 
-      // Set artifact data content-length (bytes)
-      ad.setContentLength(len);
+      ad.setContentLength(payload.getSize());
 
       // Set artifact data digest
-      DigestFileItem item = ((DigestFileItem)((CommonsMultipartFile)content).getFileItem());
+      DigestFileItem item =
+          (DigestFileItem)((CommonsMultipartFile)payload).getFileItem();
 
       String contentDigest = String.format("%s:%s",
           item.getDigest().getAlgorithm(),
@@ -233,15 +246,27 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       ad.setContentDigest(contentDigest);
 
       // Set artifact collection date if provided
-      if (collectionDate != null) {
-        ad.setCollectionDate(collectionDate);
+      String collectionDateValue = props.getFirst(ArtifactConstants.ARTIFACT_COLLECTION_DATE_KEY);
+      if (!StringUtil.isNullString(collectionDateValue)) {
+        ad.setCollectionDate(Long.parseLong(collectionDateValue));
       }
 
-      // Set artifact's content-type to content-type of content part iff
-      // it is not to be processed as an HTTP response
-      MediaType type = MediaType.valueOf(content.getContentType());
-      if (!asHttpResponse) {
-        ad.getMetadata().setContentType(type);
+      if (asHttpResponse) {
+        SessionInputBufferImpl buffer =
+            new SessionInputBufferImpl(new HttpTransportMetricsImpl(), 4096);
+
+        buffer.bind(new ByteArrayInputStream(httpStatus));
+
+        // Set HTTP status
+        ad.setHttpStatus(BasicLineParser.parseStatusLine(buffer.readLine(), null));
+
+        // Set HTTP headers
+        ad.setHttpHeaders(objMapper.readValue(httpHeaders, HttpHeaders.class));
+      } else {
+        // Set artifact's content-type to content-type of content part iff
+        // it is not to be processed as an HTTP response
+        MediaType type = MediaType.valueOf(payload.getContentType());
+        ad.getHttpHeaders().setContentType(type);
       }
 
       //// Add artifact to internal repository
@@ -253,7 +278,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         log.debug2("Added new artifact [artifactId: {}, duration: {} ms, length: {}]",
             artifact.getId(),
             TimeUtil.timeIntervalToString(end - start),
-            StringUtil.sizeToString(content.getSize()));
+            StringUtil.sizeToString(payload.getSize()));
 
         return new ResponseEntity<>(artifact, HttpStatus.OK);
 
@@ -337,12 +362,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifact(String artifactid, String namespace, String includeContent,
-                                    Boolean asHttpResponse) {
+  public ResponseEntity getArtifact(String artifactid, String namespace, String includeContent) {
 
     String parsedRequest = String.format(
-        "namespace: %s, artifactid: %s, includeContent: %s, asHttpResponse: {}, requestUrl: %s",
-        namespace, artifactid, includeContent, asHttpResponse, ServiceImplUtil.getFullRequestUrl(request));
+        "namespace: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
+        namespace, artifactid, includeContent, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -354,18 +378,12 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       // Retrieve the ArtifactData from the artifact store
       ArtifactData artifactData = repo.getArtifactData(namespace, artifactid);
 
-      // Force the multipart response to look like one for an artifact with HTTP
-      if (!artifactData.hasHttpStatus() && asHttpResponse) {
-        log.debug2("Forcing default HTTP status (asHttpResponse = true)");
-        artifactData.setHttpStatus(
-            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"));
-      }
-
-      // Break ArtifactData into multiparts
-      MultiValueMap<String, Object> parts = generateMultipartResponseFromArtifactData(
-          artifactData,
-          LockssRepository.IncludeContent.valueOf(includeContent),
-          smallContentThreshold);
+      // Transform ArtifactData into multipart map
+      MultiValueMap<String, Object> parts =
+          ArtifactDataUtil.generateMultipartMapFromArtifactData(
+              artifactData,
+              LockssRepository.IncludeContent.valueOf(includeContent),
+              smallContentThreshold);
 
       //// Return multiparts response entity
       return new ResponseEntity<MultiValueMap<String, Object>>(parts, HttpStatus.OK);
@@ -707,119 +725,6 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   // UTILITIES ///////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
 
-  public static MultiValueMap<String, Object> generateMultipartResponseFromArtifactData(
-      ArtifactData artifactData, LockssRepository.IncludeContent includeContent, long smallContentThreshold)
-      throws IOException {
-
-    String artifactId = artifactData.getIdentifier().getId();
-
-    // Holds multipart response parts
-    MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
-
-    //// Add artifact repository properties multipart
-    {
-      // Part's headers
-      HttpHeaders partHeaders = new HttpHeaders();
-      partHeaders.setContentType(MediaType.APPLICATION_JSON);
-
-      // Add repository properties multipart to multiparts list
-      parts.add(
-          RestLockssRepository.MULTIPART_ARTIFACT_REPO_PROPS,
-          // FIXME: This artifact's repository properties basically describes an Artifact - use that instead?
-          new HttpEntity<>(getArtifactRepositoryProperties(artifactData), partHeaders)
-      );
-    }
-
-    //// Add artifact headers multipart
-    {
-      // Part's headers
-      HttpHeaders partHeaders = new HttpHeaders();
-      partHeaders.setContentType(MediaType.APPLICATION_JSON);
-
-      // Add artifact headers multipart
-      parts.add(
-          RestLockssRepository.MULTIPART_ARTIFACT_HEADER,
-          new HttpEntity<>(artifactData.getMetadata(), partHeaders)
-      );
-    }
-
-    //// Add artifact HTTP status multipart if present
-    if (artifactData.hasHttpStatus()) {
-      // Part's headers
-      HttpHeaders partHeaders = new HttpHeaders();
-      partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-
-      // Create resource containing HTTP status byte array
-      Resource resource = new NamedByteArrayResource(
-          artifactId,
-          ArtifactDataUtil.getHttpStatusByteArray(artifactData.getHttpStatus())
-      );
-
-      // Add artifact headers multipart
-      parts.add(
-          RestLockssRepository.MULTIPART_ARTIFACT_HTTP_STATUS,
-          new HttpEntity<>(resource, partHeaders)
-      );
-    }
-
-    //// Add artifact content part if requested or if small enough
-    if ((includeContent == LockssRepository.IncludeContent.ALWAYS) ||
-        (includeContent == LockssRepository.IncludeContent.IF_SMALL
-            && artifactData.getContentLength() <= smallContentThreshold)) {
-
-      // Create content part headers
-      HttpHeaders partHeaders = new HttpHeaders();
-      partHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-      partHeaders.setContentLength(artifactData.getContentLength());
-
-      // Artifact content
-      Resource resource = new NamedInputStreamResource(artifactId, artifactData.getInputStream());
-
-      // Assemble content part and add to multiparts map
-      parts.add(
-          RestLockssRepository.MULTIPART_ARTIFACT_CONTENT,
-          new HttpEntity<>(resource, partHeaders)
-      );
-    }
-
-    return parts;
-  }
-
-  // FIXME: This is basically an Artifact - maybe use that instead?
-  private static HttpHeaders getArtifactRepositoryProperties(ArtifactData ad) {
-    HttpHeaders headers = new HttpHeaders();
-
-    //// Artifact repository ID information headers
-    ArtifactIdentifier id = ad.getIdentifier();
-    headers.set(ArtifactConstants.ARTIFACT_ID_KEY, id.getId());
-    headers.set(ArtifactConstants.ARTIFACT_NAMESPACE_KEY, id.getNamespace());
-    headers.set(ArtifactConstants.ARTIFACT_AUID_KEY, id.getAuid());
-    headers.set(ArtifactConstants.ARTIFACT_URI_KEY, id.getUri());
-    headers.set(ArtifactConstants.ARTIFACT_VERSION_KEY, String.valueOf(id.getVersion()));
-
-    //// Artifact repository state information headers if present
-    if (ad.getArtifactState() != null) {
-      headers.set(
-          ArtifactConstants.ARTIFACT_STATE_COMMITTED,
-          String.valueOf(ad.getArtifactState().isCommitted())
-      );
-
-      headers.set(
-          ArtifactConstants.ARTIFACT_STATE_DELETED,
-          String.valueOf(ad.getArtifactState().isDeleted())
-      );
-    }
-
-    //// Unclassified artifact repository headers
-    headers.set(ArtifactConstants.ARTIFACT_LENGTH_KEY, String.valueOf(ad.getContentLength()));
-    headers.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
-
-//    headers.set(ArtifactConstants.ARTIFACT_ORIGIN_KEY, ???);
-//    headers.set(ArtifactConstants.ARTIFACT_COLLECTION_DATE, ???);
-
-    return headers;
-  }
-
   String artifactKey(String namespace, String artifactid)
       throws IOException {
     Artifact art = repo.getArtifactFromId(artifactid);
@@ -856,7 +761,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   private void validateUri(String uri, String parsedRequest) {
     log.debug2("uri = '{}'", uri);
     log.debug2("parsedRequest = '{}'", parsedRequest);
-    if (uri.isEmpty()) {
+    if (StringUtil.isNullString(uri)) {
       String errorMessage = "The URI has not been provided";
       log.warn(errorMessage);
       log.warn("Parsed request: {}", parsedRequest);

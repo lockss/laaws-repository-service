@@ -536,7 +536,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     record.setUrl(artifactUrl);
 
     // Set the artifact MIME type.
-    MediaType ctype = artifactData.getMetadata().getContentType();
+    MediaType ctype = artifactData.getHttpHeaders().getContentType();
     if (ctype != null) {
       record.setMimeType(ctype.toString());
     }
