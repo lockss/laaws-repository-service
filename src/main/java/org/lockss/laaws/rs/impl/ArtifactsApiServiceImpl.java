@@ -213,8 +213,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       boolean asHttpResponse = (httpStatus != null);
 
       // Read artifact properties part
-      HttpHeaders props = new HttpHeaders();
-      props.setAll(objMapper.readValue(properties, Map.class));
+      Map<String, String> props = objMapper.readValue(properties, Map.class);
 
       ArtifactIdentifier artifactId = buildArtifactIdentifier(props);
 
@@ -226,12 +225,6 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       // Set artifact identifier
       ad.setIdentifier(artifactId);
-
-      // Set payload length
-//      String lenVal = props.getFirst(ArtifactConstants.ARTIFACT_LENGTH_KEY);
-//      long len = StringUtil.isNullString(lenVal) ?
-//          props.getContentLength() : Long.parseLong(lenVal);
-//      assert payload.getSize() == len;
 
       ad.setContentLength(payload.getSize());
 
@@ -246,7 +239,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       ad.setContentDigest(contentDigest);
 
       // Set artifact collection date if provided
-      String collectionDateValue = props.getFirst(ArtifactConstants.ARTIFACT_COLLECTION_DATE_KEY);
+      String collectionDateValue = props.get(Artifact.ARTIFACT_COLLECTION_DATE_KEY);
       if (!StringUtil.isNullString(collectionDateValue)) {
         ad.setCollectionDate(Long.parseLong(collectionDateValue));
       }

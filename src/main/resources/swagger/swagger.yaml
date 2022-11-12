@@ -168,7 +168,7 @@ paths:
       consumes:
       - "multipart/form-data"
       parameters:
-      - name: "props"
+      - name: "artifactProps"
         in: "formData"
         required: true
         type: "string"
@@ -747,7 +747,7 @@ definitions:
   artifact:
     type: "object"
     properties:
-      id:
+      uuid:
         type: "string"
       namespace:
         type: "string"
