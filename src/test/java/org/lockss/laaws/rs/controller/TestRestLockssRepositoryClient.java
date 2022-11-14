@@ -514,7 +514,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     }
 
     public void runTestGetArtifactData(LockssRepository.IncludeContent includeContent,
-                                       boolean isWebCrawl, Boolean isSmall) throws Exception {
+                                       boolean isHttpResponse, Boolean isSmall) throws Exception {
 
         // ******************************
         // Reference artifact and headers
@@ -529,7 +529,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         String content = "\"Dog watched his human cry, concerned. Where was human's smile? Probably lost somewhere, " +
             "dog thought. That was OK. Dog knew how to fetch.\"";
 
-        BasicStatusLine httpStatus = !isWebCrawl ?
+        BasicStatusLine httpStatus = !isHttpResponse ?
             null : new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
 
         String js1 = "{\"artifactId\": \"artifact\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
@@ -612,14 +612,12 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals(reference.getContentLength(), result.getContentLength());
         assertEquals(reference.getContentDigest(), result.getContentDigest());
 
-        // Verify artifact header equality (only HTTP response artifacts)
-        if (isWebCrawl) {
+        // Verify artifact HTTP status is present if expected
+        if (isHttpResponse) {
+            // Verify artifact header equality (only HTTP response artifacts)
             assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
                 && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
-        }
 
-        // Verify artifact HTTP status is present if expected
-        if (isWebCrawl) {
             // Assert artifact HTTP response status matches
             assertArrayEquals(
                 ArtifactDataUtil.getHttpStatusByteArray(httpStatus),
