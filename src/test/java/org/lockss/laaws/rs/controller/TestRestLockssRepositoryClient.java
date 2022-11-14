@@ -612,9 +612,11 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals(reference.getContentLength(), result.getContentLength());
         assertEquals(reference.getContentDigest(), result.getContentDigest());
 
-        // Verify artifact header set equality
-        assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
-            && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
+        // Verify artifact header equality (only HTTP response artifacts)
+        if (isWebCrawl) {
+            assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
+                && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
+        }
 
         // Verify artifact HTTP status is present if expected
         if (isWebCrawl) {
