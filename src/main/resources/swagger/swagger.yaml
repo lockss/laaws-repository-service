@@ -489,7 +489,7 @@ paths:
           description: "Unauthorized"
         500:
           description: "Internal Server Error"
-  /wayback/cdx/owb/:
+  /wayback/cdx/owb/{namespace}:
     get:
       tags:
         - wayback
@@ -514,9 +514,9 @@ paths:
       parameters:
         - name: "namespace"
           description: "Namespace of the artifacts"
-          in: "query"
+          in: "path"
           type: "string"
-          required: false
+          required: true
           default: "lockss"
         - name: q
           in: query
@@ -542,7 +542,7 @@ paths:
           description: The Accept-Encoding header
           required: false
           type: string
-  /wayback/cdx/pywb/:
+  /wayback/cdx/pywb/{namespace}:
     get:
       tags:
         - wayback
@@ -567,9 +567,9 @@ paths:
       parameters:
         - name: "namespace"
           description: "Namespace of the artifacts"
-          in: "query"
+          in: "path"
           type: "string"
-          required: false
+          required: true
           default: "lockss"
         - name: url
           in: query
