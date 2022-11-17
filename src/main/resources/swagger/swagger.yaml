@@ -105,19 +105,18 @@ paths:
         502:
           description: "Internal error creating artifact"
   /artifacts:
-    parameters:
-      - name: "namespace"
-        description: "Namespace of the artifacts"
-        in: "query"
-        type: "string"
-        required: false
-        default: "lockss"
     get:
       tags:
         - artifacts
       summary: "Returns all artifacts that match a given a URL or URL prefix and/or version."
       operationId: getArtifactsFromAllAus
       parameters:
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "query"
+          type: "string"
+          required: false
+          default: "lockss"
         - name: "url"
           in: "query"
           required: false
@@ -172,19 +171,16 @@ paths:
         in: "formData"
         required: true
         type: "string"
-        format: "byte"
         description: "Artifact properties (JSON)"
       - name: "httpStatus"
         in: "formData"
         required: false
         type: "string"
-        format: "byte"
         description: "HTTP status (optional)"
       - name: "httpHeaders"
         in: "formData"
         required: false
         type: "string"
-        format: "byte"
         description: "HTTP headers (optional)"
       - name: "payload"
         in: "formData"
@@ -744,12 +740,13 @@ definitions:
       totalWarcSize:
         type: "integer"
         format: "int64"
-  artifact:
+  artifactProperties:
     type: "object"
     properties:
-      uuid:
-        type: "string"
       namespace:
+        type: "string"
+        default: "lockss"
+      uuid:
         type: "string"
       auid:
         type: "string"
@@ -757,10 +754,6 @@ definitions:
         type: "string"
       version:
         type: "integer"
-      committed:
-        type: "boolean"
-      storageUrl:
-        type: "string"
       contentLength:
         type: "integer"
         format: "int64"
@@ -769,6 +762,17 @@ definitions:
       collectionDate:
         type: "integer"
         format: "int64"
+      state:
+        type: "string"
+  artifact:
+    allOf:
+      - $ref: '#/definitions/artifactProperties'
+    type: "object"
+    properties:
+      committed:
+        type: "boolean"
+      storageUrl:
+        type: "string"
   streamingResponseBody:
     type: "object"
   apiStatus:

@@ -186,23 +186,21 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    *
    * @param properties
    * @param payload
-   * @param namespace    A String with the namespace of the artifact.
    * @param httpStatus
    * @param httpHeaders
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity<Artifact> createArtifact(byte[] properties,
+  public ResponseEntity<Artifact> createArtifact(String properties,
                                                  MultipartFile payload,
-                                                 String  namespace,
-                                                 byte[] httpStatus,
-                                                 byte[] httpHeaders) {
+                                                 String httpStatus,
+                                                 String httpHeaders) {
 
     long start = System.currentTimeMillis();
 
     String parsedRequest = String.format(
-        "properties: %s, payload: %s, namespace: %s, httpStatus: %s, httpHeaders: %s: requestUrl: %s",
-        properties, payload, namespace, httpStatus, httpHeaders,
+        "properties: %s, payload: %s, httpStatus: %s, httpHeaders: %s: requestUrl: %s",
+        properties, payload, httpStatus, httpHeaders,
         ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
@@ -213,7 +211,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       boolean asHttpResponse = (httpStatus != null);
 
       // Read artifact properties part
-      Map<String, String> props = objMapper.readValue(properties, Map.class);
+      ArtifactProperties props = objMapper.readValue(properties, ArtifactProperties.class);
 
       ArtifactIdentifier artifactId = buildArtifactIdentifier(props);
 
@@ -239,19 +237,13 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       ad.setContentDigest(contentDigest);
 
       // Set artifact collection date if provided
-      String collectionDateValue = props.get(Artifact.ARTIFACT_COLLECTION_DATE_KEY);
-      if (!StringUtil.isNullString(collectionDateValue)) {
-        ad.setCollectionDate(Long.parseLong(collectionDateValue));
+      if (props.getCollectionDate() != null) {
+        ad.setCollectionDate(props.getCollectionDate());
       }
 
       if (asHttpResponse) {
-        SessionInputBufferImpl buffer =
-            new SessionInputBufferImpl(new HttpTransportMetricsImpl(), 4096);
-
-        buffer.bind(new ByteArrayInputStream(httpStatus));
-
         // Set HTTP status
-        ad.setHttpStatus(BasicLineParser.parseStatusLine(buffer.readLine(), null));
+        ad.setHttpStatus(BasicLineParser.parseStatusLine(httpStatus, null));
 
         // Set HTTP headers
         ad.setHttpHeaders(objMapper.readValue(httpHeaders, HttpHeaders.class));
