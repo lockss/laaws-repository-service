@@ -206,7 +206,7 @@ paths:
           description: "Client not authorized to create artifacts"
         502:
           description: "Internal error creating artifact"
-  /artifacts/{artifactid}:
+  /artifacts/{uuid}:
     parameters:
       - name: "namespace"
         description: "Namespace of the artifacts"
@@ -214,7 +214,7 @@ paths:
         type: "string"
         required: false
         default: "lockss"
-      - name: "artifactid"
+      - name: "uuid"
         in: "path"
         required: true
         type: "string"
@@ -225,20 +225,20 @@ paths:
       summary: "Get artifact and metadata"
       operationId: getArtifact
       parameters:
-      - name: "includeContent"
-        in: "query"
-        type: "string"
-        enum: ["NEVER", "IF_SMALL", "ALWAYS"]
-        description: "Controls whether to include the artifact content part in multipart response"
-        required: false
-        default: "ALWAYS"
+        - name: "includeContent"
+          in: "query"
+          type: "string"
+          enum: [ "NEVER", "IF_SMALL", "ALWAYS" ]
+          description: "Controls whether to include the artifact content part in multipart response"
+          required: false
+          default: "ALWAYS"
       produces:
         - "multipart/form-data"
       responses:
         200:
           description: "Multipart/form-data containing the following parts: The artifact properties, HTTP 
-          status and headers if present, and the artifact's payload if requested. See POST /artifacts for 
-          more information."
+            status and headers if present, and the artifact's payload if requested. See POST /artifacts for 
+            more information."
           schema:
             type: file
         401:
@@ -255,13 +255,13 @@ paths:
       summary: "Update the property of an artifact"
       operationId: updateArtifact
       consumes:
-      - "multipart/form-data"
+        - "multipart/form-data"
       parameters:
-      - name: "committed"
-        in: "formData"
-        required: true
-        type: "boolean"
-        description: "New commit status of artifact"
+        - name: "committed"
+          in: "formData"
+          required: true
+          type: "boolean"
+          description: "New commit status of artifact"
       responses:
         200:
           description: "Artifact updated"
@@ -281,8 +281,8 @@ paths:
       summary: "Remove an artifact from the repository"
       operationId: deleteArtifact
       consumes:
-      - "application/json"
-      parameters: []
+        - "application/json"
+      parameters: [ ]
       responses:
         200:
           description: "Successfully removed artifact"
@@ -701,7 +701,7 @@ definitions:
         format: "int64"
       url:
         type: "string"
-      artifactId:
+      artifactUuid:
         type: "string"
       digest:
         type: "string"

@@ -242,7 +242,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	String testData = "hello world";
 
-        String js1 = "{\"artifactId\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
+        String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
@@ -299,7 +299,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	String testData = "hello world";
 
-        String js1 = "{\"artifactId\": \"test\", \"entryDate\": 1234, \"artifactState\": \"UNCOMMITTED\"}";
+        String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"UNCOMMITTED\"}";
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
@@ -389,13 +389,14 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"artifacts\":[{\"id\":\"1\",\"version\":2}], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
+                    MediaType.APPLICATION_JSON));
 
         Artifact result = repository.getArtifact("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
-        assertEquals("1", result.getId());
+        assertEquals("1", result.getUuid());
         assertEquals(2, result.getVersion().intValue());
     }
 
@@ -427,11 +428,11 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
             .andExpect(method(HttpMethod.POST))
-            .andRespond(withSuccess("{\"id\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON));
+            .andRespond(withSuccess("{\"uuid\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON));
 
         byte buf[] = new byte[]{};
 
-        String js1 = "{\"artifactId\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
+        String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
 
         Artifact result = repository.addArtifact(
             new ArtifactData(
@@ -446,7 +447,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         mockServer.verify();
 
         assertNotNull(result);
-        assertEquals("1", result.getId());
+        assertEquals("1", result.getUuid());
         assertEquals(2, result.getVersion().intValue());
     }
 
@@ -532,7 +533,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         BasicStatusLine httpStatus = !isHttpResponse ?
             null : new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
 
-        String js1 = "{\"artifactId\": \"artifact\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
+        String js1 = "{\"artifactUuid\": \"artifact\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
 
         // Setup reference artifact data
         ArtifactData reference = new ArtifactData(
@@ -570,7 +571,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         // Build expected endpoint
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASEURL);
-        builder.path(String.format("/artifacts/%s", refId.getId()));
+        builder.path(String.format("/artifacts/%s", refId.getUuid()));
         builder.queryParam("namespace", refId.getNamespace());
         builder.queryParam("includeContent", includeContent);
 
@@ -587,7 +588,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         // ************************************
 
         // Fetch artifact data
-        ArtifactData result = repository.getArtifactData(refId.getNamespace(), refId.getId(), includeContent);
+        ArtifactData result = repository.getArtifactData(refId.getNamespace(), refId.getUuid(), includeContent);
         assertNotNull(result);
 
         // Verify we made the expected REST API call
@@ -595,7 +596,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         // Verify artifact repository properties
         assertNotNull(result.getIdentifier());
-        assertEquals(refId.getId(), result.getIdentifier().getId());
+        assertEquals(refId.getUuid(), result.getIdentifier().getUuid());
         assertEquals(refId.getNamespace(), result.getIdentifier().getNamespace());
         assertEquals(refId.getAuid(), result.getIdentifier().getAuid());
         assertEquals(refId.getUri(), result.getIdentifier().getUri());
@@ -669,13 +670,13 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.PUT))
-                .andRespond(withSuccess("{\"id\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON).headers(mockHeaders));
+                .andRespond(withSuccess("{\"uuid\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON).headers(mockHeaders));
 
         Artifact result = repository.commitArtifact("ns1", "artifact1");
         mockServer.verify();
 
         assertNotNull(result);
-        assertEquals("1", result.getId());
+        assertEquals("1", result.getUuid());
         assertEquals(2, result.getVersion().intValue());
     }
 
@@ -850,7 +851,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"artifacts\":[{\"id\":\"1\",\"version\":2}], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
+                    MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repository.getArtifacts("ns1", "auid1");
         mockServer.verify();
@@ -858,7 +860,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
         Artifact artifact = result.iterator().next();
-        assertEquals("1", artifact.getId());
+        assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
     }
@@ -928,7 +930,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"artifacts\":[{\"id\":\"1\",\"version\":2}], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
+                    MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1");
         mockServer.verify();
@@ -936,7 +939,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
         Artifact artifact = result.iterator().next();
-        assertEquals("1", artifact.getId());
+        assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
     }
@@ -1008,7 +1011,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"artifacts\":[{\"id\":\"1\",\"version\":2}], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
+                    MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repository.getArtifactsWithPrefix("ns1", "auid1", "url1");
         mockServer.verify();
@@ -1016,7 +1020,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
         Artifact artifact = result.iterator().next();
-        assertEquals("1", artifact.getId());
+        assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
     }
@@ -1087,7 +1091,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"artifacts\":[{\"id\":\"1\",\"version\":2}], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
+                    MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repository.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
@@ -1095,7 +1100,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
         Artifact artifact = result.iterator().next();
-        assertEquals("1", artifact.getId());
+        assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
     }
@@ -1168,7 +1173,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"artifacts\":[{\"id\":\"1\",\"version\":2}], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
+                    MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
@@ -1176,7 +1182,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
         Artifact artifact = result.iterator().next();
-        assertEquals("1", artifact.getId());
+        assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
     }
@@ -1278,13 +1284,14 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"artifacts\":[{\"id\":\"1\",\"version\":123}], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":123}], \"pageInfo\":{}}",
+                    MediaType.APPLICATION_JSON));
 
         Artifact result = repository.getArtifactVersion("ns1", "auid1", "url1", 123);
         mockServer.verify();
 
         assertNotNull(result);
-        assertEquals("1", result.getId());
+        assertEquals("1", result.getUuid());
         assertEquals(123, result.getVersion().intValue());
     }
 

@@ -3,8 +3,6 @@ package org.lockss.laaws.rs.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
-import org.apache.http.impl.io.HttpTransportMetricsImpl;
-import org.apache.http.impl.io.SessionInputBufferImpl;
 import org.apache.http.message.BasicLineParser;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
@@ -39,7 +37,6 @@ import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -260,8 +257,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
         long end = System.currentTimeMillis();
 
-        log.debug2("Added new artifact [artifactId: {}, duration: {} ms, length: {}]",
-            artifact.getId(),
+        log.debug2("Added new artifact [uuid: {}, duration: {} ms, length: {}]",
+            artifact.getUuid(),
             TimeUtil.timeIntervalToString(end - start),
             StringUtil.sizeToString(payload.getSize()));
 
@@ -712,7 +709,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
   String artifactKey(String namespace, String artifactid)
       throws IOException {
-    Artifact art = repo.getArtifactFromId(artifactid);
+    Artifact art = repo.getArtifactFromUuid(artifactid);
     if (art != null) {
       return art.makeKey();
     } else {

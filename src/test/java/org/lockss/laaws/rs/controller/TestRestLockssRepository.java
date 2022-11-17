@@ -351,7 +351,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         ImportStatus status = result.get(i);
         ArtifactSpec spec = specs.get(i);
 
-        assertEquals(formatWarcRecordId(spec.getArtifactId()), status.getWarcId());
+        assertEquals(formatWarcRecordId(spec.getArtifactUuid()), status.getWarcId());
         assertEquals(spec.getUrl(), status.getUrl());
         assertEquals(spec.getContentDigest(), status.getDigest());
         assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
@@ -360,7 +360,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         Artifact artifact =
             repository.getArtifactVersion(namespace, auId, spec.getUrl(), i+1, true);
 
-        assertEquals(artifact.getId(), status.getArtifactId());
+        assertEquals(artifact.getUuid(), status.getArtifactUuid());
         assertEquals(artifact.getVersion(), status.getVersion());
         assertEquals(spec.getContentDigest(), artifact.getContentDigest());
 
@@ -422,7 +422,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           ImportStatus status = result.get(i);
           ArtifactSpec spec = specs.get(i);
 
-          assertEquals(formatWarcRecordId(spec.getArtifactId()), status.getWarcId());
+          assertEquals(formatWarcRecordId(spec.getArtifactUuid()), status.getWarcId());
           assertEquals(spec.getUrl(), status.getUrl());
           assertEquals(spec.getContentDigest(), status.getDigest());
           assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
@@ -431,7 +431,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           Artifact artifact =
               repository.getArtifactVersion(namespace, auId, spec.getUrl(), i + 1, true);
 
-          assertEquals(artifact.getId(), status.getArtifactId());
+          assertEquals(artifact.getUuid(), status.getArtifactUuid());
           assertEquals(artifact.getVersion(), status.getVersion());
           assertEquals(spec.getContentDigest(), artifact.getContentDigest());
 
@@ -496,7 +496,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         ImportStatus status = result.get(i);
         ArtifactSpec spec = specs.get(i);
 
-        assertEquals(formatWarcRecordId(spec.getArtifactId()), status.getWarcId());
+        assertEquals(formatWarcRecordId(spec.getArtifactUuid()), status.getWarcId());
         assertEquals(spec.getUrl(), status.getUrl());
 
         if (i % 2 == 0) {
@@ -516,7 +516,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         Artifact artifact =
             repository.getArtifactVersion(namespace, auId, spec.getUrl(), version, true);
 
-        assertEquals(artifact.getId(), status.getArtifactId());
+        assertEquals(artifact.getUuid(), status.getArtifactUuid());
         assertEquals(artifact.getVersion(), status.getVersion());
         assertEquals(spec.getContentDigest(), artifact.getContentDigest());
 
@@ -548,7 +548,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     int seed = new Random().nextInt();
 
     return new ArtifactSpec()
-        .setArtifactId(UUID.randomUUID().toString())
+        .setArtifactUuid(UUID.randomUUID().toString())
         .setNamespace(namespace)
         .setAuid(auId)
         .setUrl(url)
@@ -568,7 +568,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     long WARC_BLOCK_LENGTH = WARC_BLOCK.length() + spec.getContentLength();
 
     String WARC_HEADER = "WARC/1.0" + WARCConstants.CRLF +
-        "WARC-Record-ID: " + formatWarcRecordId(spec.getArtifactId()) + WARCConstants.CRLF +
+        "WARC-Record-ID: " + formatWarcRecordId(spec.getArtifactUuid()) + WARCConstants.CRLF +
         "WARC-Target-URI: " + spec.getUrl() + WARCConstants.CRLF +
         "Content-Length: " + WARC_BLOCK_LENGTH + WARCConstants.CRLF +
         "WARC-Date: " + formatWarcDate(spec.getCollectionDate()) + WARCConstants.CRLF +
@@ -695,7 +695,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     log.info("uncommArt.getStorageUrl(): " + storeUrl);
 
-    Artifact commArt = repository.commitArtifact(spec.getNamespace(), newArt.getId());
+    Artifact commArt = repository.commitArtifact(spec.getNamespace(), newArt.getUuid());
     spec.setCommitted(true);
 
     log.info("commArt.getStorageUrl(): " + commArt.getStorageUrl());
@@ -839,11 +839,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact art_large = addUncommitted(spec_large);
     Artifact art_larger = addUncommitted(spec_larger);
     Artifact art_small_c =
-        repository.commitArtifact(spec_small.getNamespace(), art_small.getId());
+        repository.commitArtifact(spec_small.getNamespace(), art_small.getUuid());
     Artifact art_large_c =
-        repository.commitArtifact(spec_large.getNamespace(), art_large.getId());
+        repository.commitArtifact(spec_large.getNamespace(), art_large.getUuid());
     Artifact art_larger_c =
-        repository.commitArtifact(spec_larger.getNamespace(), art_larger.getId());
+        repository.commitArtifact(spec_larger.getNamespace(), art_larger.getUuid());
     spec_small.setCommitted(true);
     spec_large.setCommitted(true);
     spec_larger.setCommitted(true);
@@ -959,12 +959,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testGetArtifactData() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null artifact ID",
+        "Null artifact UUID",
         () -> {
           repository.getArtifactData((String) null, (String) null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null artifact ID",
+        "Null artifact UUID",
         () -> {
           repository.getArtifactData(NS1, null);
         });
@@ -986,13 +986,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     ArtifactSpec cspec = anyCommittedSpec();
     if (cspec != null) {
       ArtifactData ad = repository.getArtifactData(cspec.getNamespace(),
-          cspec.getArtifactId());
+          cspec.getArtifactUuid());
       cspec.assertArtifactData(ad);
     }
     ArtifactSpec uspec = anyUncommittedSpec();
     if (uspec != null) {
       ArtifactData ad = repository.getArtifactData(uspec.getNamespace(),
-          uspec.getArtifactId());
+          uspec.getArtifactUuid());
       uspec.assertArtifactData(ad);
     }
   }
@@ -1018,7 +1018,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       expectedHeaders.setAll(cspec.getHeaders());
 
       // Get headers from repository service
-      HttpHeaders actualHeaders = repository.getArtifactHeaders(cspec.getNamespace(), cspec.getArtifactId());
+      HttpHeaders actualHeaders = repository.getArtifactHeaders(cspec.getNamespace(), cspec.getArtifactUuid());
 
       // Assert the headers returned by the service match those from the spec
       assertEquals(expectedHeaders, actualHeaders);
@@ -1198,7 +1198,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 // 		   () -> {repository.commitArtifact(commSpec.getNamespace(),
 // 						    commSpec.getArtifactId());});
       Artifact dupArt = repository.commitArtifact(commSpec.getNamespace(),
-          commSpec.getArtifactId());
+          commSpec.getArtifactUuid());
       assertEquals(commArt, dupArt);
       commSpec.assertArtifact(repository, dupArt);
 
@@ -1207,7 +1207,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       assertEquals(commArt, dupArt);
 
       assertThrowsMatch(LockssNoSuchArtifactIdException.class,
-          "non-existent artifact id",
+          "non-existent artifact",
           () -> {
             repository.commitArtifact(commSpec.getNamespace(),
                 "NOTANARTID");
@@ -1218,7 +1218,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testDeleteArtifact() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null artifact ID",
+        "Null artifact UUID",
         () -> {
           repository.deleteArtifact(null, null);
         });
@@ -1252,15 +1252,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       if (spec != null) {
         AuSize auSize1 = repository.auSize(spec.getNamespace(), spec.getAuid());
 
-        assertNotNull(repository.getArtifactData(spec.getNamespace(), spec.getArtifactId()));
+        assertNotNull(repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid()));
         assertNotNull(getArtifact(repository, spec, false));
         assertNotNull(getArtifact(repository, spec, true));
         log.info("Deleting not highest: " + spec);
-        repository.deleteArtifact(spec.getNamespace(), spec.getArtifactId());
+        repository.deleteArtifact(spec.getNamespace(), spec.getArtifactUuid());
 
         assertThrows(
             LockssNoSuchArtifactIdException.class,
-            (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactId())
+            (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
         );
 
         assertNull(getArtifact(repository, spec, false));
@@ -1287,15 +1287,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         AuSize auSize1 = repository.auSize(spec.getNamespace(), spec.getAuid());
 
         long artsize = spec.getContentLength();
-        assertNotNull(repository.getArtifactData(spec.getNamespace(), spec.getArtifactId()));
+        assertNotNull(repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid()));
         assertNotNull(getArtifact(repository, spec, false));
         assertNotNull(getArtifact(repository, spec, true));
         log.info("Deleting highest: " + spec);
-        repository.deleteArtifact(spec.getNamespace(), spec.getArtifactId());
+        repository.deleteArtifact(spec.getNamespace(), spec.getArtifactUuid());
 
         assertThrows(
             LockssNoSuchArtifactIdException.class,
-            (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactId())
+            (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
         );
 
         assertNull(getArtifact(repository, spec, false));
@@ -1330,15 +1330,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       if (uspec != null) {
         AuSize auSize1 = repository.auSize(uspec.getNamespace(), uspec.getAuid());
 
-        assertNotNull(repository.getArtifactData(uspec.getNamespace(), uspec.getArtifactId()));
+        assertNotNull(repository.getArtifactData(uspec.getNamespace(), uspec.getArtifactUuid()));
         assertNull(getArtifact(repository, uspec, false));
         assertNotNull(getArtifact(repository, uspec, true));
         log.info("Deleting uncommitted: " + uspec);
-        repository.deleteArtifact(uspec.getNamespace(), uspec.getArtifactId());
+        repository.deleteArtifact(uspec.getNamespace(), uspec.getArtifactUuid());
 
         assertThrows(
             LockssNoSuchArtifactIdException.class,
-            (Executable) () -> repository.getArtifactData(uspec.getNamespace(), uspec.getArtifactId())
+            (Executable) () -> repository.getArtifactData(uspec.getNamespace(), uspec.getArtifactUuid())
         );
 
         assertNull(getArtifact(repository, uspec, false));
@@ -1366,14 +1366,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       // Get the next artifact.
       ArtifactSpec spec = iter.next();
       String ns = spec.getNamespace();
-      String id = spec.getArtifactId();
-      assertNotNull(repository.getArtifactData(spec.getNamespace(), spec.getArtifactId()));
+      String id = spec.getArtifactUuid();
+      assertNotNull(repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid()));
       // Delete the artifact.
       repository.deleteArtifact(ns, id);
 
       assertThrows(
           LockssNoSuchArtifactIdException.class,
-          (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactId())
+          (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
       );
 
       // Delete it again.
@@ -1385,7 +1385,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       assertThrows(
           LockssNoSuchArtifactIdException.class,
-          (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactId())
+          (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
       );
     }
 
@@ -1798,12 +1798,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testIsArtifactCommitted() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null artifact ID",
+        "Null artifact UUID",
         () -> {
           repository.isArtifactCommitted(null, null);
         });
     assertThrowsMatch(IllegalArgumentException.class,
-        "Null artifact ID",
+        "Null artifact UUID",
         () -> {
           repository.isArtifactCommitted(NS1, null);
         });
@@ -1828,10 +1828,10 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     for (ArtifactSpec spec : addedSpecs) {
       if (spec.isCommitted()) {
         assertTrue(repository.isArtifactCommitted(spec.getNamespace(),
-            spec.getArtifactId()));
+            spec.getArtifactUuid()));
       } else {
         assertFalse(repository.isArtifactCommitted(spec.getNamespace(),
-            spec.getArtifactId()));
+            spec.getArtifactUuid()));
       }
     }
 
@@ -2201,12 +2201,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       throw new IllegalStateException("addUncommitted() must be called with unused ArtifactSpec");
     }
 
-    String newArtId = newArt.getId();
-    assertNotNull(newArtId);
+    String newArtUuid = newArt.getUuid();
+    assertNotNull(newArtUuid);
     assertFalse(repository.isArtifactCommitted(spec.getNamespace(),
-        newArtId));
+        newArtUuid));
     assertFalse(newArt.getCommitted());
-    assertNotNull(repository.getArtifactData(spec.getNamespace(), newArtId));
+    assertNotNull(repository.getArtifactData(spec.getNamespace(), newArtUuid));
 
     Artifact oldArt = getArtifact(repository, spec, false);
     if (expVers == 0) {
@@ -2228,7 +2228,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertEquals(newArt, newArt2);
 
     spec.setVersion(newArt.getVersion());
-    spec.setArtifactId(newArtId);
+    spec.setArtifactUuid(newArtUuid);
 
     addedSpecs.add(spec);
     // Remember the highest version of this URL we've added
@@ -2243,12 +2243,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact uncommittedArt = getArtifact(repository, spec, true);
     assertNotNull(uncommittedArt);
     assertFalse(repository.isArtifactCommitted(spec.getNamespace(),
-        uncommittedArt.getId()));
+        uncommittedArt.getUuid()));
     assertFalse(uncommittedArt.getCommitted());
 
-    String artId = art.getId();
+    String artUuid = art.getUuid();
     log.info("committing: " + art);
-    Artifact commArt = repository.commitArtifact(spec.getNamespace(), artId);
+    Artifact commArt = repository.commitArtifact(spec.getNamespace(), artUuid);
     assertNotNull(commArt);
     if (spec.getExpVer() > 0) {
       assertEquals(spec.getExpVer(), (int) commArt.getVersion());
@@ -2260,7 +2260,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       highestCommittedVerSpec.put(spec.artButVerKey(), spec);
     }
     assertTrue(repository.isArtifactCommitted(spec.getNamespace(),
-        commArt.getId()));
+        commArt.getUuid()));
     assertTrue(commArt.getCommitted());
 
     spec.assertArtifact(repository, commArt);
@@ -2268,9 +2268,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact newArt = getArtifact(repository, spec, false);
     assertNotNull(newArt);
     assertTrue(repository.isArtifactCommitted(spec.getNamespace(),
-        newArt.getId()));
+        newArt.getUuid()));
     assertTrue(newArt.getCommitted());
-    assertNotNull(repository.getArtifactData(spec.getNamespace(), newArt.getId()));
+    assertNotNull(repository.getArtifactData(spec.getNamespace(), newArt.getUuid()));
     // Get the same artifact when uncommitted may be included.
     Artifact newArt2 = getArtifact(repository, spec, true);
     assertTrue(newArt.equalsExceptStorageUrl(newArt2));

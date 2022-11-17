@@ -481,12 +481,12 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
       // Check whether this artifact needs to be included in the results.
       if (iteratorCounter > lastArticleSkipped) {
         // Yes: Get the artifact identifier.
-        String artifactId = artifact.getId();
-        log.trace("artifactId = {}", artifactId);
+        String artifactUuid = artifact.getUuid();
+        log.trace("artifactUuid = {}", artifactUuid);
 
         // Create the result for this artifact.
         CdxRecord record = getCdxRecord(
-            repo.getArtifactData(artifact.getNamespace(), artifactId));
+            repo.getArtifactData(artifact.getNamespace(), artifactUuid));
         log.trace("record = {}", record);
 
         // Add this artifact to the results.
@@ -557,7 +557,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Set the artifact archive name.
     record.setArchiveName(ServiceImplUtil.getArtifactArchiveName(
-        artifactIdentifier.getNamespace(), artifactIdentifier.getId()));
+        artifactIdentifier.getNamespace(), artifactIdentifier.getUuid()));
 
     log.debug2("record = {}", record);
     return record;

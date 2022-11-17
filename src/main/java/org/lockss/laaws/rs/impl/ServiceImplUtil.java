@@ -136,12 +136,12 @@ public class ServiceImplUtil {
    * 
    * @param namespace
    *          A String with the namespace of the artifact.
-   * @param artifactId
+   * @param artifactUuid
    *          A String with the identifier of the artifact.
    * @return a String with the artifact archive name.
    */
-  static String getArtifactArchiveName(String namespace, String artifactId) {
-   return namespace + archiveFileSeparator + artifactId
+  static String getArtifactArchiveName(String namespace, String artifactUuid) {
+   return namespace + archiveFileSeparator + artifactUuid
        + archiveFileExtension; 
   }
 

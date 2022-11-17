@@ -487,7 +487,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
       // Validate archive name.
       assertEquals(
-          ServiceImplUtil.getArtifactArchiveName(collId, artifact.getId()),
+          ServiceImplUtil.getArtifactArchiveName(collId, artifact.getUuid()),
           cdxRecord.getArchiveName()
       );
 
@@ -535,7 +535,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
       // Validate archive name.
       assertEquals(ServiceImplUtil.getArtifactArchiveName(collId,
-	  artifact.getId()), cdxRecord.getArchiveName());
+	  artifact.getUuid()), cdxRecord.getArchiveName());
 
       // Validate timestamp sorting in ascending order.
       assertTrue(previousCollectiondate < artifact.getCollectionDate());
@@ -569,7 +569,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
     // Validate archive name.
     assertEquals(ServiceImplUtil.getArtifactArchiveName(collId,
-	artifact.getId()), cdxRecord.getArchiveName());
+	artifact.getUuid()), cdxRecord.getArchiveName());
 
     // Get prefix CDX records for www. in the first collection.
     collId = "coll1";
@@ -743,7 +743,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     am.setDate(collectionDate);
 
     ArtifactSpec spec = new ArtifactSpec()
-        .setArtifactId(id)
+        .setArtifactUuid(id)
         .setNamespace(collection)
         .setAuid(auid)
         .setUrl(url)
@@ -788,6 +788,6 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
         .addArtifact(makeArtifactData(null, collection, auid, url, version, contentType, collectionDate));
 
     // Commit artifact
-    return repository.commitArtifact("coll1", art.getId());
+    return repository.commitArtifact("coll1", art.getUuid());
   }
 }
