@@ -707,14 +707,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   // UTILITIES ///////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
 
-  String artifactKey(String namespace, String artifactid)
+  String artifactKey(String namespace, String artifactUuid)
       throws IOException {
-    Artifact art = repo.getArtifactFromUuid(artifactid);
+    Artifact art = repo.getArtifactFromUuid(artifactUuid);
     if (art != null) {
       return art.makeKey();
     } else {
-      log.error("Expected artifact not found, can't send invalidate: {}",
-          artifactid);
+      log.error("Expected artifact not found, can't send invalidate [uuid: {}]",
+          artifactUuid);
       return null;
     }
   }
