@@ -172,16 +172,11 @@ paths:
         required: true
         type: "string"
         description: "Artifact properties (JSON)"
-      - name: "httpStatus"
+      - name: "httpResponseHeader"
         in: "formData"
         required: false
         type: "string"
-        description: "HTTP status (optional)"
-      - name: "httpHeaders"
-        in: "formData"
-        required: false
-        type: "string"
-        description: "HTTP headers (optional)"
+        description: "HTTP response status and headers (optional)"
       - name: "payload"
         in: "formData"
         required: true

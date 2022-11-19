@@ -3,6 +3,9 @@ package org.lockss.laaws.rs.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpException;
+import org.apache.http.HttpResponse;
 import org.apache.http.message.BasicLineParser;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
@@ -38,6 +41,7 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -183,21 +187,19 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    *
    * @param properties
    * @param payload
-   * @param httpStatus
-   * @param httpHeaders
+   * @param httpResponseHeader
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
   public ResponseEntity<Artifact> createArtifact(String properties,
                                                  MultipartFile payload,
-                                                 String httpStatus,
-                                                 String httpHeaders) {
+                                                 String httpResponseHeader) {
 
     long start = System.currentTimeMillis();
 
     String parsedRequest = String.format(
-        "properties: %s, payload: %s, httpStatus: %s, httpHeaders: %s: requestUrl: %s",
-        properties, payload, httpStatus, httpHeaders,
+        "properties: %s, payload: %s, httpResponseHeader: %s: requestUrl: %s",
+        properties, payload, httpResponseHeader,
         ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
@@ -205,7 +207,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
 
     try {
-      boolean asHttpResponse = (httpStatus != null);
+      boolean asHttpResponse = !StringUtil.isNullString(httpResponseHeader);
 
       // Read artifact properties part
       ArtifactProperties props = objMapper.readValue(properties, ArtifactProperties.class);
@@ -239,11 +241,18 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       }
 
       if (asHttpResponse) {
-        // Set HTTP status
-        ad.setHttpStatus(BasicLineParser.parseStatusLine(httpStatus, null));
+        try {
+          HttpResponse httpResponse = ArtifactDataFactory.getHttpResponseFromStream(
+              IOUtils.toInputStream(httpResponseHeader, StandardCharsets.UTF_8));
 
-        // Set HTTP headers
-        ad.setHttpHeaders(objMapper.readValue(httpHeaders, HttpHeaders.class));
+          // Set HTTP status
+          ad.setHttpStatus(httpResponse.getStatusLine());
+
+          // Set HTTP headers
+          ad.setHttpHeaders(ArtifactDataFactory.transformHeaderArrayToHttpHeaders(httpResponse.getAllHeaders()));
+        } catch (HttpException e) {
+          throw new HttpMessageNotReadableException("Error parsing HTTP response header part", e);
+        }
       } else {
         // Set artifact's content-type to content-type of content part iff
         // it is not to be processed as an HTTP response
