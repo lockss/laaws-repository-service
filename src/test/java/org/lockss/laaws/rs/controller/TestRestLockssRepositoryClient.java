@@ -424,7 +424,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testAddArtifact_success() throws Exception {
-        URI endpoint = new URI(BASEURL + "/artifacts?namespace=ns1");
+        URI endpoint = new URI(BASEURL + "/artifacts");
 
         mockServer.expect(uriRequestTo(endpoint))
             .andExpect(method(HttpMethod.POST))
@@ -453,7 +453,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testAddArtifact_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/artifacts?namespace=ns1");
+        URI endpoint = new URI(BASEURL + "/artifacts");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.POST))
