@@ -214,6 +214,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       ArtifactIdentifier artifactId = buildArtifactIdentifier(props);
 
+      if (artifactId.getVersion() != null) {
+        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
+            "Version property not allowed");
+      }
+
       // Check URI
       validateUri(artifactId.getUri(), parsedRequest);
 
