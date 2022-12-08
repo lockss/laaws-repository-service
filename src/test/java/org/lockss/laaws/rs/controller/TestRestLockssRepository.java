@@ -294,6 +294,32 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
+   * Tests adding and fetching artifact with an illegal mime type in
+   * the Content-Type header
+   */
+  @Test
+  public void testAddArtifactMalformedContentType() throws Exception {
+    HttpHeaders headers = new HttpHeaders();
+    long clen = FileUtils.ONE_MB;
+
+    headers.add("Date", "Fri, 29 Jul 2022 21:08:40 GMT");
+    headers.add("Accept-Ranges", "bytes");
+    headers.add("Content-Length", String.valueOf(clen));
+    headers.add("Content-Type", "x-ms-wmv");
+
+    ArtifactSpec spec = new ArtifactSpec()
+        .setUrl("https://example.lockss.org/foo")
+        .setContentLength(clen)
+        .setCollectionDate(1234)
+        .setHeaders(headers.toSingleValueMap());
+
+    Artifact artifact = addUncommitted(spec);
+    Artifact committed = commit(spec, artifact);
+
+    spec.assertArtifact(repository, committed);
+  }
+
+  /**
    * Test for {@link org.lockss.laaws.rs.api.ArchivesApi#addArtifacts(String, MultipartFile, String)}.
    */
   @Test
