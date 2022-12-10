@@ -33,7 +33,9 @@ POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.multipart;
 
 import org.apache.commons.fileupload.disk.DiskFileItem;
+import org.apache.commons.lang3.StringUtils;
 import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.util.ArtifactConstants;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,6 +67,21 @@ public class DigestFileItem extends DiskFileItem {
     }
 
     return output;
+  }
+
+
+  /**
+   * Returns the {@code X-Lockss-Content-Type} header if present, otherwise the
+   * normal {@code Content-Type} header. This is a workaround for the transport
+   * of invalid Content-Types.
+   */
+  @Override
+  public String getContentType() {
+    String contentType =
+        getHeaders().getHeader(ArtifactConstants.X_LOCKSS_CONTENT_TYPE);
+
+    return StringUtils.isEmpty(contentType) ?
+        super.getContentType() : contentType;
   }
 
   public MessageDigest getDigest() {

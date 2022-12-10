@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.message.BasicLineParser;
@@ -259,10 +260,9 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           throw new HttpMessageNotReadableException("Error parsing HTTP response header part", e);
         }
       } else {
-        // Set artifact's content-type to content-type of content part iff
-        // it is not to be processed as an HTTP response
-        MediaType type = MediaType.valueOf(payload.getContentType());
-        ad.getHttpHeaders().setContentType(type);
+        // Set artifact's Content-Type to the Content-Type of the part
+        ad.getHttpHeaders().set(HttpHeaders.CONTENT_TYPE,
+            ((CommonsMultipartFile) payload).getFileItem().getContentType());
       }
 
       //// Add artifact to internal repository

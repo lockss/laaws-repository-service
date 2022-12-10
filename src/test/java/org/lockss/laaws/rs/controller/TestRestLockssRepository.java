@@ -300,23 +300,41 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @Test
   public void testAddArtifactMalformedContentType() throws Exception {
     HttpHeaders headers = new HttpHeaders();
-    long clen = FileUtils.ONE_MB;
+    long clen = FileUtils.ONE_KB;
 
     headers.add("Date", "Fri, 29 Jul 2022 21:08:40 GMT");
     headers.add("Accept-Ranges", "bytes");
     headers.add("Content-Length", String.valueOf(clen));
     headers.add("Content-Type", "x-ms-wmv");
 
-    ArtifactSpec spec = new ArtifactSpec()
-        .setUrl("https://example.lockss.org/foo")
-        .setContentLength(clen)
-        .setCollectionDate(1234)
-        .setHeaders(headers.toSingleValueMap());
+    // Test with an HTTP response artifact
+    {
+      ArtifactSpec spec = new ArtifactSpec()
+          .setUrl("https://example.lockss.org/foo1")
+          .setContentLength(clen)
+          .setCollectionDate(1234)
+          .setHeaders(headers.toSingleValueMap());
 
-    Artifact artifact = addUncommitted(spec);
-    Artifact committed = commit(spec, artifact);
+      Artifact artifact = addUncommitted(spec);
+      Artifact committed = commit(spec, artifact);
 
-    spec.assertArtifact(repository, committed);
+      spec.assertArtifact(repository, committed);
+    }
+
+    // Test with a resource artifact
+    {
+      ArtifactSpec spec = new ArtifactSpec()
+          .setUrl("https://example.lockss.org/foo2")
+          .setContentLength(clen)
+          .setCollectionDate(1234)
+          .setHeaders(headers.toSingleValueMap())
+          .setIsHttpResponse(false);
+
+      Artifact artifact = addUncommitted(spec);
+      Artifact committed = commit(spec, artifact);
+
+      spec.assertArtifact(repository, committed);
+    }
   }
 
   /**
