@@ -229,6 +229,7 @@ paths:
           default: "ALWAYS"
       produces:
         - "multipart/form-data"
+        - "application/json"
       responses:
         200:
           description: "Multipart/form-data containing the following parts: The artifact properties, HTTP 
@@ -242,6 +243,8 @@ paths:
           description: "Client not authorized to retrieve artifact"
         404:
           description: "Artifact not found"
+        500:
+          description: "Internal Server Error"
         502:
           description: "Could not read from external resource"
     put:
