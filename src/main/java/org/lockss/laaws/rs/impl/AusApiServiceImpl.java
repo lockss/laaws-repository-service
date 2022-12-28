@@ -108,6 +108,14 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
   private int bulkIndexBatchSize = DEFAULT_BULK_INDEX_BATCH_SIZE;
 
   /**
+   * Set false to disable putting AUs into bulk mode
+   */
+  public static final String PARAM_BULK_INDEX_ENABLED =
+    PREFIX + "bulkIndexEnabled";
+  public static final boolean DEFAULT_BULK_INDEX_ENABLED = true;
+  private boolean bulkIndexEnabled = DEFAULT_BULK_INDEX_ENABLED;
+
+  /**
    * Interval after which unused Artifact iterator continuations will
    * be discarded.  Change requires restart to take effect.
    */
@@ -144,6 +152,8 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       bulkIndexBatchSize =
           newConfig.getInt(PARAM_BULK_INDEX_BATCH_SIZE,
               DEFAULT_BULK_INDEX_BATCH_SIZE);
+      bulkIndexEnabled = newConfig.getBoolean(PARAM_BULK_INDEX_ENABLED,
+                                              DEFAULT_BULK_INDEX_ENABLED);
 
       // The first time setConfig() is called, replace the temporary
       // iterator continuation maps
@@ -815,37 +825,41 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
 
     log.debug2("Parsed request: {}", parsedRequest);
 
-    ArtifactIndex index = ((BaseLockssRepository)repo).getArtifactIndex();
-    try {
-      switch (op) {
-        case "start":
-          log.debug("startBulkStore({}, {})", namespace, auid);
-          bulkAuids.add(auid);
-          index.startBulkStore(namespace, auid);
-          break;
+    if (bulkIndexEnabled) {
+      ArtifactIndex index = ((BaseLockssRepository)repo).getArtifactIndex();
+      try {
+        switch (op) {
+          case "start":
+            log.debug("startBulkStore({}, {})", namespace, auid);
+            bulkAuids.add(auid);
+            index.startBulkStore(namespace, auid);
+            break;
 
-        case "finish":
-          log.debug("finishBulkStore({}, {})", namespace, auid);
-          bulkAuids.remove(auid);
-          index.finishBulkStore(namespace, auid, bulkIndexBatchSize);
-          break;
+          case "finish":
+            log.debug("finishBulkStore({}, {})", namespace, auid);
+            bulkAuids.remove(auid);
+            index.finishBulkStore(namespace, auid, bulkIndexBatchSize);
+            break;
 
-        default:
-          throw new LockssRestServiceException("Unknown bulk operation")
-              .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
-              .setHttpStatus(HttpStatus.BAD_REQUEST)
-              .setServletPath(request.getServletPath())
-              .setParsedRequest(parsedRequest);
+          default:
+            throw new LockssRestServiceException("Unknown bulk operation")
+                .setServerErrorType(LockssRestHttpException.ServerErrorType.NONE)
+                .setHttpStatus(HttpStatus.BAD_REQUEST)
+                .setServletPath(request.getServletPath())
+                .setParsedRequest(parsedRequest);
+        }
+      } catch (IOException e) {
+        String errorMessage = String.format("IOException attempting to start or finish bulk store: %s", auid);
+        log.warn(errorMessage, e);
+        log.warn("Parsed request: {}", parsedRequest);
+
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            errorMessage, e, parsedRequest);
       }
-    } catch (IOException e) {
-      String errorMessage = String.format("IOException attempting to start or finish bulk store: %s", auid);
-      log.warn(errorMessage, e);
-      log.warn("Parsed request: {}", parsedRequest);
-
-      throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          errorMessage, e, parsedRequest);
+    } else {
+      log.debug2("Bulk indexing disabled, ignoring bulk {} for {}", op, auid);
     }
     return new ResponseEntity<>(HttpStatus.OK);
   }
