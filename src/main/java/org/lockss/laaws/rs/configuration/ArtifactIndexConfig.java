@@ -33,6 +33,7 @@ package org.lockss.laaws.rs.configuration;
 import org.lockss.app.LockssApp;
 import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.io.index.ArtifactIndex;
+import org.lockss.laaws.rs.io.index.DispatchingArtifactIndex;
 import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
 import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
 import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
@@ -123,6 +124,14 @@ public class ArtifactIndexConfig {
         solrIndex = new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials)
             .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
         return solrIndex;
+
+      case "dispatching":
+        // Create Solr index
+        ArtifactIndex solrIndex = createArtifactIndex("solr");
+
+        // Create Dispatching with Solr
+        return new DispatchingArtifactIndex(solrIndex);
+
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);
         log.error(errMsg);

@@ -36,9 +36,9 @@ STATUS_API=src/generated/java/org/lockss/laaws/rs/api/StatusApi.java
 sed -i.backup "s/import org.lockss.laaws.rs.model.ApiStatus/import org.lockss.util.rest.status.ApiStatus/" $STATUS_API && rm $STATUS_API.backup
 
 # Edit CollectionsApiDelegate.java.
-COLLECTIONS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/CollectionsApiDelegate.java
-sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody/" $COLLECTIONS_API_DELEGATE && rm $COLLECTIONS_API_DELEGATE.backup
+ARCHIVES_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/ArchivesApiDelegate.java
+sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody/" $ARCHIVES_API_DELEGATE && rm $ARCHIVES_API_DELEGATE.backup
 
 # Edit CollectionsApi.java.
-COLLECTIONS_API=src/generated/java/org/lockss/laaws/rs/api/CollectionsApi.java
-sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody/" $COLLECTIONS_API && rm $COLLECTIONS_API.backup
+ARCHIVES_API=src/generated/java/org/lockss/laaws/rs/api/ArchivesApi.java
+sed -i.backup "s/import org.lockss.laaws.rs.model.StreamingResponseBody/import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody/" $ARCHIVES_API && rm $ARCHIVES_API.backup

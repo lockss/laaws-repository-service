@@ -33,14 +33,15 @@ package org.lockss.laaws.rs.impl;
 
 import org.json.JSONObject;
 import org.lockss.laaws.rs.core.LockssRepository;
+import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.springframework.http.HttpStatus;
 
 import javax.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.util.stream.StreamSupport;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Utility method used in the service controllers.
@@ -96,44 +97,6 @@ public class ServiceImplUtil {
   }
 
   /**
-   * Verifies that the collection exists.
-   * 
-   * @param repo
-   *          A LockssRepository with the repository.
-   * @param collectionid
-   *          A String with the identifier of the collection.
-   * @param parsedRequest
-   *          A String with the parsed request for diagnostic purposes.
-   * @exception IOException
-   *              if there are problems accessing the repository.
-   */
-  static void validateCollectionId(LockssRepository repo, String collectionid,
-      String parsedRequest) throws IOException {
-    log.debug2("repo = {}, collectionid = {}, parsedRequest = {}", repo,
-	collectionid, parsedRequest);
-
-    log.trace("repo.getCollectionIds().iterator().hasNext() = {}",
-	repo.getCollectionIds().iterator().hasNext());
-
-    for (String collectionInRepository : repo.getCollectionIds()) {
-      log.trace("collectionInRepository = {}", collectionInRepository);
-    }
-
-    if (!StreamSupport.stream(repo.getCollectionIds().spliterator(), false)
-	.anyMatch(name -> collectionid.equals(name))) {
-      String errorMessage = "The collection does not exist";
-      log.warn(errorMessage);
-      log.warn("Parsed request: {}", parsedRequest);
-
-      throw new LockssRestServiceException(
-          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.NOT_FOUND,
-          errorMessage, parsedRequest);
-    }
-
-    log.debug2("collectionid '{}' is valid.", collectionid);
-  }
-
-  /**
    * Validates the pagination request parameters.
    * 
    * @param count
@@ -171,28 +134,28 @@ public class ServiceImplUtil {
    * 
    * If no extension is provided, one is added automatically  at the other end.
    * 
-   * @param collectionid
-   *          A String with the identifier of the collection.
-   * @param artifactId
+   * @param namespace
+   *          A String with the namespace of the artifact.
+   * @param artifactUuid
    *          A String with the identifier of the artifact.
    * @return a String with the artifact archive name.
    */
-  static String getArtifactArchiveName(String collectionid, String artifactId) {
-   return collectionid + archiveFileSeparator + artifactId
+  static String getArtifactArchiveName(String namespace, String artifactUuid) {
+   return namespace + archiveFileSeparator + artifactUuid
        + archiveFileExtension; 
   }
 
   /**
-   * Provides the collection identifier embedded in the archive file name.
+   * Provides the namespace embedded in the archive file name.
    * 
    * @param fileName
    *          A String with the file name.
    * @param parsedRequest
    *          A String with the parsed request for diagnostic purposes.
-   * @return a String with the collection identifier.
+   * @return a String with the namespace
    */
-  static String getArchiveFilenameCollectionId(String fileName,
-      String parsedRequest) {
+  static String getArchiveFilenameNamespace(String fileName,
+                                            String parsedRequest) {
     int separatorLocation =
 	getArchiveFilenameSeparator(fileName, parsedRequest);
 
@@ -218,7 +181,7 @@ public class ServiceImplUtil {
   }
 
   /**
-   * Provides the location of the separator between the collection and artifact
+   * Provides the location of the separator between the namespace and artifact
    * identifiers embedded in the archive file name.
    * 
    * @param fileName
@@ -265,5 +228,62 @@ public class ServiceImplUtil {
     JSONObject responseBody = new JSONObject();
     responseBody.put("error", errorElement);
     return responseBody.toString();
+  }
+
+  /**
+   * Validates the page size specified in the request.
+   *
+   * @param requestLimit An Integer with the page size specified in the request.
+   * @param defaultValue An int with the value to be used when no page size is
+   *                     specified in the request.
+   * @param maxValue     An int with the maximum allowed value for the page
+   *                     size.
+   * @return an int with the validated value for the page size.
+   */
+  static int validateLimit(Integer requestLimit, int defaultValue, int maxValue,
+                           String parsedRequest) {
+    log.debug2("requestLimit = {}, defaultValue = {}, maxValue = {}",
+        requestLimit, defaultValue, maxValue);
+
+    // Check whether it's not a positive integer.
+    if (requestLimit != null && requestLimit.intValue() <= 0) {
+      // Yes: Report the problem.
+      String message =
+          "Limit of requested items must be a positive integer; it was '"
+              + requestLimit + "'";
+      log.warn(message);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
+    }
+
+    // No: Get the result.
+    int result = requestLimit == null ?
+        Math.min(defaultValue, maxValue) : Math.min(requestLimit, maxValue);
+    log.debug2("result = {}", result);
+    return result;
+  }
+
+  /**
+   * Populates the artifacts to be included in the response.
+   *
+   * @param iterator  An Iterator<Artifact> with the artifact source iterator.
+   * @param limit     An Integer with the maximum number of artifacts to be
+   *                  included in the response.
+   * @param artifacts A List<Artifact> with the artifacts to be included in the
+   *                  response.
+   */
+  static public void populateArtifacts(Iterator<Artifact> iterator, Integer limit,
+                                 List<Artifact> artifacts) {
+    log.debug2("limit = {}, artifacts = {}", limit, artifacts);
+    int artifactCount = artifacts.size();
+
+    // Loop through as many artifacts that exist and are requested.
+    while (artifactCount < limit && iterator.hasNext()) {
+      // Add this artifact to the results.
+      artifacts.add(iterator.next());
+      artifactCount++;
+    }
   }
 }

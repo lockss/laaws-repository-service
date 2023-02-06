@@ -1,4 +1,6 @@
-Copyright (c) 2000-2023, Board of Trustees of Leland Stanford Jr. University
+/*
+
+Copyright (c) 2000-2022, Board of Trustees of Leland Stanford Jr. University
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -25,3 +27,17 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
+
+*/
+
+package org.lockss.laaws.rs.multipart;
+
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.springframework.web.multipart.commons.CommonsMultipartResolver;
+
+public class DigestMultipartResolver extends CommonsMultipartResolver {
+  @Override
+  protected DiskFileItemFactory newFileItemFactory() {
+    return new DigestFileItemFactory();
+  }
+}

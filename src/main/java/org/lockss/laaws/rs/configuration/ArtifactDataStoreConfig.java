@@ -193,10 +193,13 @@ public class ArtifactDataStoreConfig {
         twads.setTestingDiskSpaceMap(freeSpacePatternMap);
       }
 
-      boolean useWarcCompression =
+      if (wads != null) {
+        boolean useWarcCompression =
           newConfig.getBoolean(PARAM_REPO_USE_WARC_COMPRESSION, DEFAULT_REPO_USE_WARC_COMPRESSION);
-
-      wads.setUseWarcCompression(useWarcCompression);
+        wads.setUseWarcCompression(useWarcCompression);
+      } else {
+        log.warn("configurationChanged() called before ConfigManager started.  Okey while running unit tests, should not happen during real startup");
+      }
     }
   }
 }

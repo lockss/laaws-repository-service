@@ -44,20 +44,19 @@ basePath: "/"
 tags:
   - name: Default
     description: Default section
-  - name: collections
-    description: Tasks on the repository collections
+  - name: repository
+    description: Tasks on the repository
 schemes:
 - "http"
 produces:
 - "application/json"
 paths:
-  /collections:
+  /namespaces:
     get:
       tags:
-        - collections
-      summary: "Get collection identifiers of the committed artifacts in the\
-        \ repository"
-      operationId: getCollections
+        - repo
+      summary: "Get namespaces of the committed artifacts in the repository"
+      operationId: getNamespaces
       parameters: []
       responses:
         200:
@@ -66,19 +65,58 @@ paths:
             type: "array"
             items:
               type: "string"
-  /collections/{collectionid}/artifacts:
-    get:
+  /archives:
+    post:
       tags:
-        - collections
-      summary: "This endpoint returns the committed artifacts of all versions of a given URL, from a specified
-      collection."
-      operationId: getArtifactsFromAllAus
+        - artifacts
+      summary: "Imports artifacts from an archive"
+      operationId: addArtifacts
+      consumes:
+        - "multipart/form-data"
       parameters:
-        - name: "collectionid"
-          in: "path"
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "query"
+          type: "string"
+          required: false
+          default: "lockss"
+        - name: "auid"
+          in: "formData"
           required: true
           type: "string"
-          description: "Identifier of the collection containing the artifacts"
+          description: "Archival Unit ID (AUID) of new artifact"
+        - name: "archive"
+          in: "formData"
+          required: true
+          type: "file"
+          description: "Archive data containing artifacts"
+      responses:
+        200:
+          description: "Status of artifacts imported from the archive, maybe partially. Return body is a sequence of 
+          JSON ImportStatus objects."
+          schema:
+            type: file
+        400:
+          description: "Invalid input"
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to create artifacts"
+        502:
+          description: "Internal error creating artifact"
+  /artifacts:
+    get:
+      tags:
+        - artifacts
+      summary: "Returns all artifacts that match a given a URL or URL prefix and/or version."
+      operationId: getArtifactsFromAllAus
+      parameters:
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "query"
+          type: "string"
+          required: false
+          default: "lockss"
         - name: "url"
           in: "query"
           required: false
@@ -123,33 +161,27 @@ paths:
           description: "Could not read from external resource"
     post:
       tags:
-        - collections
+        - artifacts
       summary: "Create an artifact"
       operationId: createArtifact
       consumes:
       - "multipart/form-data"
       parameters:
-      - name: "auid"
+      - name: "artifactProps"
         in: "formData"
         required: true
         type: "string"
-        description: "Archival Unit ID (AUID) of new artifact"
-      - name: "uri"
-        in: "formData"
-        required: true
-        type: "string"
-        description: "URI represented by this artifact"
-      - name: "collectionDate"
+        description: "Artifact properties (JSON)"
+      - name: "httpResponseHeader"
         in: "formData"
         required: false
-        type: "integer"
-        format: "int64"
-        description: "Artifact collection/crawl date (milliseconds since epoch; UTC)"
-      - name: "artifact"
+        type: "string"
+        description: "HTTP response status and headers (optional)"
+      - name: "payload"
         in: "formData"
         required: true
         type: "file"
-        description: "Artifact data"
+        description: "Artifact payload data"
       responses:
         201:
           description: "Artifact created"
@@ -169,58 +201,65 @@ paths:
           description: "Client not authorized to create artifacts"
         502:
           description: "Internal error creating artifact"
+  /artifacts/{uuid}:
     parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Collection containing the artifact"
-  /collections/{collectionid}/artifacts/{artifactid}:
-    get:
-      tags:
-        - collections
-      summary: "Get artifact content and metadata"
-      operationId: getArtifact
-      parameters:
-      - name: "includeContent"
+      - name: "namespace"
+        description: "Namespace of the artifacts"
         in: "query"
         type: "string"
-        enum: ["NEVER", "IF_SMALL", "ALWAYS"]
-        description: "Controls whether to include the artifact content part in multipart response"
         required: false
-        default: "ALWAYS"
+        default: "lockss"
+      - name: "uuid"
+        in: "path"
+        required: true
+        type: "string"
+        description: "Identifier of the artifact"
+    get:
+      tags:
+        - artifacts
+      summary: "Get artifact and metadata"
+      operationId: getArtifact
+      parameters:
+        - name: "includeContent"
+          in: "query"
+          type: "string"
+          enum: [ "NEVER", "IF_SMALL", "ALWAYS" ]
+          description: "Controls whether to include the artifact content part in multipart response"
+          required: false
+          default: "ALWAYS"
       produces:
         - "multipart/form-data"
+        - "application/json"
       responses:
         200:
-          description: "Artifact created"
+          description: "Multipart/form-data containing the following parts: The artifact properties, HTTP 
+            status and headers if present, and the artifact's payload if requested. See POST /artifacts for 
+            more information."
           schema:
             type: file
-#          schema:
-#            type: object
-#            additionalProperties:
-#              type: object
         401:
           description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve artifact"
         404:
           description: "Artifact not found"
+        500:
+          description: "Internal Server Error"
         502:
           description: "Could not read from external resource"
     put:
       tags:
-        - collections
-      summary: "Update the committed property of an artifact"
+        - artifacts
+      summary: "Update the property of an artifact"
       operationId: updateArtifact
       consumes:
-      - "multipart/form-data"
+        - "multipart/form-data"
       parameters:
-      - name: "committed"
-        in: "formData"
-        required: true
-        type: "boolean"
-        description: "New commit status of artifact"
+        - name: "committed"
+          in: "formData"
+          required: true
+          type: "boolean"
+          description: "New commit status of artifact"
       responses:
         200:
           description: "Artifact updated"
@@ -236,12 +275,12 @@ paths:
           description: "Artifact not found"
     delete:
       tags:
-        - collections
+        - artifacts
       summary: "Remove an artifact from the repository"
       operationId: deleteArtifact
       consumes:
-      - "application/json"
-      parameters: []
+        - "application/json"
+      parameters: [ ]
       responses:
         200:
           description: "Successfully removed artifact"
@@ -252,24 +291,13 @@ paths:
         404:
           description: "Artifact not found"
         409:
-          description: "Cannot delete committed artifact"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Collection containing the artifact"
-    - name: "artifactid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the artifact"
-  /collections/{collectionid}/aus:
+          description: "Cannot delete artifact"
+  /aus:
     get:
       tags:
-        - collections
-      summary: "Get Archival Unit IDs (AUIDs) in a collection"
-      description: "Get a list of all Archival Unit identifiers in a collection\
+        - aus
+      summary: "Get Archival Unit IDs (AUIDs) in a namespace"
+      description: "Get a list of all Archival Unit identifiers in a namespace\
         \ or a pageful of the list defined by the continuation token and size"
       operationId: getAus
       responses:
@@ -282,16 +310,16 @@ paths:
         403:
           description: "Client not authorized to retrieve data"
         404:
-          description: "Collection not found"
+          description: "No AUIDs in namespace"
         502:
           description: "Could not read from external resource"
       parameters:
-        - name: "collectionid"
-          in: "path"
-          required: true
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "query"
           type: "string"
-          description: "Identifier of the collection containing the Archival\
-            \ Units"
+          required: false
+          default: "lockss"
         - name: "limit"
           in: "query"
           description: "The requested maximum number of Archival Unit\
@@ -304,12 +332,46 @@ paths:
           type: "string"
           description: "The continuation token of the next page of Archival\
             \ Unit identifiers to be returned"
-  /collections/{collectionid}/aus/{auid}/artifacts:
+  /aus/{auid}/bulk:
+    post:
+      tags:
+        - aus
+      summary: "Marks the AUID for bulk artifact transfer"
+      description: ""
+      operationId: handleBulkAuOp
+      responses:
+        200:
+          description: "Bulk operation succeeded"
+        401:
+          description: "Unauthorized"
+        403:
+          description: "Client is forbidden from performing bulk operation"
+        404:
+          description: "AUID not in bulk mode"
+      parameters:
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "query"
+          type: "string"
+          required: false
+          default: "lockss"
+        - name: "auid"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Archival Unit ID"
+        - name: "op"
+          description: "Bulk AU transfer operation"
+          in: "formData"
+          required: true
+          type: string
+          enum: ["start", "finish"]
+  /aus/{auid}/artifacts:
     get:
       tags:
-        - collections
-      summary: "Get artifacts in a collection and Archival Unit"
-      description: "Get a list of all artifacts in a collection and Archival\
+        - artifacts
+      summary: "Get artifacts in an Archival Unit"
+      description: "Get a list of all artifacts in a namespace and Archival\
         \ Unit or a pageful of the list defined by the continuation token and\
         \ size"
       operationId: getArtifacts
@@ -323,15 +385,16 @@ paths:
         403:
           description: "Client not authorized to retrieve data"
         404:
-          description: "Collection not found"
+          description: "AUID not found in namespace"
         502:
           description: "Could not read from external resource"
       parameters:
-        - name: "collectionid"
-          in: "path"
-          required: true
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "query"
           type: "string"
-          description: "Identifier of the collection containing the artifacts"
+          required: false
+          default: "lockss"
         - name: "auid"
           in: "path"
           required: true
@@ -370,52 +433,38 @@ paths:
           type: "string"
           description: "The continuation token of the next page of artifacts to\
             \ be returned"
-  /collections/{collectionid}/aus/{auid}/size:
+  /aus/{auid}/size:
     get:
       tags:
-        - collections
-      summary: "Get the size of Archival Unit artifacts in a collection"
+        - aus
+      summary: "Get the size of Archival Unit artifacts in a namespace"
       operationId: getArtifactsSize
+      parameters:
+      - name: "namespace"
+        description: "Namespace of the artifacts"
+        in: "query"
+        type: "string"
+        required: false
+        default: "lockss"
+      - name: "auid"
+        in: "path"
+        required: true
+        type: "string"
+        description: "Identifier of the Archival Unit containing the artifacts"
       responses:
         200:
-          description: "The size of the artifacts"
+          description: "Returns an AuSize containing the sizes of all the artifacts, only the latest artifact \
+          version of all URLs, and the sum of the size of all the underlying WARC files, of an AU."
           schema:
-            type: "integer"
-            format: "int64"
+            $ref: "#/definitions/auSize"
         401:
           description: "Unauthorized request"
         403:
           description: "Client not authorized to retrieve data"
         404:
-          description: "Collection not found"
+          description: "AUID not found in namespace"
         502:
           description: "Could not read from external resource"
-    parameters:
-    - name: "collectionid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the collection containing the artifacts"
-    - name: "auid"
-      in: "path"
-      required: true
-      type: "string"
-      description: "Identifier of the Archival Unit containing the artifacts"
-    - name: "url"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The URL contained by the artifacts"
-    - name: "urlPrefix"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The prefix to be matched by the artifact URLs"
-    - name: "version"
-      in: "query"
-      required: false
-      type: "string"
-      description: "The version of the artifact"
   /status:
     get:
       tags:
@@ -434,18 +483,18 @@ paths:
           description: "Unauthorized"
         500:
           description: "Internal Server Error"
-  /cdx/owb/{collectionid}:
+  /wayback/cdx/owb/{namespace}:
     get:
       tags:
         - wayback
       summary: Get OpenWayback CDX records
-      description: Get the OpenWayback CDX records of a URL in a collection
+      description: Get the OpenWayback CDX records of a URL in a namespace
       operationId: getCdxOwb
       produces:
         - "application/xml"
       responses:
         '200':
-          description: The OpenWayback CDX records of the URL in the collection
+          description: The OpenWayback CDX records of the URL in the namespace
           schema:
             type: string
         '401':
@@ -453,15 +502,16 @@ paths:
         '403':
           description: Forbidden
         '404':
-          description: Collection/URL not found
+          description: Namespace/URL not found
         '500':
           description: Internal Server Error
       parameters:
-        - name: 'collectionid'
-          in: path
-          description: Identifier of the collection
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "path"
+          type: "string"
           required: true
-          type: string
+          default: "lockss"
         - name: q
           in: query
           description: Query string. Supported fields are url, type\
@@ -486,18 +536,18 @@ paths:
           description: The Accept-Encoding header
           required: false
           type: string
-  /cdx/pywb/{collectionid}:
+  /wayback/cdx/pywb/{namespace}:
     get:
       tags:
         - wayback
       summary: Get PyWayback CDX records
-      description: Get the PyWayback CDX records of a URL in a collection
+      description: Get the PyWayback CDX records of a URL in a namespace
       operationId: getCdxPywb
       produces:
         - "text/plain"
       responses:
         '200':
-          description: The PyWayback CDX records of the URL in the collection
+          description: The PyWayback CDX records of the URL in the namespace
           schema:
             type: string
         '401':
@@ -505,15 +555,16 @@ paths:
         '403':
           description: Forbidden
         '404':
-          description: Collection/URL not found
+          description: Namespace/URL not found
         '500':
           description: Internal Server Error
       parameters:
-        - name: 'collectionid'
-          in: path
-          description: Identifier of the collection
+        - name: "namespace"
+          description: "Namespace of the artifacts"
+          in: "path"
+          type: "string"
           required: true
-          type: string
+          default: "lockss"
         - name: url
           in: query
           description: The URL for which the CDX records are requested
@@ -556,7 +607,7 @@ paths:
           description: The Accept-Encoding header
           required: false
           type: string
-  /warcs/{fileName}:
+  /wayback/warcs/{fileName}:
     get:
       tags:
         - wayback
@@ -600,7 +651,7 @@ paths:
   '/checksumalgorithms':
     get:
       tags:
-        - import
+        - repo
       summary: Get the supported checksum algorithms
       description: Get a list of the names of the supported checksum algorithms
       operationId: getSupportedChecksumAlgorithms
@@ -638,6 +689,29 @@ paths:
         '500':
           description: Internal Server Error
 definitions:
+  importStatus:
+    type: "object"
+    properties:
+      warcId:
+        type: "string"
+      offset:
+        type: "integer"
+        format: "int64"
+      url:
+        type: "string"
+      artifactUuid:
+        type: "string"
+      digest:
+        type: "string"
+      version:
+        type: "integer"
+      status:
+        type: "string"
+        enum:
+          - "OK"
+          - "ERROR"
+      statusMessage:
+        type: "string"
   artifactPageInfo:
     type: "object"
     required:
@@ -652,12 +726,25 @@ definitions:
       pageInfo:
         $ref: "#/definitions/pageInfo"
     description: "A display page of artifacts"
-  artifact:
+  auSize:
     type: "object"
     properties:
-      id:
+      totalLatestVersions:
+        type: "integer"
+        format: "int64"
+      totalAllVersions:
+        type: "integer"
+        format: "int64"
+      totalWarcSize:
+        type: "integer"
+        format: "int64"
+  artifactProperties:
+    type: "object"
+    properties:
+      namespace:
         type: "string"
-      collection:
+        default: "lockss"
+      uuid:
         type: "string"
       auid:
         type: "string"
@@ -665,16 +752,25 @@ definitions:
         type: "string"
       version:
         type: "integer"
+      contentLength:
+        type: "integer"
+        format: "int64"
+      contentDigest:
+        type: "string"
+      collectionDate:
+        type: "integer"
+        format: "int64"
+      state:
+        type: "string"
+  artifact:
+    allOf:
+      - $ref: '#/definitions/artifactProperties'
+    type: "object"
+    properties:
       committed:
         type: "boolean"
       storageUrl:
         type: "string"
-      originDate:
-        type: "integer"
-        format: "int64"
-      collectionDate:
-        type: "integer"
-        format: "int64"
   streamingResponseBody:
     type: "object"
   apiStatus:

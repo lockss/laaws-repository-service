@@ -17,7 +17,7 @@ public class RepositoryServiceProperties {
   private final static L4JLogger log = L4JLogger.getLogger();
 
   // LOCKSS repository properties
-  @Value("${repo.spec}") String repoSpec;
+  @Value("${repo.spec:volatile}") String repoSpec;
   @Value("${repo.state.dir:/data/state}") String repoStateDir;
 
   // Artifact data store properties
