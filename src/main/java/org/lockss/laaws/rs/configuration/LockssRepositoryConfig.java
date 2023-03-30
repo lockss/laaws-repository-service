@@ -76,10 +76,18 @@ public class LockssRepositoryConfig {
    */
   @Bean
   public LockssRepository createInitializedRepository() throws IOException {
-    // Create and initialize the LockssRepository instance
     LockssRepository repo = createLockssRepository();
 
-    repo.initRepository();
+    // Initialize the repository in a separate thread
+    new Thread(() -> {
+      try {
+        repo.initRepository();
+      } catch (IOException e) {
+        String errMsg = "Failed to initialize internal LOCKSS repository";
+        log.error(errMsg, e);
+        throw new IllegalStateException(errMsg);
+      }
+    }).start();
 
     // Start a new thread to handle JMS messages to this LockssRepository
     // XXX wrong method, below is public
