@@ -14,19 +14,19 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
-import org.lockss.laaws.rs.model.ArtifactData;
-import org.lockss.laaws.rs.model.ArtifactSpec;
-import org.lockss.laaws.rs.util.ArtifactDataFactory;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.index.ArtifactIndex;
+import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.ListUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.model.ArtifactData;
+import org.lockss.util.rest.repo.util.ArtifactDataUtil;
+import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.time.TimeBase;
 import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -232,7 +232,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
               "message",
               statusLine.getStatusCode(),
               statusLine.getReasonPhrase(),
-              ArtifactDataFactory.transformHeaderArrayToHttpHeaders(response.getAllHeaders()),
+              ArtifactDataUtil.transformHeaderArrayToHttpHeaders(response.getAllHeaders()),
               IOUtils.toByteArray(responseBody),
               Charset.defaultCharset()
           ),

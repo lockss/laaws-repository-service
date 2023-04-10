@@ -4,20 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
-import org.apache.http.message.BasicLineParser;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
-import org.lockss.laaws.rs.core.ArtifactCache;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.model.*;
 import org.lockss.laaws.rs.multipart.DigestFileItem;
-import org.lockss.laaws.rs.util.*;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.storage.warc.WarcArtifactData;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -27,10 +20,20 @@ import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.multipart.MultipartResponse;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.model.*;
+import org.lockss.util.rest.repo.util.ArtifactCache;
+import org.lockss.util.rest.repo.util.ArtifactComparators;
+import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
@@ -51,7 +54,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.populateArtifacts;
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.validateLimit;
-import static org.lockss.laaws.rs.util.ArtifactDataFactory.buildArtifactIdentifier;
 
 @Service
 public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
@@ -213,7 +215,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       // Read artifact properties part
       ArtifactProperties props = objMapper.readValue(properties, ArtifactProperties.class);
 
-      ArtifactIdentifier artifactId = buildArtifactIdentifier(props);
+      ArtifactIdentifier artifactId = ArtifactDataUtil.buildArtifactIdentifier(props);
 
       if (artifactId.getVersion() != null) {
         throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
@@ -224,7 +226,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       validateUri(artifactId.getUri(), parsedRequest);
 
       // Construct ArtifactData from payload part
-      ArtifactData ad = ArtifactDataFactory.fromResource(payload.getInputStream());
+      ArtifactData ad = WarcArtifactData.fromResource(payload.getInputStream());
 
       // Set artifact identifier
       ad.setIdentifier(artifactId);
@@ -248,14 +250,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       if (asHttpResponse) {
         try {
-          HttpResponse httpResponse = ArtifactDataFactory.getHttpResponseFromStream(
+          HttpResponse httpResponse = ArtifactDataUtil.getHttpResponseFromStream(
               IOUtils.toInputStream(httpResponseHeader, StandardCharsets.UTF_8));
 
           // Set HTTP status
           ad.setHttpStatus(httpResponse.getStatusLine());
 
           // Set HTTP headers
-          ad.setHttpHeaders(ArtifactDataFactory.transformHeaderArrayToHttpHeaders(httpResponse.getAllHeaders()));
+          ad.setHttpHeaders(ArtifactDataUtil.transformHeaderArrayToHttpHeaders(httpResponse.getAllHeaders()));
         } catch (HttpException e) {
           throw new HttpMessageNotReadableException("Error parsing HTTP response header part", e);
         }

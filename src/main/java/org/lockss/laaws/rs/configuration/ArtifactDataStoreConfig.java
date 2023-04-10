@@ -31,22 +31,18 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.config.ConfigManager;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
-import org.lockss.laaws.rs.io.storage.hdfs.HdfsWarcArtifactDataStore;
-import org.lockss.laaws.rs.io.storage.local.LocalWarcArtifactDataStore;
-import org.lockss.laaws.rs.io.storage.local.TestingWarcArtifactDataStore;
-import org.lockss.laaws.rs.io.storage.warc.VolatileWarcArtifactDataStore;
-import org.lockss.laaws.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.index.ArtifactIndex;
+import org.lockss.rs.io.storage.ArtifactDataStore;
+import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
+import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.PatternIntMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.hadoop.config.annotation.builders.HadoopConfigBuilder;
 
-import java.nio.file.Paths;
 import java.util.List;
 
 /**
@@ -127,17 +123,6 @@ public class ArtifactDataStoreConfig {
           default:
             throw new RuntimeException("Shouldn't happen");
         }
-
-      case "hdfs":
-        log.info(
-            "Configuring HDFS artifact data store [hdfsServer: {}, hdfsBaseDir: {}]",
-            repoProps.getHdfsEndpoint(), repoProps.getHdfsBaseDir()
-        );
-
-        HadoopConfigBuilder hdfsConfigBuilder = new HadoopConfigBuilder();
-        hdfsConfigBuilder.fileSystemUri(repoProps.getHdfsEndpoint());
-
-        return new HdfsWarcArtifactDataStore(hdfsConfigBuilder.build(), Paths.get(repoProps.getHdfsBaseDir()));
 
       default:
         log.error("Unknown artifact data store: '{}'", dsType);

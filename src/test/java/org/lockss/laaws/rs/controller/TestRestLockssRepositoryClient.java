@@ -36,22 +36,19 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.io.storage.warc.ArtifactState;
-import org.lockss.laaws.rs.io.storage.warc.ArtifactStateEntry;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactData;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.AuSize;
-import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.LockssUncheckedException;
 import org.lockss.util.rest.RestUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
-import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.rest.repo.model.ArtifactData;
+import org.lockss.util.rest.repo.model.ArtifactIdentifier;
+import org.lockss.util.rest.repo.model.AuSize;
+import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -73,8 +70,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 
-import static org.lockss.laaws.rs.util.ArtifactDataUtil.generateMultipartMapFromArtifactData;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 /**
@@ -154,191 +150,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 		      "500",
 		      () -> {repository.getNamespaces();});
         mockServer.verify();
-    }
-
-    @Test
-    public void testIsArtifactCommitted_iae() throws Exception {
-        try {
-            repository.isArtifactCommitted("ns1", null);
-            fail("Should have thrown IllegalArgumentException");
-        } catch (IllegalArgumentException iae) {}
-
-        try {
-            repository.isArtifactCommitted("ns1", "");
-            fail("Should have thrown IllegalArgumentException");
-      } catch (IllegalArgumentException iae) {}
-    }
-
-    @Test
-    public void testIsArtifactCommitted_missingheader() throws Exception {
-
-        // ******************************
-        // Reference artifact and headers
-        // ******************************
-
-        // Setup reference artifact data headers
-        HttpHeaders referenceHeaders = new HttpHeaders();
-        referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key1", "value2");
-        referenceHeaders.add("key2", "value3");
-
-	String testData = "hello world";
-
-        // Setup reference artifact data
-        ArtifactData reference = new ArtifactData(
-            new ArtifactIdentifier("artifact1", "ns1", "auid1", "url1", 2),
-            referenceHeaders,
-            new ByteArrayInputStream(testData.getBytes()),
-            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-            new URI("storageUrl1"),
-            null
-        );
-
-        reference.setContentDigest("test");
-        reference.setContentLength(testData.length());
-
-        // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
-            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
-        );
-
-        // ****************************
-        // Setup mocked server response
-        // ****************************
-
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
-
-        // Setup mocked server response
-        URI endpoint = new URI(BASEURL + "/artifacts/artifact1?namespace=ns1&includeContent=IF_SMALL");
-
-        mockServer
-            .expect(uriRequestTo(endpoint))
-            .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
-
-	assertThrowsMatch(LockssRestInvalidResponseException.class,
-			  "Missing artifact repository state",
-			  () -> {repository.isArtifactCommitted("ns1",
-								"artifact1");});
-        mockServer.verify();
-    }
-
-    @Test
-    public void testIsArtifactCommitted_true() throws Exception {
-
-        // ******************************
-        // Reference artifact and headers
-        // ******************************
-
-        // Setup reference artifact data headers
-        HttpHeaders referenceHeaders = new HttpHeaders();
-        referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key1", "value2");
-        referenceHeaders.add("key2", "value3");
-
-	String testData = "hello world";
-
-        String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
-
-        // Setup reference artifact data
-        ArtifactData reference = new ArtifactData(
-            new ArtifactIdentifier("artifact1", "ns1", "auid1", "url1", 2),
-            referenceHeaders,
-            new ByteArrayInputStream(testData.getBytes()),
-            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-            new URI("storageUrl1"),
-            mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState());
-
-        reference.setContentDigest("test");
-        reference.setContentLength(testData.length());
-
-        // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
-            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
-        );
-
-        // ****************************
-        // Setup mocked server response
-        // ****************************
-
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
-
-        // Setup mocked server response
-        URI endpoint = new URI(BASEURL + "/artifacts/artifact1?namespace=ns1&includeContent=IF_SMALL");
-
-        mockServer
-            .expect(uriRequestTo(endpoint))
-            .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
-
-        Boolean result = repository.isArtifactCommitted("ns1", "artifact1");
-        mockServer.verify();
-        assertTrue(result);
-    }
-
-    @Test
-    public void testIsArtifactCommitted_false() throws Exception {
-
-        // ******************************
-        // Reference artifact and headers
-        // ******************************
-
-        // Setup reference artifact data headers
-        HttpHeaders referenceHeaders = new HttpHeaders();
-        referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key1", "value2");
-        referenceHeaders.add("key2", "value3");
-
-	String testData = "hello world";
-
-        String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"UNCOMMITTED\"}";
-
-        // Setup reference artifact data
-        ArtifactData reference = new ArtifactData(
-            new ArtifactIdentifier("artifact1", "ns1", "auid1", "url1", 2),
-            referenceHeaders,
-            new ByteArrayInputStream(testData.getBytes()),
-            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-            new URI("storageUrl1"),
-            mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState());
-
-        reference.setContentDigest("test");
-        reference.setContentLength(testData.length());
-
-        // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
-            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
-        );
-
-        // ****************************
-        // Setup mocked server response
-        // ****************************
-
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
-
-        // Setup mocked server response
-        URI endpoint = new URI(BASEURL + "/artifacts/artifact1?namespace=ns1&includeContent=IF_SMALL");
-
-        mockServer
-            .expect(uriRequestTo(endpoint))
-            .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
-
-        Boolean result = repository.isArtifactCommitted("ns1", "artifact1");
-        mockServer.verify();
-        assertFalse(result);
     }
 
     @Test
@@ -441,8 +252,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 new ByteArrayInputStream(buf),
                 new BasicStatusLine(
                     new ProtocolVersion("protocol1", 4, 5), 3, null),
-                new URI("storageUrl1"),
-                mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState()));
+                new URI("storageUrl1")));
 
         mockServer.verify();
 
@@ -468,8 +278,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     new HttpHeaders(),
                     new ByteArrayInputStream(new byte[]{}),
                     new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null),
-                    new URI("storageUrl1"),
-                    mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState()));
+                    new URI("storageUrl1")));
 
             fail("Should have thrown IOException");
         } catch (IOException ioe) {}
@@ -541,21 +350,19 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             referenceHeaders,
             new ByteArrayInputStream(content.getBytes()),
             httpStatus,
-            new URI("storageUrl1"),
-            mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState());
+            new URI("storageUrl1"));
 
         reference.setContentLength(content.length());
         reference.setContentDigest("some made-up hash");
 
         // Convenience variables
         ArtifactIdentifier refId = reference.getIdentifier();
-        ArtifactState refArtifactState = reference.getArtifactState();
 
         // Artifact is small if its size is less than or equal to the threshold
         long includeContentMaxSize = (isSmall == null || isSmall == true) ? content.length() : content.length() - 1;
 
         // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
+        MultiValueMap<String, Object> parts = ArtifactDataUtil.generateMultipartMapFromArtifactData(
             reference, includeContent, includeContentMaxSize
         );
 
@@ -601,13 +408,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals(refId.getAuid(), result.getIdentifier().getAuid());
         assertEquals(refId.getUri(), result.getIdentifier().getUri());
         assertEquals(refId.getVersion(), result.getIdentifier().getVersion());
-
-        // Verify artifact repository state
-        assertNotNull(result.getArtifactState());
-
-        // FIXME: ArtifactStateEntry now records ArtifactState
-        assertEquals(refArtifactState.isCommitted(), result.getArtifactState().isCommitted());
-        assertEquals(refArtifactState.isDeleted(), result.getArtifactState().isDeleted());
 
         // Verify misc. artifact properties
         assertEquals(reference.getContentLength(), result.getContentLength());

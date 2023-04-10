@@ -47,18 +47,12 @@ import org.archive.format.warc.WARCConstants;
 import org.junit.*;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.core.LocalLockssRepository;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.LockssRepository.ArchiveType;
-import org.lockss.laaws.rs.core.LockssRepository.IncludeContent;
-import org.lockss.laaws.rs.core.RestLockssRepository;
+import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
-import org.lockss.laaws.rs.model.*;
-import org.lockss.laaws.rs.util.ArtifactConstants;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.LocalLockssRepository;
+import org.lockss.rs.io.index.ArtifactIndex;
+import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.ConfigurationUtil;
 import org.lockss.test.LockssTestCase4;
@@ -69,6 +63,12 @@ import org.lockss.util.PreOrderComparator;
 import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.io.FileUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.model.*;
+import org.lockss.util.rest.repo.util.ArtifactConstants;
+import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
@@ -338,7 +338,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Test for {@link org.lockss.laaws.rs.api.ArchivesApi#addArtifacts(String, MultipartFile, String)}.
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String)}.
    */
   @Test
   public void testAddArtifacts() throws Exception {
@@ -372,7 +372,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       log.debug("Calling REST addArtifacts");
 
       Iterable<ImportStatus> iter = repository.addArtifacts(
-          namespace, auId, dfos.getDeleteOnCloseInputStream(), ArchiveType.WARC, isCompressed);
+          namespace, auId, dfos.getDeleteOnCloseInputStream(), LockssRepository.ArchiveType.WARC, isCompressed);
 
       List<ImportStatus> result = ListUtil.fromIterable(iter);
       ImportStatus last = result.get(result.size() - 1);
@@ -444,7 +444,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       try (InputStream fileInput = Files.newInputStream(tmpFile.toPath())) {
         Iterable<ImportStatus> iter = repository.addArtifacts(
-            namespace, auId, fileInput, ArchiveType.WARC, isCompressed);
+            namespace, auId, fileInput, LockssRepository.ArchiveType.WARC, isCompressed);
 
         List<ImportStatus> result = ListUtil.fromIterable(iter);
 
@@ -516,7 +516,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       // Call addArtifacts REST endpoint
       Iterable<ImportStatus> iter = repository.addArtifacts(
-          namespace, auId, dfos.getDeleteOnCloseInputStream(), ArchiveType.WARC, isCompressed);
+          namespace, auId, dfos.getDeleteOnCloseInputStream(), LockssRepository.ArchiveType.WARC, isCompressed);
 
       List<ImportStatus> result = ListUtil.fromIterable(iter);
 
@@ -838,7 +838,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testGetArtifactsWithUrlPrefixFromAllAus();
     testGetAuIds();
     testGetNamespaces();
-    testIsArtifactCommitted();
+//    testIsArtifactCommitted();
   }
 
   @Test
@@ -892,32 +892,32 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     spec_large.setCommitted(true);
     spec_larger.setCommitted(true);
 
-    assertReceivesNoContent(art_small_c, IncludeContent.NEVER);
-    assertReceivesContent(art_small_c, IncludeContent.IF_SMALL);
-    assertReceivesContent(art_small_c, IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_small_c, LockssRepository.IncludeContent.NEVER);
+    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.IF_SMALL);
+    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.ALWAYS);
 
-    assertReceivesNoContent(art_large_c, IncludeContent.NEVER);
-    assertReceivesNoContent(art_large_c, IncludeContent.IF_SMALL);
-    assertReceivesContent(art_large_c, IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.NEVER);
+    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.IF_SMALL);
+    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.ALWAYS);
 
-    assertReceivesNoContent(art_larger_c, IncludeContent.NEVER);
-    assertReceivesNoContent(art_larger_c, IncludeContent.IF_SMALL);
-    assertReceivesContent(art_larger_c, IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.NEVER);
+    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.IF_SMALL);
+    assertReceivesContent(art_larger_c, LockssRepository.IncludeContent.ALWAYS);
 
     ConfigurationUtil.addFromArgs(ArtifactsApiServiceImpl.PARAM_SMALL_CONTENT_THRESHOLD,
         "" + (len_large + len_larger) / 2);
 
-    assertReceivesNoContent(art_small_c, IncludeContent.NEVER);
-    assertReceivesContent(art_small_c, IncludeContent.IF_SMALL);
-    assertReceivesContent(art_small_c, IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_small_c, LockssRepository.IncludeContent.NEVER);
+    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.IF_SMALL);
+    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.ALWAYS);
 
-    assertReceivesNoContent(art_large_c, IncludeContent.NEVER);
-    assertReceivesContent(art_large_c, IncludeContent.IF_SMALL);
-    assertReceivesContent(art_large_c, IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.NEVER);
+    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.IF_SMALL);
+    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.ALWAYS);
 
-    assertReceivesNoContent(art_larger_c, IncludeContent.NEVER);
-    assertReceivesNoContent(art_larger_c, IncludeContent.IF_SMALL);
-    assertReceivesContent(art_larger_c, IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.NEVER);
+    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.IF_SMALL);
+    assertReceivesContent(art_larger_c, LockssRepository.IncludeContent.ALWAYS);
 
   }
 
@@ -954,7 +954,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   /**
    * Assert that the repo supplies content with the ArtifactData
    */
-  void assertReceivesContent(Artifact art, IncludeContent ic)
+  void assertReceivesContent(Artifact art, LockssRepository.IncludeContent ic)
       throws IOException {
     ArtifactData ad = repository.getArtifactData(art, ic);
     assertTrue(ad.hasContentInputStream());
@@ -963,7 +963,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   /**
    * Assert that the repo does not supply content with the ArtifactData
    */
-  void assertReceivesNoContent(Artifact art, IncludeContent ic)
+  void assertReceivesNoContent(Artifact art, LockssRepository.IncludeContent ic)
       throws IOException {
     ArtifactData ad = repository.getArtifactData(art, ic);
     assertFalse(ad.hasContentInputStream());
@@ -1839,49 +1839,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         IteratorUtils.toList(repository.getNamespaces().iterator()));
   }
 
-  public void testIsArtifactCommitted() throws IOException {
-    // Illegal args
-    assertThrowsMatch(IllegalArgumentException.class,
-        "Null artifact UUID",
-        () -> {
-          repository.isArtifactCommitted(null, null);
-        });
-    assertThrowsMatch(IllegalArgumentException.class,
-        "Null artifact UUID",
-        () -> {
-          repository.isArtifactCommitted(NS1, null);
-        });
-
-    // non-existent namespace, artifact id
-
-    // XXXAPI
-    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
-        "Artifact not found: " + NO_ARTID,
-        () -> {
-          repository.isArtifactCommitted(NS1, NO_ARTID);
-        });
-    assertThrowsMatch(LockssNoSuchArtifactIdException.class,
-        "Artifact not found: " + ARTID1,
-        () -> {
-          repository.isArtifactCommitted(NO_NAMESPACE, ARTID1);
-        });
-
-//     assertFalse(repository.isArtifactCommitted(NS1, NO_ARTID));
-//     assertFalse(repository.isArtifactCommitted(NO_NAMESPACE, ARTID1));
-
-    for (ArtifactSpec spec : addedSpecs) {
-      if (spec.isCommitted()) {
-        assertTrue(repository.isArtifactCommitted(spec.getNamespace(),
-            spec.getArtifactUuid()));
-      } else {
-        assertFalse(repository.isArtifactCommitted(spec.getNamespace(),
-            spec.getArtifactUuid()));
-      }
-    }
-
-  }
-
-
   // SCENARIOS
 
   protected enum StdVariants {
@@ -2247,8 +2204,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     String newArtUuid = newArt.getUuid();
     assertNotNull(newArtUuid);
-    assertFalse(repository.isArtifactCommitted(spec.getNamespace(),
-        newArtUuid));
     assertFalse(newArt.getCommitted());
     assertNotNull(repository.getArtifactData(spec.getNamespace(), newArtUuid));
 
@@ -2286,8 +2241,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   Artifact commit(ArtifactSpec spec, Artifact art) throws IOException {
     Artifact uncommittedArt = getArtifact(repository, spec, true);
     assertNotNull(uncommittedArt);
-    assertFalse(repository.isArtifactCommitted(spec.getNamespace(),
-        uncommittedArt.getUuid()));
     assertFalse(uncommittedArt.getCommitted());
 
     String artUuid = art.getUuid();
@@ -2303,16 +2256,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     if (maxVerSpec == null || maxVerSpec.getVersion() < spec.getVersion()) {
       highestCommittedVerSpec.put(spec.artButVerKey(), spec);
     }
-    assertTrue(repository.isArtifactCommitted(spec.getNamespace(),
-        commArt.getUuid()));
     assertTrue(commArt.getCommitted());
 
     spec.assertArtifact(repository, commArt);
 
     Artifact newArt = getArtifact(repository, spec, false);
     assertNotNull(newArt);
-    assertTrue(repository.isArtifactCommitted(spec.getNamespace(),
-        newArt.getUuid()));
     assertTrue(newArt.getCommitted());
     assertNotNull(repository.getArtifactData(spec.getNamespace(), newArt.getUuid()));
     // Get the same artifact when uncommitted may be included.

@@ -32,11 +32,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.impl;
 
 import org.json.JSONObject;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.model.Artifact;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.model.Artifact;
 import org.springframework.http.HttpStatus;
 
 import javax.servlet.http.HttpServletRequest;

@@ -32,18 +32,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Optional;
-import javax.servlet.http.HttpServletRequest;
 import org.lockss.laaws.rs.api.RepoinfoApiDelegate;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.model.RepositoryInfo;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.model.RepositoryInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Optional;
 
 /**
  * Service for obtaining the properties of a repository.

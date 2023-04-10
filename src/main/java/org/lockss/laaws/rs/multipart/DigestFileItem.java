@@ -34,8 +34,8 @@ package org.lockss.laaws.rs.multipart;
 
 import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.lang3.StringUtils;
-import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.util.ArtifactConstants;
+import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.util.ArtifactConstants;
 
 import java.io.File;
 import java.io.IOException;
