@@ -35,6 +35,7 @@ import org.lockss.log.L4JLogger;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
+import org.lockss.rs.io.storage.warc.TestingWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.PatternIntMap;
