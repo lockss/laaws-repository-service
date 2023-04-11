@@ -27,8 +27,6 @@
  */
 package org.lockss.laaws.rs;
 
-import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
-import static org.lockss.app.ManagerDescs.*;
 import org.lockss.app.LockssApp;
 import org.lockss.app.LockssApp.AppSpec;
 import org.lockss.app.LockssApp.ManagerDesc;
@@ -36,12 +34,18 @@ import org.lockss.app.LockssDaemon;
 import org.lockss.app.ServiceDescr;
 import org.lockss.log.L4JLogger;
 import org.lockss.plugin.PluginManager;
+import org.lockss.repository.RepositoryDbManager;
 import org.lockss.spring.base.BaseSpringBootApplication;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.solr.SolrAutoConfiguration;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
+import static org.lockss.app.LockssApp.managerKey;
+import static org.lockss.app.ManagerDescs.ACCOUNT_MANAGER_DESC;
+
 /**
  * The Spring-Boot application.
  */
@@ -54,7 +58,8 @@ public class RepositoryApplication extends BaseSpringBootApplication
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private static final ManagerDesc[] myManagerDescs = {
-      ACCOUNT_MANAGER_DESC
+      ACCOUNT_MANAGER_DESC,
+      new ManagerDesc(managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName())
   };
 
   /**
@@ -90,6 +95,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
 	.addAppDefault(PluginManager.PARAM_START_ALL_AUS, "false")
 	.setSpringApplicatonContext(getApplicationContext())
 	.setAppManagers(myManagerDescs);
+
       LockssApp.startStatic(LockssDaemon.class, spec);
     } else {
       // No: Do nothing. This happens when a test is started and before the
