@@ -176,24 +176,42 @@ public class LockssRepositoryConfig {
   void initJmsFactory(LockssRepository repo) {
     if (repo instanceof JmsFactorySource) {
       JmsFactorySource jmsSource = (JmsFactorySource) repo;
-      LockssDaemon daemon = null;
-      while (daemon == null) {
-        try {
-          daemon = LockssDaemon.getLockssDaemon();
-        } catch (IllegalStateException e) {
-          log.warn("getLockssDaemon() timed out");
-        }
+      LockssDaemon daemon = getRunningLockssDaemon();
+
+      if (daemon == null) {
+        throw new IllegalStateException("LOCKSS daemon failed to start");
       }
+
       try {
-        while (!daemon.waitUntilAppRunning(Deadline.in(5 * 60 * 1000))) ;
         JMSManager mgr = daemon.getManagerByType(JMSManager.class);
         jmsSource.setJmsFactory(mgr.getJmsFactory());
         log.info("Stored JmsFactory in {}", jmsSource);
       } catch (IllegalArgumentException e) {
         log.warn("Couldn't get JmsManager", e);
-      } catch (InterruptedException e) {
-        // exit
       }
     }
+  }
+
+  LockssDaemon getRunningLockssDaemon() {
+    LockssDaemon daemon = null;
+
+    while (daemon == null) {
+      try {
+        daemon = LockssDaemon.getLockssDaemon();
+      } catch (IllegalStateException e) {
+        log.warn("getLockssDaemon() timed out");
+      }
+    }
+
+    try {
+      while (!daemon.waitUntilAppRunning(Deadline.in(5 * 60 * 1000))) {
+        log.warn("Still waiting for LOCKSS daemon to start");
+      }
+      return daemon;
+    } catch (InterruptedException e) {
+      // exit
+    }
+
+    return null;
   }
 }
