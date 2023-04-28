@@ -81,6 +81,7 @@ public class LockssRepositoryConfig {
     // Initialize the repository in a separate thread
     new Thread(() -> {
       try {
+        log.debug("Initializing LOCKSS repository from thread");
         repo.initRepository();
       } catch (IOException e) {
         String errMsg = "Failed to initialize internal LOCKSS repository";
