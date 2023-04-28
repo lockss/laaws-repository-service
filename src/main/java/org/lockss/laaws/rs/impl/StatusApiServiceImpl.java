@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.impl;
 
+import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.api.StatusApiDelegate;
 import org.lockss.spring.status.SpringLockssBaseApiController;
 import org.lockss.util.rest.repo.LockssRepository;
@@ -55,6 +56,10 @@ public class StatusApiServiceImpl extends SpringLockssBaseApiController
    */
   @Override
   public ApiStatus getApiStatus() {
-    return getDefaultApiStatus();
+    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+    return new ApiStatus("swagger/swagger.yaml")
+        .setReady(daemon.isAppRunning() && repo.isReady())
+        .setReadyTime(daemon.getReadyTime())
+        .setPluginsReady(daemon.areLoadablePluginsReady());
   }
 }
