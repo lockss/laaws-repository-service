@@ -667,8 +667,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal ArtifactData (at least one null field)
     for (ArtifactData illAd : nullPointerArtData) {
       assertThrows(NullPointerException.class,
-          (Executable) () -> {
-            repository.addArtifact(illAd);
+          () -> {repository.addArtifact(illAd);
           });
     }
 
@@ -804,7 +803,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     assertThrows(
         LockssNoSuchArtifactIdException.class,
-        (Executable) () -> repository.getArtifactData(ns, ARTID1)
+        () -> repository.getArtifactData(ns, ARTID1)
     );
 
     assertEmpty(repository.getArtifactsAllVersions(ns, AUID1, URL1));
@@ -1218,17 +1217,17 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testCommitArtifact() throws IOException {
     // Illegal args
     assertThrows(IllegalArgumentException.class,
-        (Executable) () -> {
+                 () -> {
           repository.commitArtifact(null, null);
         });
     assertThrows(IllegalArgumentException.class,
-        (Executable) () -> {
+                 () -> {
           repository.commitArtifact(NS1, null);
         });
 
     // Artifact not found in default namespace
     assertThrows(LockssNoSuchArtifactIdException.class,
-        (Executable) () -> {
+                 () -> {
           repository.commitArtifact(null, ARTID1);
         });
 
@@ -1304,7 +1303,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
         assertThrows(
             LockssNoSuchArtifactIdException.class,
-            (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
+            () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
         );
 
         assertNull(getArtifact(repository, spec, false));
@@ -1339,7 +1338,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
         assertThrows(
             LockssNoSuchArtifactIdException.class,
-            (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
+            () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
         );
 
         assertNull(getArtifact(repository, spec, false));
@@ -1382,7 +1381,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
         assertThrows(
             LockssNoSuchArtifactIdException.class,
-            (Executable) () -> repository.getArtifactData(uspec.getNamespace(), uspec.getArtifactUuid())
+            () -> repository.getArtifactData(uspec.getNamespace(), uspec.getArtifactUuid())
         );
 
         assertNull(getArtifact(repository, uspec, false));
@@ -1417,7 +1416,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       assertThrows(
           LockssNoSuchArtifactIdException.class,
-          (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
+          () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
       );
 
       // Delete it again.
@@ -1429,7 +1428,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       assertThrows(
           LockssNoSuchArtifactIdException.class,
-          (Executable) () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
+          () -> repository.getArtifactData(spec.getNamespace(), spec.getArtifactUuid())
       );
     }
 

@@ -1118,7 +1118,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
         assertThrows(LockssRestHttpException.class,
-            (Executable) () -> repository.auSize("ns1", "auid1"));
+                     () -> repository.auSize("ns1", "auid1"));
 
         mockServer.verify();
     }
@@ -1132,7 +1132,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThrows(LockssRestHttpException.class,
-            (Executable) () -> repository.auSize("ns1", "auid1"));
+                     () -> repository.auSize("ns1", "auid1"));
 
         mockServer.verify();
     }
@@ -1180,7 +1180,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withServerError());
 
         assertThrows(LockssRestHttpException.class,
-            (Executable) () -> repository.auSize("ns1", "auid1"));
+                     () -> repository.auSize("ns1", "auid1"));
 
         mockServer.verify();
     }
