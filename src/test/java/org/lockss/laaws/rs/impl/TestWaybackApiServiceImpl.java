@@ -71,6 +71,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
    */
   @Before
   public void setUpArtifactDataStore() throws Exception {
+    getMockLockssDaemon().setAppRunning(true);
     repository = new VolatileLockssRepository();
     repository.initRepository();
   }
