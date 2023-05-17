@@ -183,44 +183,45 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @LocalServerPort
   private int port;
 
-  @Autowired
-  ApplicationContext appCtx;
+//   @Autowired
+//   ApplicationContext appCtx;
 
   static List<File> tmpDirs = new ArrayList<>();
 
-  @Autowired
+//   @Autowired
   LockssRepository internalRepo;
 
-  @TestConfiguration
-  @Profile("test")
-  static class TestLockssRepositoryConfig {
-    /**
-     * Initializes the internal {@link LockssRepository} instance used by the
-     * embedded LOCKSS Repository Service.
-     */
-    @Bean
-    public LockssRepository createInitializedRepository() throws IOException {
-      File stateDir = LockssTestCase4.getTempDir(tmpDirs);
-      File basePath = LockssTestCase4.getTempDir(tmpDirs);
+//   @TestConfiguration
+//   @Profile("test")
+//   static class TestLockssRepositoryConfig {
+//     /**
+//      * Initializes the internal {@link LockssRepository} instance used by the
+//      * embedded LOCKSS Repository Service.
+//      */
+//     @Bean
+//     public LockssRepository createInitializedRepository() throws IOException {
 
-      LockssRepository repository =
-          new LocalLockssRepository(stateDir, basePath, NS1);
+//       File stateDir = LockssTestCase4.getTempDir(tmpDirs);
+//       File basePath = LockssTestCase4.getTempDir(tmpDirs);
 
-      repository.initRepository();
+//       LockssRepository repository =
+//           new LocalLockssRepository(stateDir, basePath, NS1);
 
-      return spy(repository);
-    }
+//       repository.initRepository();
 
-    @Bean
-    public ArtifactIndex setArtifactIndex() {
-      return null;
-    }
+//       return spy(repository);
+//     }
 
-    @Bean
-    public ArtifactDataStore setArtifactDataStore() {
-      return null;
-    }
-  }
+//     @Bean
+//     public ArtifactIndex setArtifactIndex() {
+//       return null;
+//     }
+
+//     @Bean
+//     public ArtifactDataStore setArtifactDataStore() {
+//       return null;
+//     }
+//   }
 
   @AfterClass
   public static void deleteTempDirs() throws Exception {
@@ -254,6 +255,17 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @Before
   public void setUpArtifactDataStore() throws Exception {
     TimeBase.setSimulated();
+    getMockLockssDaemon().setAppRunning(true);
+    File stateDir = LockssTestCase4.getTempDir(tmpDirs);
+    File basePath = LockssTestCase4.getTempDir(tmpDirs);
+
+    LockssRepository repository =
+      new LocalLockssRepository(stateDir, basePath, NS1);
+
+    repository.initRepository();
+
+    internalRepo = spy(repository);
+
     this.repository = makeLockssRepository();
   }
 
@@ -421,8 +433,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       // Write test WARC
       log.debug("Writing test WARC [numArtifacts = {}]", numArtifacts);
 
-      File tmpFile = FileUtil.createTempFile("test-warc", null);
-      tmpFile.deleteOnExit();
+      File tmpFile = getTempFile("test-warc", null);
 
       String url = "http://www.lockss.org/example2.txt";
 
@@ -486,6 +497,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     //// Test adding artifacts from a WARC archive with only partial success
     {
+      log.fatal("internalRepo: {}", internalRepo);
+
       int numArtifacts = 10;
       boolean isCompressed = false;
       List<ArtifactSpec> specs = new ArrayList<>(numArtifacts);
@@ -512,7 +525,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       doThrow(new IOException("This is a mocked IOException; okay to ignore"))
           .when(internalRepo)
           .addArtifact(argThat(
-              artifactData -> artifactData.getIdentifier().getUri().contains("error")));
+//               artifactData -> artifactData.getIdentifier().getUri().contains("error")));
+                               artifactData -> x(artifactData)));
 
       // Call addArtifacts REST endpoint
       Iterable<ImportStatus> iter = repository.addArtifacts(
@@ -544,7 +558,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         assertEquals(spec.getUrl(), status.getUrl());
 
         if (i % 2 == 0) {
-          assertEquals(ImportStatus.StatusEnum.ERROR, status.getStatus());
+          assertEquals("i="+i, ImportStatus.StatusEnum.ERROR, status.getStatus());
         } else {
           assertEquals(spec.getContentDigest(), status.getDigest());
           assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
@@ -568,6 +582,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       }
     }
   }
+
+  public static boolean x(ArtifactData ad) {
+    System.out.println("XXXXXXXXXXXXXX: " + ad);
+    return ad.getIdentifier().getUri().contains("error");
+  }
+
 
   private String formatWarcRecordId(String uuid) {
     return "<urn:uuid:" + uuid + ">";
