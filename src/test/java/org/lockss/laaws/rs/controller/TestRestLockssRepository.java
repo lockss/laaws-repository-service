@@ -342,6 +342,145 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     String namespace = "namespace";
     String auId = "auId";
 
+    //// Test adding artifacts from an uncompressed WARC archive with success
+    {
+      int numArtifacts = 10;
+      boolean isCompressed = false;
+      List<ArtifactSpec> specs = new ArrayList<>(numArtifacts);
+
+      // Write test WARC
+      log.debug("Writing test WARC [numArtifacts = {}]", numArtifacts);
+
+      DeferredTempFileOutputStream dfos =
+          new DeferredTempFileOutputStream((int) FileUtils.ONE_MB, "test-warc");
+
+      String url = "http://www.lockss.org/example1.txt";
+
+      for (int i = 0; i < numArtifacts; i++) {
+        ArtifactSpec spec = createArtifactSpec(namespace, auId, url);
+        spec.setCommitted(true);
+        specs.add(spec);
+        writeWarcRecord(spec, dfos);
+      }
+
+      dfos.close();
+
+      // Call addArtifacts REST endpoint
+      log.debug("Calling REST addArtifacts");
+
+      Iterable<ImportStatus> iter = repository.addArtifacts(
+          namespace, auId, dfos.getDeleteOnCloseInputStream(), LockssRepository.ArchiveType.WARC, isCompressed);
+
+      List<ImportStatus> result = ListUtil.fromIterable(iter);
+      ImportStatus last = result.get(result.size() - 1);
+
+      // Wait for committed artifacts to be written to permanent storage
+      log.debug("Waiting for copies to finish");
+
+      while (true) {
+        Artifact artifact = repository.getArtifact(namespace, auId, last.getUrl());
+        if (!artifact.getStorageUrl().contains("tmp/warc")) break;
+        Thread.sleep(100);
+      }
+
+      // Assert artifacts from the archive were added successfully
+      log.debug("Asserting artifacts added from archive");
+
+      assertEquals(specs.size(), result.size());
+
+      for (int i = 0; i < result.size(); i++) {
+        ImportStatus status = result.get(i);
+        ArtifactSpec spec = specs.get(i);
+
+        assertEquals(formatWarcRecordId(spec.getArtifactUuid()), status.getWarcId());
+        assertEquals(spec.getUrl(), status.getUrl());
+        assertEquals(spec.getContentDigest(), status.getDigest());
+        assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
+        assertNull(status.getStatusMessage());
+
+        Artifact artifact =
+            repository.getArtifactVersion(namespace, auId, spec.getUrl(), i+1, true);
+
+        assertEquals(artifact.getUuid(), status.getArtifactUuid());
+        assertEquals(artifact.getVersion(), status.getVersion());
+        assertEquals(spec.getContentDigest(), artifact.getContentDigest());
+
+        spec.assertArtifact(repository, artifact);
+      }
+    }
+
+    //// Test adding artifacts from a GZIP compressed WARC archive with success
+    {
+      int numArtifacts = 10;
+      boolean isCompressed = true;
+      List<ArtifactSpec> specs = new ArrayList<>(numArtifacts);
+
+      // Write test WARC
+      log.debug("Writing test WARC [numArtifacts = {}]", numArtifacts);
+
+      File tmpFile = FileUtil.createTempFile("test-warc", null);
+      tmpFile.deleteOnExit();
+
+      String url = "http://www.lockss.org/example2.txt";
+
+      for (int i = 0; i < numArtifacts; i++) {
+        ArtifactSpec spec = createArtifactSpec(namespace, auId, url);
+        spec.setCommitted(true);
+        specs.add(spec);
+
+        // Append individual GZIP members to the file
+        try (OutputStream fileOut = Files.newOutputStream(tmpFile.toPath(), APPEND)) {
+          try (GZIPOutputStream gzipOutput = new GZIPOutputStream(fileOut)) {
+            writeWarcRecord(spec, gzipOutput);
+          }
+        }
+      }
+
+      // Call addArtifacts REST endpoint
+      log.debug("Calling REST addArtifacts");
+
+      try (InputStream fileInput = Files.newInputStream(tmpFile.toPath())) {
+        Iterable<ImportStatus> iter = repository.addArtifacts(
+            namespace, auId, fileInput, LockssRepository.ArchiveType.WARC, isCompressed);
+
+        List<ImportStatus> result = ListUtil.fromIterable(iter);
+
+        // Wait for committed artifacts to be written to permanent storage
+        log.debug("Waiting for copies to finish");
+
+        while (true) {
+          Artifact artifact = repository.getArtifact(namespace, auId, url);
+          if (!artifact.getStorageUrl().contains("tmp/warc")) break;
+          Thread.sleep(100);
+        }
+
+        // Assert artifacts from the archive were added successfully
+        log.debug("Asserting artifacts added from archive");
+
+        assertEquals(specs.size(), result.size());
+
+        for (int i = 0; i < result.size(); i++) {
+          ImportStatus status = result.get(i);
+          ArtifactSpec spec = specs.get(i);
+
+          assertEquals(formatWarcRecordId(spec.getArtifactUuid()), status.getWarcId());
+          assertEquals(spec.getUrl(), status.getUrl());
+          assertEquals(spec.getContentDigest(), status.getDigest());
+          assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
+          assertNull(status.getStatusMessage());
+
+          Artifact artifact =
+              repository.getArtifactVersion(namespace, auId, spec.getUrl(), i + 1, true);
+
+          assertEquals(artifact.getUuid(), status.getArtifactUuid());
+          assertEquals(artifact.getVersion(), status.getVersion());
+          assertEquals(spec.getContentDigest(), artifact.getContentDigest());
+
+          spec.assertArtifact(repository, artifact);
+        }
+      }
+    }
+
     //// Test adding artifacts from a WARC archive with only partial success
     {
       log.fatal("internalRepo: {}", internalRepo);
