@@ -483,8 +483,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     //// Test adding artifacts from a WARC archive with only partial success
     {
-      log.fatal("internalRepo: {}", internalRepo);
-
       int numArtifacts = 10;
       boolean isCompressed = false;
       List<ArtifactSpec> specs = new ArrayList<>(numArtifacts);
@@ -511,8 +509,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       doThrow(new IOException("This is a mocked IOException; okay to ignore"))
           .when(internalRepo)
           .addArtifact(argThat(
-//               artifactData -> artifactData.getIdentifier().getUri().contains("error")));
-                               artifactData -> x(artifactData)));
+              artifactData -> artifactData.getIdentifier().getUri().contains("error")));
 
       // Call addArtifacts REST endpoint
       Iterable<ImportStatus> iter = repository.addArtifacts(
@@ -568,12 +565,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       }
     }
   }
-
-  public static boolean x(ArtifactData ad) {
-    System.out.println("XXXXXXXXXXXXXX: " + ad);
-    return ad.getIdentifier().getUri().contains("error");
-  }
-
 
   private String formatWarcRecordId(String uuid) {
     return "<urn:uuid:" + uuid + ">";
