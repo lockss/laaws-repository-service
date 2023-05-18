@@ -81,6 +81,7 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
   public void setUpBeforeEachTest() throws IOException {
     log.debug2("port = {}", port);
 
+    getMockLockssDaemon().setAppRunning(true);
     // Set up the temporary directory where the test data will reside.
     setUpTempDirectory(TestStatusApiServiceImpl.class.getCanonicalName());
 
