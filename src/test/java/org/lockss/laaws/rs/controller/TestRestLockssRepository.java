@@ -183,9 +183,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @LocalServerPort
   private int port;
 
-  @Autowired
-  ApplicationContext appCtx;
-
   static List<File> tmpDirs = new ArrayList<>();
 
   @Autowired
@@ -205,8 +202,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       LockssRepository repository =
           new LocalLockssRepository(stateDir, basePath, NS1);
-
-      repository.initRepository();
 
       return spy(repository);
     }
@@ -254,6 +249,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @Before
   public void setUpArtifactDataStore() throws Exception {
     TimeBase.setSimulated();
+    getMockLockssDaemon().setAppRunning(true);
+    internalRepo.initRepository();
     this.repository = makeLockssRepository();
   }
 
@@ -544,7 +541,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         assertEquals(spec.getUrl(), status.getUrl());
 
         if (i % 2 == 0) {
-          assertEquals(ImportStatus.StatusEnum.ERROR, status.getStatus());
+          assertEquals("i="+i, ImportStatus.StatusEnum.ERROR, status.getStatus());
         } else {
           assertEquals(spec.getContentDigest(), status.getDigest());
           assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
