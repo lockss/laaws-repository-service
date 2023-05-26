@@ -73,7 +73,9 @@ fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.AuSize org.lockss.util.res
 # Edit RepoinfoApi.java.
 REPOINFO_API=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApi.java
 fixImport $REPOINFO_API org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
+fixImport $REPOINFO_API org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
 
 # Edit RepoinfoApiDelegate.java.
 REPOINFO_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApiDelegate.java
 fixImport $REPOINFO_API_DELEGATE org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
+fixImport $REPOINFO_API_DELEGATE org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
