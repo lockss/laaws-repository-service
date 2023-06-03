@@ -29,15 +29,20 @@ import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.time.TimeBase;
 import org.mockito.ArgumentMatchers;
+import org.mockito.InjectMocks;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.io.BufferedInputStream;
@@ -58,7 +63,7 @@ import static org.mockito.Mockito.*;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("mock-lockss-repository")
+@ContextConfiguration(classes = { MyTestConfig.class })
 public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 
@@ -79,32 +84,33 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
   @Autowired
   protected LockssRepository internalRepo;
 
-  /**
-   * Test configuration beans.
-   * <p>
-   * Provides a mock internal LOCKSS repository for use by the embedded LOCKSS Repository Service.
-   */
-  @TestConfiguration
-  @Profile("mock-lockss-repository")
-  static class TestLockssRepositoryConfig {
-    // NOTE: It would be cleaner to use @MockBean but creates a conflict with the
-    // "createInitializedRepository" bean created in LockssRepositoryConfig
-    @Bean
-    public LockssRepository createInitializedRepository() throws IOException {
-      // Create a mock internal LockssRepository for use by the embedded Repository Service
-      return mock(LockssRepository.class);
-    }
-
-    @Bean
-    public ArtifactIndex setArtifactIndex() {
-      return null;
-    }
-
-    @Bean
-    public ArtifactDataStore setArtifactDataStore() {
-      return null;
-    }
-  }
+//  /**
+//   * Test configuration beans.
+//   * <p>
+//   * Provides a mock internal LOCKSS repository for use by the embedded LOCKSS Repository Service.
+//   */
+//  @TestConfiguration
+//  @Primary
+//  private static class TestLockssRepositoryConfig {
+//    public TestLockssRepositoryConfig() { }
+//    // NOTE: It would be cleaner to use @MockBean but creates a conflict with the
+//    // "createInitializedRepository" bean created in LockssRepositoryConfig
+//    @Bean
+//    public LockssRepository createInitializedRepository() throws IOException {
+//      // Create a mock internal LockssRepository for use by the embedded Repository Service
+//      return mock(LockssRepository.class);
+//    }
+//
+//    @Bean
+//    public ArtifactIndex setArtifactIndex() {
+//      return null;
+//    }
+//
+//    @Bean
+//    public ArtifactDataStore setArtifactDataStore() {
+//      return null;
+//    }
+//  }
 
 // *********************************************************************************************************************
 // * JUNIT
@@ -114,6 +120,9 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
   public void setupRestLockssRepository() throws Exception {
     // Set TimeBase into simulated mode
     TimeBase.setSimulated();
+
+//    LockssRepository mockedRepo = mock(LockssRepository.class);
+//    ReflectionTestUtils.setField(internalRepo, "createLockssRepository", mockedRepo);
 
     // Reset internal LockssRepository mock behavior
     reset(internalRepo);
