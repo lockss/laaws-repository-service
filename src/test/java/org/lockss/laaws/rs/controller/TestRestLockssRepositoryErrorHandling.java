@@ -274,12 +274,13 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert 500 Internal Server Error if IOException is thrown
-    when(internalRepo.getNamespaces())
-        .thenThrow(new IOException("Test error message"));
+    doThrow(new IOException("IOException from mock"))
+        .when(internalRepo).getNamespaces();
+
 
     assertLockssRestHttpException(
         (Executable) () -> clientRepo.getNamespaces(),
-        "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
+        "IOException from mock", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
 
     // Reset mock
@@ -287,12 +288,12 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert unspecified 500 Internal Server Error if generic RuntimeException is thrown
-    when(internalRepo.getNamespaces())
-        .thenThrow(new RuntimeException("surprise!"));
+    doThrow(new RuntimeException("RuntimeException from mock"))
+        .when(internalRepo).getNamespaces();
 
     assertLockssRestHttpException(
         (Executable) () -> clientRepo.getNamespaces(),
-        "surprise!", HttpStatus.INTERNAL_SERVER_ERROR,
+        "RuntimeException from mock", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.UNSPECIFIED_ERROR);
   }
 
@@ -333,8 +334,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     String artifactId = "artifact";
     Exception e = new LockssNoSuchArtifactIdException("Non-existent artifact ID: " + artifactId);
 
-    when(internalRepo.getArtifactData("namespace", "artifact"))
-        .thenThrow(e);
+    doThrow(e).when(internalRepo).getArtifactData("namespace", "artifact");
 
     assertThrowsMatch(LockssNoSuchArtifactIdException.class, "Artifact not found", () ->
         clientRepo.getArtifactData("namespace", "artifact"));
@@ -344,9 +344,8 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Generic LockssRestServiceException
-    when(internalRepo.getArtifactData("namespace", "artifact"))
-        .thenThrow(new LockssRestServiceException(
-            HttpStatus.INTERNAL_SERVER_ERROR, "Test error message", null, "/test/path"));
+    doThrow(new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, "Test error message", null, "/test/path"))
+        .when(internalRepo).getArtifactData("namespace", "artifact");
 
     assertLockssRestHttpException(
         (Executable) () -> clientRepo.getArtifactData("namespace", "artifact"),
@@ -358,8 +357,8 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// IOException
-    when(internalRepo.getArtifactData("namespace", "artifact"))
-        .thenThrow(new IOException("Test error message"));
+    doThrow(new IOException("Test error message"))
+        .when(internalRepo).getArtifactData("namespace", "artifact");
 
     assertLockssRestHttpException(
         (Executable) () -> clientRepo.getArtifactData("namespace", "artifact"),
@@ -392,8 +391,8 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert 404 if LockssNoSuchArtifactIdException is thrown
-    when(internalRepo.commitArtifact("namespace", "artifact"))
-        .thenThrow(new LockssNoSuchArtifactIdException());
+    doThrow(new LockssNoSuchArtifactIdException())
+        .when(internalRepo).commitArtifact("namespace", "artifact");
 
     assertThrowsMatch(LockssNoSuchArtifactIdException.class, "non-existent artifact", () ->
         clientRepo.commitArtifact("namespace", "artifact"));
@@ -403,8 +402,8 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     initInternalLockssRepository();
 
     //// Assert 500 Internal Server Error if IOException is thrown
-    when(internalRepo.commitArtifact("namespace", "artifact"))
-        .thenThrow(new IOException("Test error message"));
+    doThrow(new IOException("Test error message"))
+        .when(internalRepo).commitArtifact("namespace", "artifact");
 
     assertLockssRestHttpException(
         (Executable) () -> clientRepo.commitArtifact("namespace", "artifact"),
@@ -442,13 +441,13 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         .generateContent();
 
     // Set internal repository to throw IOException when attempting to add an artifact
-    when(internalRepo.addArtifact(ArgumentMatchers.any(ArtifactData.class)))
-        .thenThrow(new IOException("Test error message"));
+    doThrow(new IOException("IOException from mock"))
+        .when(internalRepo).addArtifact(ArgumentMatchers.any());
 
     // Assert response
     assertLockssRestHttpException(
         (Executable) () -> clientRepo.addArtifact(spec2.getArtifactData()),
-        "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
+        "IOException from mock", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
   }
 
