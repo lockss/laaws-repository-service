@@ -32,6 +32,7 @@ import org.lockss.app.LockssApp.AppSpec;
 import org.lockss.app.LockssApp.ManagerDesc;
 import org.lockss.app.LockssDaemon;
 import org.lockss.app.ServiceDescr;
+import org.lockss.config.ConfigManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.plugin.PluginManager;
 import org.lockss.repository.RepositoryDbManager;
@@ -91,6 +92,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
       AppSpec spec = new AppSpec()
 	.setService(ServiceDescr.SVC_REPO)
 	.setArgs(args)
+	.addBootDefault(ConfigManager.PARAM_LOAD_TDBS, "false")
 	.addAppConfig(PARAM_START_PLUGINS, "false")
 	.addAppDefault(PluginManager.PARAM_START_ALL_AUS, "false")
 	.setSpringApplicatonContext(getApplicationContext())

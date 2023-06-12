@@ -56,10 +56,8 @@ public class StatusApiServiceImpl extends SpringLockssBaseApiController
    */
   @Override
   public ApiStatus getApiStatus() {
-    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
-    return new ApiStatus("swagger/swagger.yaml")
-        .setReady(daemon.isAppRunning() && repo.isReady())
-        .setReadyTime(daemon.getReadyTime())
-        .setPluginsReady(daemon.areLoadablePluginsReady());
+    ApiStatus apistat = super.getDefaultApiStatus();
+    apistat.setReady(apistat.isReady() && repo.isReady());
+    return apistat;
   }
 }
