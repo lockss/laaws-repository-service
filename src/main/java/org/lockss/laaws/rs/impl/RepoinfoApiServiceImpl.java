@@ -38,6 +38,7 @@ import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.model.RepositoryInfo;
+import org.lockss.util.storage.StorageInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -98,6 +99,26 @@ public class RepoinfoApiServiceImpl extends BaseSpringApiServiceImpl
 
       throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
 	  errorMessage, e);
+    }
+  }
+
+  @Override
+  public ResponseEntity<StorageInfo> getStorageInfo() {
+    log.debug2("Invoked");
+
+    ServiceImplUtil.checkRepositoryReady(repo, null);
+
+    try {
+      StorageInfo result = repo.getStorageInfo();
+      log.debug2("result = {}", result);
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      String errorMessage =
+          "Exception caught trying to provide the repository storage information.";
+      log.warn(errorMessage, e);
+
+      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+          errorMessage, e);
     }
   }
 

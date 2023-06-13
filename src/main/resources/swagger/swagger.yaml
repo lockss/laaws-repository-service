@@ -688,6 +688,24 @@ paths:
           description: Unauthorized
         '500':
           description: Internal Server Error
+  '/repoinfo/storage':
+    get:
+      tags:
+        - repo
+      summary: Get repository storage information
+      description: Get properties of the repository storage
+      operationId: getStorageInfo
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: The repository storage information
+          schema:
+            $ref: "#/definitions/storageInfo"
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal Server Error
 definitions:
   importStatus:
     type: "object"
