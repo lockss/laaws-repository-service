@@ -59,6 +59,7 @@ import org.lockss.test.LockssTestCase4;
 import org.lockss.test.RandomInputStream;
 import org.lockss.test.ZeroInputStream;
 import org.lockss.util.ListUtil;
+import org.lockss.util.StringUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.io.FileUtil;
@@ -335,6 +336,32 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
+   * Tests resource Artifact, ensure it creates the correct WARC record type.
+   */
+  @Test
+  public void testResourceArtifact() throws Exception {
+    HttpHeaders headers = new HttpHeaders();
+
+    headers.add("Content-Type", "x-ms-wmv");
+    ArtifactSpec spec = new ArtifactSpec()
+      .setUrl("https://example.lockss.org/foo2")
+      .setContentLength(100)
+      .setCollectionDate(1234)
+      .setHeaders(headers.toSingleValueMap())
+      .setIsHttpResponse(false);
+
+    Artifact artifact = addUncommitted(spec);
+    Artifact committed = commit(spec, artifact);
+    spec.assertArtifact(repository, committed);
+    ArtifactData ad = repository.getArtifactData(committed);
+    assertFalse(ad.isHttpResponse());
+    Artifact copied = waitCopied(spec);
+    String path = new URL(copied.getStorageUrl()).getPath();
+    String warcstr = StringUtil.fromFile(path);
+    assertMatchesRE("WARC-Type: resource", warcstr);
+  }
+
+  /**
    * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String)}.
    */
   @Test
@@ -377,11 +404,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       // Wait for committed artifacts to be written to permanent storage
       log.debug("Waiting for copies to finish");
 
-      while (true) {
-        Artifact artifact = repository.getArtifact(namespace, auId, last.getUrl());
-        if (!artifact.getStorageUrl().contains("tmp/warc")) break;
-        Thread.sleep(100);
-      }
+      waitCopied(namespace, auId, last.getUrl());
 
       // Assert artifacts from the archive were added successfully
       log.debug("Asserting artifacts added from archive");
@@ -448,11 +471,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         // Wait for committed artifacts to be written to permanent storage
         log.debug("Waiting for copies to finish");
 
-        while (true) {
-          Artifact artifact = repository.getArtifact(namespace, auId, url);
-          if (!artifact.getStorageUrl().contains("tmp/warc")) break;
-          Thread.sleep(100);
-        }
+        waitCopied(namespace, auId, url);
 
         // Assert artifacts from the archive were added successfully
         log.debug("Asserting artifacts added from archive");
@@ -522,11 +541,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       // Wait for committed artifacts to be written to permanent storage
       log.debug("Waiting for copies to finish");
 
-      while (true) {
-        Artifact artifact = repository.getArtifact(namespace, auId, url);
-        if (!artifact.getStorageUrl().contains("tmp/warc")) break;
-        Thread.sleep(100);
-      }
+      waitCopied(namespace, auId, url);
 
       // Assert artifacts from the archive were added successfully
       log.debug("Asserting artifacts added from archive");
@@ -2352,6 +2367,24 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
 
     return res;
+  }
+
+  /** Wait until the artifact has been copied to permanent storage */
+  private Artifact waitCopied(ArtifactSpec spec)
+      throws IOException, InterruptedException {
+    return waitCopied(spec.getNamespace(), spec.getAuid(), spec.getUrl());
+  }
+
+  /** Wait until the artifact has been copied to permanent storage */
+  private Artifact waitCopied(String namespace, String auId, String url)
+      throws IOException, InterruptedException {
+    while (true) {
+      Artifact artifact = repository.getArtifact(namespace, auId, url);
+      if (!artifact.getStorageUrl().contains("tmp/warc")) {
+        return artifact;
+      }
+      Thread.sleep(100);
+    }
   }
 
   InputStream stringInputStream(String str) {
