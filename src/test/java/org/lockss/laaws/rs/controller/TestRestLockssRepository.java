@@ -817,7 +817,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
-  public void testNoSideEffect() throws IOException {
+  public void testNoSideEffect() throws Exception {
     for (StdVariants var : StdVariants.values()) {
       instantiateScanario(var.toString());
       testAllNoSideEffect();
@@ -829,7 +829,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testGetArtifactsWithUrlPrefixFromAllAus();
   }
 
-  public void testAllNoSideEffect() throws IOException {
+  public void testAllNoSideEffect() throws Exception {
     testGetArtifact();
     testGetArtifactData();
     testGetArtifactHeaders();
@@ -848,7 +848,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
-  public void testModifications() throws IOException {
+  public void testModifications() throws Exception {
     testCommitArtifact();
     testDeleteArtifact();
     instantiateScanario(getVariantSpecs("commit1"));
@@ -860,7 +860,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testDeleteAllArtifacts();
   }
 
-
+  /** Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}. */
   @Test
   public void testConditionalContent() throws IOException {
     String url_small = "https://art/small/";
@@ -910,6 +910,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.IF_SMALL);
     assertReceivesContent(art_larger_c, LockssRepository.IncludeContent.ALWAYS);
 
+    // Set the threshold to something larger
     ConfigurationUtil.addFromArgs(ArtifactsApiServiceImpl.PARAM_SMALL_CONTENT_THRESHOLD,
         "" + (len_large + len_larger) / 2);
 

@@ -297,11 +297,11 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         try {
             repository.getArtifactData("ns1", "artifactid1");
             fail("Should have thrown IOException");
-        } catch (IOException ioe) {}
+        } catch (IOException e) {}
     }
 
     /**
-     * Test for {@link RestLockssRepository#getArtifactData(String, String, LockssRepository.IncludeContent)}.
+     * Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}.
      *
      * @throws Exception
      */
