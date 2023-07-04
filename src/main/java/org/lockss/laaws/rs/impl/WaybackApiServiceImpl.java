@@ -7,6 +7,7 @@ import org.lockss.laaws.rs.api.WaybackApiDelegate;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -491,7 +492,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
         // Create the result for this artifact.
         CdxRecord record = getCdxRecord(
-            repo.getArtifactData(artifact.getNamespace(), artifactUuid));
+            repo.getArtifactData(artifact, LockssRepository.IncludeContent.NEVER));
         log.trace("record = {}", record);
 
         // Add this artifact to the results.
