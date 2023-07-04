@@ -38,7 +38,6 @@ import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.util.Deadline;
 import org.lockss.util.rest.repo.LockssRepository;
-import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.util.JmsFactorySource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -46,8 +45,6 @@ import org.springframework.context.annotation.Configuration;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
-import java.util.List;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal repository.
