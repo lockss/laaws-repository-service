@@ -79,7 +79,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //    private ArtifactDataStore artifactStore;
 
     @MockBean
-    private LockssRepository repo;
+    private BaseLockssRepository repo;
 
     // The value of the Authorization header to be used when calling the REST
     // service.

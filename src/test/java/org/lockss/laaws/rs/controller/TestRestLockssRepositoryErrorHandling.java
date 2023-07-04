@@ -77,7 +77,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
    * Internal LOCKSS repository used by the embedded LOCKSS Repository Service.
    */
   @Autowired
-  protected LockssRepository internalRepo;
+  protected BaseLockssRepository internalRepo;
 
   /**
    * Test configuration beans.
@@ -90,9 +90,9 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     // NOTE: It would be cleaner to use @MockBean but creates a conflict with the
     // "createInitializedRepository" bean created in LockssRepositoryConfig
     @Bean
-    public LockssRepository createInitializedRepository() throws IOException {
+    public BaseLockssRepository createInitializedRepository() throws IOException {
       // Create a mock internal LockssRepository for use by the embedded Repository Service
-      return mock(LockssRepository.class);
+      return mock(BaseLockssRepository.class);
     }
 
     @Bean

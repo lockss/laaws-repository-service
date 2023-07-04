@@ -38,7 +38,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   private static String charsetName = StandardCharsets.UTF_8.name();
 
   @Autowired
-  LockssRepository repo;
+  BaseLockssRepository repo;
 
   private final HttpServletRequest request;
 

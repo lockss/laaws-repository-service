@@ -75,8 +75,8 @@ public class LockssRepositoryConfig {
    * @throws IOException
    */
   @Bean
-  public LockssRepository createInitializedRepository() throws IOException {
-    LockssRepository repo = createLockssRepository();
+  public BaseLockssRepository createInitializedRepository() throws IOException {
+    BaseLockssRepository repo = createLockssRepository();
 
     // Initialize the repository in a separate thread
     new Thread(() -> {
@@ -103,7 +103,7 @@ public class LockssRepositoryConfig {
    * @return
    * @throws IOException
    */
-  public LockssRepository createLockssRepository() throws IOException {
+  public BaseLockssRepository createLockssRepository() throws IOException {
     log.debug("Starting internal LOCKSS repository [repoSpec: {}]", repoProps.getRepositorySpec());
 
     switch (repoProps.getRepositoryType()) {
@@ -118,47 +118,47 @@ public class LockssRepositoryConfig {
         // respectively.
         return new BaseLockssRepository(stateDir, index, store);
 
-      case "rest":
-        if (repoProps.getRepoSpecParts().length <= 1) {
-          log.error("No REST endpoint specified");
-          throw new IllegalArgumentException("No REST endpoint specified");
-        }
-
-        String repositoryRestUrl = repoProps.getRepoSpecParts()[1];
-
-        log.debug("repositoryRestUrl = {}", repositoryRestUrl);
-
-        // Get the REST client credentials.
-        List<String> restClientCredentials =
-            LockssDaemon.getLockssDaemon().getRestClientCredentials();
-
-        log.trace("restClientCredentials = {}", restClientCredentials);
-
-        String userName = null;
-        String password = null;
-
-        // Check whether there is a user name.
-        if (restClientCredentials != null && restClientCredentials.size() > 0) {
-          // Yes: Get the user name.
-          userName = restClientCredentials.get(0);
-
-          log.trace("userName = " + userName);
-
-          // Check whether there is a user password.
-          if (restClientCredentials.size() > 1) {
-            // Yes: Get the user password.
-            password = restClientCredentials.get(1);
-          }
-
-          // Check whether no configured user was found.
-          if (userName == null || password == null) {
-            String errMsg = "No user has been configured for authentication";
-            log.error(errMsg);
-            throw new IllegalArgumentException(errMsg);
-          }
-        }
-
-        return new RestLockssRepository(new URL(repositoryRestUrl), userName, password);
+//      case "rest":
+//        if (repoProps.getRepoSpecParts().length <= 1) {
+//          log.error("No REST endpoint specified");
+//          throw new IllegalArgumentException("No REST endpoint specified");
+//        }
+//
+//        String repositoryRestUrl = repoProps.getRepoSpecParts()[1];
+//
+//        log.debug("repositoryRestUrl = {}", repositoryRestUrl);
+//
+//        // Get the REST client credentials.
+//        List<String> restClientCredentials =
+//            LockssDaemon.getLockssDaemon().getRestClientCredentials();
+//
+//        log.trace("restClientCredentials = {}", restClientCredentials);
+//
+//        String userName = null;
+//        String password = null;
+//
+//        // Check whether there is a user name.
+//        if (restClientCredentials != null && restClientCredentials.size() > 0) {
+//          // Yes: Get the user name.
+//          userName = restClientCredentials.get(0);
+//
+//          log.trace("userName = " + userName);
+//
+//          // Check whether there is a user password.
+//          if (restClientCredentials.size() > 1) {
+//            // Yes: Get the user password.
+//            password = restClientCredentials.get(1);
+//          }
+//
+//          // Check whether no configured user was found.
+//          if (userName == null || password == null) {
+//            String errMsg = "No user has been configured for authentication";
+//            log.error(errMsg);
+//            throw new IllegalArgumentException(errMsg);
+//          }
+//        }
+//
+//        return new RestLockssRepository(new URL(repositoryRestUrl), userName, password);
 
       default:
         // Unknown repository specification

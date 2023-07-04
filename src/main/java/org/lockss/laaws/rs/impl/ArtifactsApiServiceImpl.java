@@ -67,7 +67,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       MediaType.parseMediaType(APPLICATION_HTTP_RESPONSE_VALUE);
 
   @Autowired
-  LockssRepository repo;
+  BaseLockssRepository repo;
 
   @Autowired
   ObjectMapper objMapper;
