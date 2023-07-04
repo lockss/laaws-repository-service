@@ -10,6 +10,7 @@ import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
 import org.lockss.laaws.rs.multipart.DigestFileItem;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactData;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
@@ -26,10 +27,13 @@ import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.*;
 import org.lockss.util.rest.repo.util.ArtifactCache;
 import org.lockss.util.rest.repo.util.ArtifactComparators;
+import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -44,7 +48,9 @@ import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
 import javax.servlet.http.HttpServletRequest;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -360,7 +366,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifact(String artifactid, String namespace, String includeContent) {
+  public ResponseEntity getArtifactDataByMultipart(String artifactid, String namespace, String includeContent) {
 
     String parsedRequest = String.format(
         "namespace: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
@@ -402,6 +408,132 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       log.warn(errorMessage, e);
       log.warn("Parsed request: {}", parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          errorMessage, e, parsedRequest);
+    }
+  }
+
+  /**
+   * GET /artifacts/{artifactid}/payload:
+   * Retrieves an artifact from the repository.
+   *
+   * @param artifactId     A String with the Identifier of the artifact.
+   * @param namespace      A String with the namespace of the artifact.
+   * @param includeContentParam A {@link Boolean} indicating whether the artifact content part should be included in the
+   *                       multipart response.
+   * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
+   */
+  @Override
+  public ResponseEntity<Resource> getArtifactDataByPayload(String artifactId, String namespace,
+                                                           String includeContentParam) {
+
+    LockssRepository.IncludeContent includeContent =
+        LockssRepository.IncludeContent.valueOf(includeContentParam);
+
+    String parsedRequest = String.format(
+        "namespace: %s, artifactId: %s, includeContent: %s, requestUrl: %s",
+        namespace, artifactId, includeContent, ServiceImplUtil.getFullRequestUrl(request));
+
+    log.debug2("Parsed request: {}", parsedRequest);
+
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+
+    try {
+      ArtifactData ad = repo.getArtifactData(namespace, artifactId);
+      InputStreamResource res = new InputStreamResource(ad.getInputStream());
+      return new ResponseEntity<Resource>(res, HttpStatus.OK);
+
+    } catch (LockssNoSuchArtifactIdException e) {
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
+
+    } catch (IOException e) {
+      String errorMessage = String.format(
+          "Caught IOException while attempting to retrieve artifact from repository [artifactId: %s]",
+          artifactId);
+
+      log.error(errorMessage, e);
+      log.error("Parsed request: {}", parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.DATA_ERROR,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          errorMessage, e, parsedRequest);
+    }
+  }
+
+  /**
+   * GET /artifacts/{artifactid}/response:
+   * Retrieves an artifact from the repository.
+   *
+   * @param artifactId     A String with the Identifier of the artifact.
+   * @param namespace      A String with the namespace of the artifact.
+   * @param includeContentParam A {@link Boolean} indicating whether the artifact content part should be included in the
+   *                       multipart response.
+   * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
+   */
+  @Override
+  public ResponseEntity<Resource> getArtifactDataByResponse(String artifactId, String namespace,
+                                                            String includeContentParam) {
+
+    LockssRepository.IncludeContent includeContent =
+        LockssRepository.IncludeContent.valueOf(includeContentParam);
+
+    String parsedRequest = String.format(
+        "namespace: %s, artifactId: %s, includeContent: %s, requestUrl: %s",
+        namespace, artifactId, includeContent, ServiceImplUtil.getFullRequestUrl(request));
+
+    log.debug2("Parsed request: {}", parsedRequest);
+
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+
+    try {
+      ArtifactData ad = repo.getArtifactData(namespace, artifactId);
+
+      HttpResponse httpResponse = ArtifactDataUtil.getHttpResponseFromArtifactData(ad);
+
+      boolean onlyHeaders = includeContent == LockssRepository.IncludeContent.NEVER ||
+          (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
+              ad.getContentLength() > smallContentThreshold);
+
+      InputStream httpResponseStream = onlyHeaders ?
+          new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(httpResponse)) :
+          ArtifactDataUtil.getHttpResponseStreamFromHttpResponse(httpResponse);
+
+      InputStreamResource resource = new InputStreamResource(httpResponseStream);
+
+      HttpHeaders restResponseHeaders = new HttpHeaders();
+      restResponseHeaders.setContentType(APPLICATION_HTTP_RESPONSE);
+      restResponseHeaders.set(ArtifactConstants.ARTIFACT_DATA_TYPE,
+          ad.isHttpResponse() ? "response" : "resource");
+      restResponseHeaders.set(ArtifactConstants.INCLUDES_CONTENT,
+          String.valueOf(!onlyHeaders));
+
+      return new ResponseEntity<>(resource, restResponseHeaders, HttpStatus.OK);
+    } catch (LockssNoSuchArtifactIdException e) {
+      // Translate to LockssRestServiceException and throw
+      throw new LockssRestServiceException("Artifact not found", e)
+          .setUtcTimestamp(LocalDateTime.now(ZoneOffset.UTC))
+          .setHttpStatus(HttpStatus.NOT_FOUND)
+          .setServletPath(request.getServletPath())
+          .setServerErrorType(LockssRestHttpException.ServerErrorType.DATA_ERROR)
+          .setParsedRequest(parsedRequest);
+
+    } catch (IOException e) {
+      String errorMessage = String.format(
+          "Caught IOException while attempting to retrieve artifact from repository [artifactId: %s]",
+          artifactId);
+
+      log.error(errorMessage, e);
+      log.error("Parsed request: {}", parsedRequest);
 
       throw new LockssRestServiceException(
           LockssRestHttpException.ServerErrorType.DATA_ERROR,

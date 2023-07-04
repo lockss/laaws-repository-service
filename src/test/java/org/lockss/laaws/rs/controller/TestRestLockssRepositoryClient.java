@@ -287,7 +287,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactData_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/artifacts/artifactid1?namespace=ns1&includeContent=ALWAYS");
+        URI endpoint = new URI(BASEURL + "/artifacts/artifactid1/response?includeContent=ALWAYS&namespace=ns1");
 
         mockServer
             .expect(uriRequestTo(endpoint))
@@ -371,15 +371,23 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         // Setup mocked server response
         // ****************************
 
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
+        ArtifactData ad = spec.getArtifactData(!isHttpResponse);
+        assertEquals(isHttpResponse, ad.isHttpResponse());
+
+        ResourceHttpMessageConverter converter = new ResourceHttpMessageConverter();
         MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+        InputStreamResource resource = new InputStreamResource(
+            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(ad));
+        converter.write(resource, APPLICATION_HTTP_RESPONSE, outputMessage);
+
+        HttpHeaders outputHeaders = outputMessage.getHeaders();
+        if (!isHttpResponse) {
+            outputHeaders.set(ArtifactConstants.ARTIFACT_DATA_TYPE, isHttpResponse ? "response" : "resource");
+        }
 
         // Build expected endpoint
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASEURL);
-        builder.path(String.format("/artifacts/%s", refId.getUuid()));
+        builder.path(String.format("/artifacts/%s/response", refId.getUuid()));
         builder.queryParam("namespace", refId.getNamespace());
         builder.queryParam("includeContent", includeContent);
 
@@ -389,7 +397,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             // FIXME: Why doesn't this work?
 //             .andExpect(queryParam("includeContent", String.valueOf(includeContent)))
             .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
+            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputHeaders.getContentType())
+                    .headers(outputHeaders));
 
         // ************************************
         // Verify result from getArtifactData()
@@ -417,12 +426,13 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         // Verify artifact HTTP status is present if expected
         if (isHttpResponse) {
             // Verify artifact header equality (only HTTP response artifacts)
+            HttpHeaders referenceHeaders = reference.getHttpHeaders();
             assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
                 && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
 
             // Assert artifact HTTP response status matches
             assertArrayEquals(
-                ArtifactDataUtil.getHttpStatusByteArray(httpStatus),
+                ArtifactDataUtil.getHttpStatusByteArray(reference.getHttpStatus()),
                 ArtifactDataUtil.getHttpStatusByteArray(result.getHttpStatus())
             );
         } else {

@@ -218,7 +218,7 @@ paths:
       tags:
         - artifacts
       summary: "Get artifact and metadata"
-      operationId: getArtifact
+      operationId: getArtifactDataByMultipart
       parameters:
         - name: "includeContent"
           in: "query"
@@ -292,6 +292,92 @@ paths:
           description: "Artifact not found"
         409:
           description: "Cannot delete artifact"
+  /artifacts/{uuid}/payload:
+    parameters:
+      - name: "namespace"
+        description: "Namespace of the artifacts"
+        in: "query"
+        type: "string"
+        required: false
+        default: "lockss"
+      - name: "uuid"
+        in: "path"
+        required: true
+        type: "string"
+        description: "Identifier of the artifact"
+    get:
+      tags:
+        - artifacts
+      summary: "Get artifact payload"
+      operationId: getArtifactDataByPayload
+      parameters:
+        - name: "includeContent"
+          in: "query"
+          type: "string"
+          enum: [ "NEVER", "IF_SMALL", "ALWAYS" ]
+          description: "Controls whether to include the artifact content part in multipart response"
+          required: false
+          default: "ALWAYS"
+      produces:
+        - "application/octet-stream"
+      responses:
+        200:
+          description: "Artifact's payload"
+          schema:
+            type: file
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve artifact"
+        404:
+          description: "Artifact not found"
+        500:
+          description: "Internal Server Error"
+        502:
+          description: "Could not read artifact"
+  /artifacts/{uuid}/response:
+    parameters:
+      - name: "namespace"
+        description: "Namespace of the artifacts"
+        in: "query"
+        type: "string"
+        required: false
+        default: "lockss"
+      - name: "uuid"
+        in: "path"
+        required: true
+        type: "string"
+        description: "Identifier of the artifact"
+    get:
+      tags:
+        - artifacts
+      summary: "Get artifact data as HTTP response"
+      operationId: getArtifactDataByResponse
+      parameters:
+        - name: "includeContent"
+          in: "query"
+          type: "string"
+          enum: [ "NEVER", "IF_SMALL", "ALWAYS" ]
+          description: "Controls whether to include the artifact content part in multipart response"
+          required: false
+          default: "ALWAYS"
+      produces:
+        - "application/http;msgtype=response"
+      responses:
+        200:
+          description: "Artifact's payload"
+          schema:
+            type: file
+        401:
+          description: "Unauthorized request"
+        403:
+          description: "Client not authorized to retrieve artifact"
+        404:
+          description: "Artifact not found"
+        500:
+          description: "Internal Server Error"
+        502:
+          description: "Could not read artifact"
   /aus:
     get:
       tags:
