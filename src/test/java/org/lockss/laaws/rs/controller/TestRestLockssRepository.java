@@ -648,6 +648,25 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertEquals(2, artver(repository.getArtifact(namespace, auId, url2)));
     assertEquals(1, artver(repository.getArtifact(namespace, auId, url3)));
     assertEquals(1, artver(repository.getArtifact(namespace, auId, url4)));
+
+    // Now import the 2nd WARC again with storeDuplicate true, ensure
+    // get new version of dup artifact
+    Iterable<ImportStatus> iter3 =
+      repository.addArtifacts(namespace, auId,
+                              dfos2.getDeleteOnCloseInputStream(),
+                              LockssRepository.ArchiveType.WARC,
+                              false, true);
+
+    List<ImportStatus> results3 = ListUtil.fromIterable(iter3);
+    assertEquals(3, results3.size());
+    assertEquals(ImportStatus.StatusEnum.OK, results3.get(0).getStatus());
+    assertEquals(ImportStatus.StatusEnum.OK, results3.get(1).getStatus());
+    assertEquals(ImportStatus.StatusEnum.OK, results3.get(2).getStatus());
+
+    assertEquals(1, artver(repository.getArtifact(namespace, auId, url1)));
+    assertEquals(3, artver(repository.getArtifact(namespace, auId, url2)));
+    assertEquals(2, artver(repository.getArtifact(namespace, auId, url3)));
+    assertEquals(2, artver(repository.getArtifact(namespace, auId, url4)));
   }
 
   private int artver(Artifact art) {
