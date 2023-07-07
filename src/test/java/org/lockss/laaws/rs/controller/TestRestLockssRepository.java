@@ -581,6 +581,79 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  /**
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String)}.
+   */
+  @Test
+  public void testAddArtifactsDupCheck() throws Exception {
+    String namespace = "namespace1";
+    String auId = "auId1";
+
+    // Make two WARCs, with one URL unquely in each and two in common,
+    // one with different content, one with same
+
+    String url = "http://www.lockss.org/example.";
+    String url1 = url + "1";
+    String url2 = url + "2";
+    String url3 = url + "3";
+    String url4 = url + "4";
+
+    ArtifactSpec asu1c1 = createArtifactSpec(namespace, auId, url1);
+    // Need two version of content for url2
+    ArtifactSpec asu2c1 = createArtifactSpec(namespace, auId, url2);
+    ArtifactSpec asu2c2 = createArtifactSpec(namespace, auId, url2);
+    ArtifactSpec asu3c1 = createArtifactSpec(namespace, auId, url3);
+    ArtifactSpec asu4c1 = createArtifactSpec(namespace, auId, url4);
+
+    DeferredTempFileOutputStream dfos1 =
+      new DeferredTempFileOutputStream((int)FileUtils.ONE_MB, "test-warc1");
+    writeWarcRecord(asu1c1, dfos1);
+    writeWarcRecord(asu2c1, dfos1);
+    writeWarcRecord(asu3c1, dfos1);
+    dfos1.close();
+
+    DeferredTempFileOutputStream dfos2 =
+      new DeferredTempFileOutputStream((int)FileUtils.ONE_MB, "test-warc2");
+    writeWarcRecord(asu2c2, dfos2);     // different content
+    writeWarcRecord(asu3c1, dfos2);     // same conteng
+    writeWarcRecord(asu4c1, dfos2);
+    dfos2.close();
+
+    // import the two warcs
+    log.debug("Calling REST addArtifacts");
+    Iterable<ImportStatus> iter1 =
+      repository.addArtifacts(namespace, auId,
+                              dfos1.getDeleteOnCloseInputStream(),
+                              LockssRepository.ArchiveType.WARC,
+                              false);
+    List<ImportStatus> results1 = ListUtil.fromIterable(iter1);
+    assertEquals(3, results1.size());
+    assertEquals(ImportStatus.StatusEnum.OK, results1.get(0).getStatus());
+    assertEquals(ImportStatus.StatusEnum.OK, results1.get(1).getStatus());
+    assertEquals(ImportStatus.StatusEnum.OK, results1.get(2).getStatus());
+
+    Iterable<ImportStatus> iter2 =
+      repository.addArtifacts(namespace, auId,
+                              dfos2.getDeleteOnCloseInputStream(),
+                              LockssRepository.ArchiveType.WARC,
+                              false);
+
+    List<ImportStatus> results2 = ListUtil.fromIterable(iter2);
+    assertEquals(3, results2.size());
+    assertEquals(ImportStatus.StatusEnum.OK, results2.get(0).getStatus());
+    assertEquals(ImportStatus.StatusEnum.DUPLICATE, results2.get(1).getStatus());
+    assertEquals(ImportStatus.StatusEnum.OK, results2.get(2).getStatus());
+
+    assertEquals(1, artver(repository.getArtifact(namespace, auId, url1)));
+    assertEquals(2, artver(repository.getArtifact(namespace, auId, url2)));
+    assertEquals(1, artver(repository.getArtifact(namespace, auId, url3)));
+    assertEquals(1, artver(repository.getArtifact(namespace, auId, url4)));
+  }
+
+  private int artver(Artifact art) {
+    return art.getVersion();
+  }
+
   private String formatWarcRecordId(String uuid) {
     return "<urn:uuid:" + uuid + ">";
   }

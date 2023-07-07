@@ -56,7 +56,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
    * @return
    */
   @Override
-  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace) {
+  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace, Boolean storeDuplicate) {
     log.debug("archive.name = {}", archive.getName());
     log.debug("archive.origFileName = {}", archive.getOriginalFilename());
     log.debug("archive.type = {}", archive.getContentType());
