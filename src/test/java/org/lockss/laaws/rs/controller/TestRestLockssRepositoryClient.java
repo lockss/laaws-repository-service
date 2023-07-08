@@ -30,6 +30,7 @@
 package org.lockss.laaws.rs.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
@@ -348,8 +349,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .generateContent();
 
         ArtifactData reference = spec.getArtifactData();
-
-        // Convenience variables
         ArtifactIdentifier refId = reference.getIdentifier();
 
         // ****************************
@@ -361,14 +360,21 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         ResourceHttpMessageConverter converter = new ResourceHttpMessageConverter();
         MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        InputStreamResource resource = new InputStreamResource(
-            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(ad));
+
+        boolean onlyHeaders = includeContent == LockssRepository.IncludeContent.NEVER ||
+            (includeContent == LockssRepository.IncludeContent.IF_SMALL && !isSmall);
+
+        InputStream httpResponseStream = onlyHeaders ?
+            new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :
+            ad.getResponseInputStream();
+
+        InputStreamResource resource = new InputStreamResource(httpResponseStream);
         converter.write(resource, APPLICATION_HTTP_RESPONSE, outputMessage);
 
         HttpHeaders outputHeaders = outputMessage.getHeaders();
-        if (!isHttpResponse) {
-            outputHeaders.set(ArtifactConstants.ARTIFACT_DATA_TYPE, isHttpResponse ? "response" : "resource");
-        }
+        outputHeaders.setContentType(APPLICATION_HTTP_RESPONSE);
+        outputHeaders.set(ArtifactConstants.ARTIFACT_DATA_TYPE, ad.isHttpResponse() ? "response" : "resource");
+        outputHeaders.set(ArtifactConstants.INCLUDES_CONTENT, String.valueOf(!onlyHeaders));
 
         // Build expected endpoint
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASEURL);
@@ -426,19 +432,18 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         }
 
         // Verify artifact content is present if expected
-//        if ((includeContent == LockssRepository.IncludeContent.IF_SMALL && isSmall) ||
-//            (includeContent == LockssRepository.IncludeContent.ALWAYS)) {
-//
+        if ((includeContent == LockssRepository.IncludeContent.IF_SMALL && isSmall) ||
+            (includeContent == LockssRepository.IncludeContent.ALWAYS)) {
+
             // Assert artifact data has content and that its InputStream has the expected content
             assertTrue(result.hasContentInputStream());
             InputStream inputStream = result.getInputStream();
             assertNotNull(inputStream);
             assertInputStreamMatchesString(spec.getContent(), inputStream);
-
-//        } else {
-//            // Assert artifact has no content
-//            assertFalse(result.hasContentInputStream());
-//        }
+        } else {
+            // Assert artifact has no content
+            assertFalse(result.hasContentInputStream());
+        }
 
         // Clean-up after ourselves
         mockServer.reset();
