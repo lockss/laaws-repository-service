@@ -443,9 +443,32 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
     try {
       ArtifactData ad = repo.getArtifactData(namespace, artifactId);
-      InputStreamResource res = new InputStreamResource(ad.getInputStream());
-      return new ResponseEntity<Resource>(res, HttpStatus.OK);
 
+      HttpHeaders httpHeaders = ad.getHttpHeaders();
+      HttpHeaders respHeaders = new HttpHeaders();
+
+      // Selectively copy artifact headers into REST response
+      respHeaders.setContentType(httpHeaders.getContentType());
+      respHeaders.setContentLength(httpHeaders.getContentLength());
+      if (httpHeaders.containsKey(HttpHeaders.LAST_MODIFIED)) {
+        respHeaders.setLastModified(httpHeaders.getLastModified());
+      }
+
+      if (includeContent == LockssRepository.IncludeContent.ALWAYS ||
+         (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
+             ad.getContentLength() <= smallContentThreshold)) {
+        // Return full HTTP response
+        InputStreamResource resource = new InputStreamResource(ad.getInputStream());
+        return new ResponseEntity<Resource>(resource, respHeaders, HttpStatus.OK);
+      } else {
+        // Remember the actual Content-Length in another header then set Conent-Length to zero
+        respHeaders.set(ArtifactConstants.X_LOCKSS_CONTENT_LENGTH,
+            String.valueOf(respHeaders.getContentLength()));
+        respHeaders.setContentLength(0);
+
+        // Return a response with HTTP status line and headers only
+        return new ResponseEntity<Resource>(respHeaders, HttpStatus.OK);
+      }
     } catch (LockssNoSuchArtifactIdException e) {
       // Translate to LockssRestServiceException and throw
       throw new LockssRestServiceException("Artifact not found", e)
