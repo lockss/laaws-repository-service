@@ -56,7 +56,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
    * @return
    */
   @Override
-  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace) {
+  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace, Boolean storeDuplicate) {
     log.debug("archive.name = {}", archive.getName());
     log.debug("archive.origFileName = {}", archive.getOriginalFilename());
     log.debug("archive.type = {}", archive.getContentType());
@@ -75,7 +75,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
         try (InputStream input = archive.getInputStream();
              ImportStatusIterable result =
-                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, isCompressed)) {
+                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, isCompressed, storeDuplicate)) {
 
           try (DeferredTempFileOutputStream out =
                    new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
