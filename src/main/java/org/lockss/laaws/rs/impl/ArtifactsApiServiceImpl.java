@@ -521,15 +521,13 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     try {
       ArtifactData ad = repo.getArtifactData(namespace, artifactId);
 
-      HttpResponse httpResponse = ArtifactDataUtil.getHttpResponseFromArtifactData(ad);
-
       boolean onlyHeaders = includeContent == LockssRepository.IncludeContent.NEVER ||
           (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
               ad.getContentLength() > smallContentThreshold);
 
       InputStream httpResponseStream = onlyHeaders ?
-          new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(httpResponse)) :
-          ArtifactDataUtil.getHttpResponseStreamFromHttpResponse(httpResponse);
+            new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :
+            ad.getResponseInputStream();
 
       InputStreamResource resource = new InputStreamResource(httpResponseStream);
 
