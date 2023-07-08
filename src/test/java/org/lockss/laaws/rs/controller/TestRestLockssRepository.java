@@ -324,7 +324,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           .setContentLength(clen)
           .setCollectionDate(1234)
           .setHeaders(headers.toSingleValueMap())
-          .setStatusLine(false);
+          .setIsHttpResponse(false);
 
       Artifact artifact = addUncommitted(spec);
       Artifact committed = commit(spec, artifact);
@@ -346,7 +346,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       .setContentLength(100)
       .setCollectionDate(1234)
       .setHeaders(headers.toSingleValueMap())
-      .setStatusLine(false);
+      .setIsHttpResponse(false);
 
     Artifact artifact = addUncommitted(spec);
     Artifact committed = commit(spec, artifact);

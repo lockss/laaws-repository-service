@@ -335,7 +335,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     }
 
     public void runTestGetArtifactData(LockssRepository.IncludeContent includeContent,
-                                       boolean isHttpResponse, Boolean isSmall) throws Exception {
+                                       boolean isHttpResponse, boolean isSmall) throws Exception {
 
         ArtifactSpec spec = new ArtifactSpec()
             .setNamespace("ns")
@@ -344,7 +344,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .setUrl("url")
             .setStorageUrl(URI.create("storageUrl"))
             .setVersion(1)
-            .setStatusLine(isHttpResponse)
+            .setIsHttpResponse(isHttpResponse)
             .generateContent();
 
         ArtifactData reference = spec.getArtifactData();
