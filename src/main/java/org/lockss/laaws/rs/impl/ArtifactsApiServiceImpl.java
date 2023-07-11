@@ -449,7 +449,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       // Selectively copy artifact headers into REST response
       respHeaders.setContentType(httpHeaders.getContentType());
-      respHeaders.setContentLength(httpHeaders.getContentLength());
+      respHeaders.setContentLength(ad.getContentLength());
       if (httpHeaders.containsKey(HttpHeaders.LAST_MODIFIED)) {
         respHeaders.setLastModified(httpHeaders.getLastModified());
       }
