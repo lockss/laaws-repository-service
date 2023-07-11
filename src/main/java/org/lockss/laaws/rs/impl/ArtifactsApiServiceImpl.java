@@ -454,6 +454,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         respHeaders.setLastModified(httpHeaders.getLastModified());
       }
 
+      respHeaders.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
+
       if (includeContent == LockssRepository.IncludeContent.ALWAYS ||
          (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
              ad.getContentLength() <= smallContentThreshold)) {
