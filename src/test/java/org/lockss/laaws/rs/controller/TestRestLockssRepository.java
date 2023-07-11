@@ -352,6 +352,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact committed = commit(spec, artifact);
     spec.assertArtifact(repoClient, committed);
     ArtifactData ad = repoClient.getArtifactData(committed);
+    assertEquals(headers.getFirst("Content-Type"),
+        ad.getHttpHeaders().getFirst("Content-Type"));
     assertFalse(ad.isHttpResponse());
     Artifact copied = waitCopied(spec);
     String path = new URL(copied.getStorageUrl()).getPath();
