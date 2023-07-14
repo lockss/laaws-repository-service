@@ -62,7 +62,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
     log.debug("archive.name = {}", archive.getName());
     log.debug("archive.origFileName = {}", archive.getOriginalFilename());
     log.debug("archive.type = {}", archive.getContentType());
-    if (!StringUtils.isEmpty(excludeStatusPattern))
+    if (!StringUtil.isNullString(excludeStatusPattern))
       log.debug("excludeStatusPattern = {}", excludeStatusPattern);
 
     String parsedRequest = String.format("namespace: %s, auId: %s, requestUrl: %s",

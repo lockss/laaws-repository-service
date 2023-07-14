@@ -697,7 +697,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     log.debug("Calling REST addArtifacts");
     Iterable<ImportStatus> iter =
-      repository.addArtifacts(namespace, auId,
+      repoClient.addArtifacts(namespace, auId,
                               dfos.getDeleteOnCloseInputStream(),
                               LockssRepository.ArchiveType.WARC,
                               false, false, "500|404|401");
@@ -707,9 +707,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertEquals(ImportStatus.StatusEnum.EXCLUDED, results.get(1).getStatus());
     assertEquals(ImportStatus.StatusEnum.OK, results.get(2).getStatus());
 
-    assertEquals(1, artver(repository.getArtifact(namespace, auId, url1)));
-    assertNull(repository.getArtifact(namespace, auId, url2));
-    assertEquals(1, artver(repository.getArtifact(namespace, auId, url3)));
+    assertEquals(1, artver(repoClient.getArtifact(namespace, auId, url1)));
+    assertNull(repoClient.getArtifact(namespace, auId, url2));
+    assertEquals(1, artver(repoClient.getArtifact(namespace, auId, url3)));
 
   }
 
