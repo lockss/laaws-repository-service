@@ -53,13 +53,17 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
    * @param auId         A {@link String} containing the AUID of the artifacts.
    * @param archive      A {@link MultipartFile} containing the archive.
    * @param namespace    A {@link String} containing the namespace of the artifacts.
+   * @param storeDuplicate    A {@link Boolean} indicating whether artifacts whose content is identical to the previous version should be stored
+   * @param excludeStatusPattern    A {@link String} containing a regexp.  WARC records whose HTTP response status code matches will not be added to the repository
    * @return
    */
   @Override
-  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace, Boolean storeDuplicate) {
+  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace, Boolean storeDuplicate, String excludeStatusPattern) {
     log.debug("archive.name = {}", archive.getName());
     log.debug("archive.origFileName = {}", archive.getOriginalFilename());
     log.debug("archive.type = {}", archive.getContentType());
+    if (!StringUtils.isEmpty(excludeStatusPattern))
+      log.debug("excludeStatusPattern = {}", excludeStatusPattern);
 
     String parsedRequest = String.format("namespace: %s, auId: %s, requestUrl: %s",
         namespace, auId, ServiceImplUtil.getFullRequestUrl(request));
@@ -75,7 +79,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
         try (InputStream input = archive.getInputStream();
              ImportStatusIterable result =
-                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, isCompressed, storeDuplicate)) {
+                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, isCompressed, storeDuplicate, excludeStatusPattern)) {
 
           try (DeferredTempFileOutputStream out =
                    new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
