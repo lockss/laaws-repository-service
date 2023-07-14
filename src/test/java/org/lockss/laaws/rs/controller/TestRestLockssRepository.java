@@ -168,6 +168,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
   protected static StatusLine STATUS_LINE_MOVED =
       new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 301, "Moved");
+  protected static StatusLine STATUS_LINE_404 =
+      new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 404, "Not home");
 
   // Identifiers expected not to exist in the repository
   protected static String NO_NAMESPACE = "no_ns";
@@ -582,7 +584,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String)}.
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean)}.
    */
   @Test
   public void testAddArtifactsDupCheck() throws Exception {
@@ -669,6 +671,48 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertEquals(2, artver(repository.getArtifact(namespace, auId, url4)));
   }
 
+  /**
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean, String)}.
+   */
+  @Test
+  public void testAddArtifactsExcludePattern() throws Exception {
+    String namespace = "namespace1";
+    String auId = "auId1";
+
+    String url1 = "http://www.lockss.org/example1";
+    String url2 = "http://www.lockss.org/example2";
+    String url3 = "http://www.lockss.org/example3";
+
+    ArtifactSpec as1 = createArtifactSpec(namespace, auId, url1);
+    ArtifactSpec as2 = createArtifactSpec(namespace, auId, url2)
+      .setStatusLine(STATUS_LINE_404);
+    ArtifactSpec as3 = createArtifactSpec(namespace, auId, url3);
+
+    DeferredTempFileOutputStream dfos =
+      new DeferredTempFileOutputStream((int)FileUtils.ONE_MB, "test-warc");
+    writeWarcRecord(as1, dfos);
+    writeWarcRecord(as2, dfos);
+    writeWarcRecord(as3, dfos);
+    dfos.close();
+
+    log.debug("Calling REST addArtifacts");
+    Iterable<ImportStatus> iter =
+      repository.addArtifacts(namespace, auId,
+                              dfos.getDeleteOnCloseInputStream(),
+                              LockssRepository.ArchiveType.WARC,
+                              false, false, "500|404|401");
+    List<ImportStatus> results = ListUtil.fromIterable(iter);
+    assertEquals(3, results.size());
+    assertEquals(ImportStatus.StatusEnum.OK, results.get(0).getStatus());
+    assertEquals(ImportStatus.StatusEnum.EXCLUDED, results.get(1).getStatus());
+    assertEquals(ImportStatus.StatusEnum.OK, results.get(2).getStatus());
+
+    assertEquals(1, artver(repository.getArtifact(namespace, auId, url1)));
+    assertNull(repository.getArtifact(namespace, auId, url2));
+    assertEquals(1, artver(repository.getArtifact(namespace, auId, url3)));
+
+  }
+
   private int artver(Artifact art) {
     return art.getVersion();
   }
@@ -709,7 +753,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   private void writeWarcRecord(ArtifactSpec spec, OutputStream out) throws IOException {
     String WARC_BLOCK =
-        "HTTP/1.1 200 OK\n" +
+            spec.getStatusLine().toString() + "\n" +
             spec.getHeadersAsText() +
             "\n";
 
