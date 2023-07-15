@@ -13,7 +13,9 @@ import org.lockss.util.StringUtil;
 import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.ImportStatus;
+import org.lockss.util.rest.repo.util.ArtifactCache;
 import org.lockss.util.rest.repo.util.ImportStatusIterable;
 import org.lockss.util.rest.repo.util.NamedInputStreamResource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +28,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.jms.JMSException;
+import javax.jms.Message;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.*;
 
 @Service
 public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements ArchivesApiDelegate {
@@ -76,6 +81,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
       try {
         boolean isCompressed = StringUtil.endsWithIgnoreCase(
             archive.getOriginalFilename(), WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
+        boolean needCacheInvalidate = false;
 
         try (InputStream input = archive.getInputStream();
              ImportStatusIterable result =
@@ -90,10 +96,17 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
             // Write result to temporary file
             for (ImportStatus status : result) {
+              if (ImportStatus.StatusEnum.OK == status.getStatus()) {
+                needCacheInvalidate = true;
+              }
               objWriter.writeValue(out, status);
             }
 
             out.flush();
+
+            if (needCacheInvalidate) {
+              sendCacheInvalidateAu(ArtifactCache.InvalidateOp.Commit, auId);
+            }
 
             // Set Content-Length of file
             HttpHeaders headers = new HttpHeaders();
@@ -113,6 +126,29 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
       String errorMessage = "Archive not supported";
       throw new LockssRestServiceException(LockssRestHttpException.ServerErrorType.NONE,
           HttpStatus.BAD_REQUEST, errorMessage, parsedRequest);
+    }
+  }
+
+  @javax.annotation.PostConstruct
+  private void init() {
+    setUpJms(JMS_SEND,
+        RestLockssRepository.REST_ARTIFACT_CACHE_ID,
+        RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC);
+  }
+
+  protected void sendCacheInvalidateAu(ArtifactCache.InvalidateOp op,
+                                       String auid) {
+    if (jmsProducer != null && auid != null) {
+      Map<String, Object> map = new HashMap<>();
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION,
+          RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE_AU);
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_OP, op.toString());
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_KEY, auid);
+      try {
+        jmsProducer.sendMap(map);
+      } catch (JMSException e) {
+        log.error("Couldn't send cache invalidate notification", e);
+      }
     }
   }
 

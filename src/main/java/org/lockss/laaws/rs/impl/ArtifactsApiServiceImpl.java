@@ -322,7 +322,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       // Remove the artifact from the artifact store and index
       String key = artifactKey(namespace, artifactid);
       repo.deleteArtifact(namespace, artifactid);
-      sendCacheInvalidate(ArtifactCache.InvalidateOp.Delete, key);
+      sendCacheInvalidateArtifact(ArtifactCache.InvalidateOp.Delete, key);
       return new ResponseEntity<>(HttpStatus.OK);
 
     } catch (LockssNoSuchArtifactIdException e) {
@@ -689,7 +689,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       // (Unless in bulk mode, where it takes noticeable time and is
       // unnecessary).
       if (!bulkAuids.contains(updatedArtifact.getAuid())) {
-        sendCacheInvalidate(ArtifactCache.InvalidateOp.Commit, artifactKey(namespace, artifactid));
+        sendCacheInvalidateArtifact(ArtifactCache.InvalidateOp.Commit,
+                                    artifactKey(namespace, artifactid));
       }
 
       // Return the updated Artifact
@@ -735,12 +736,12 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     }
   }
 
-  protected void sendCacheInvalidate(ArtifactCache.InvalidateOp op,
-                                     String key) {
+  protected void sendCacheInvalidateArtifact(ArtifactCache.InvalidateOp op,
+                                             String key) {
     if (jmsProducer != null && key != null) {
       Map<String, Object> map = new HashMap<>();
       map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION,
-          RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE);
+          RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE_ARTIFACT);
       map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_OP, op.toString());
       map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_KEY, key);
       try {
@@ -830,7 +831,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_ECHO:
               sendPingResponse(key);
               break;
-            case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE:
+            case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE_ARTIFACT:
+            case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE_AU:
             case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_ECHO_RESP:
             case RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_FLUSH:
               // expected, ignore
