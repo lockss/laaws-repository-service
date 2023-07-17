@@ -96,6 +96,11 @@ paths:
           type: "boolean"
           required: false
           default: false
+        - name: "excludeStatusPattern"
+          description: "If supplied, WARC records whose HTTP response status code matches the regular expression will not be imported"
+          in: "query"
+          type: "string"
+          required: false
       responses:
         200:
           description: "Status of artifacts imported from the archive, maybe partially. Return body is a sequence of 
@@ -820,6 +825,8 @@ definitions:
         enum:
           - "OK"
           - "ERROR"
+          - "DUPLICATE"
+          - "EXCLUDED"
       statusMessage:
         type: "string"
   artifactPageInfo:
