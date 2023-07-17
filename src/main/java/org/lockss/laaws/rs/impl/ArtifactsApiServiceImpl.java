@@ -448,25 +448,33 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       HttpHeaders respHeaders = new HttpHeaders();
 
       // Selectively copy artifact headers into REST response
-      respHeaders.setContentType(httpHeaders.getContentType());
-      respHeaders.setContentLength(ad.getContentLength());
+      if (httpHeaders.containsKey(HttpHeaders.CONTENT_TYPE)) {
+        respHeaders.setContentType(httpHeaders.getContentType());
+      }
+
       if (httpHeaders.containsKey(HttpHeaders.LAST_MODIFIED)) {
         respHeaders.setLastModified(httpHeaders.getLastModified());
       }
 
+      respHeaders.setContentLength(ad.getContentLength());
       respHeaders.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
 
       if (includeContent == LockssRepository.IncludeContent.ALWAYS ||
          (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
              ad.getContentLength() <= smallContentThreshold)) {
+
+        respHeaders.set(ArtifactConstants.INCLUDES_CONTENT, "true");
+
         // Return full HTTP response
         InputStreamResource resource = new InputStreamResource(ad.getInputStream());
         return new ResponseEntity<Resource>(resource, respHeaders, HttpStatus.OK);
       } else {
-        // Remember the actual Content-Length in another header then set Conent-Length to zero
+        // Remember the actual Content-Length in another header then set Content-Length to zero
         respHeaders.set(ArtifactConstants.X_LOCKSS_CONTENT_LENGTH,
             String.valueOf(respHeaders.getContentLength()));
         respHeaders.setContentLength(0);
+
+        respHeaders.set(ArtifactConstants.INCLUDES_CONTENT, "false");
 
         // Return a response with HTTP status line and headers only
         return new ResponseEntity<Resource>(respHeaders, HttpStatus.OK);

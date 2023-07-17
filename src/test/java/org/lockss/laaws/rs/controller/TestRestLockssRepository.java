@@ -45,6 +45,7 @@ import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
 import org.archive.format.warc.WARCConstants;
 import org.junit.*;
+import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
@@ -69,6 +70,8 @@ import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.*;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
+import org.lockss.util.rest.repo.util.RepoUtil;
+import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.embedded.LocalServerPort;
@@ -1151,6 +1154,105 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     if (uspec != null) {
       ArtifactData ad = repoClient.getArtifactData(uspec.getArtifact());
       uspec.assertArtifactData(ad);
+    }
+  }
+
+  /** Test for {@link RestLockssRepository#getArtifactDataByPayload(Artifact, LockssRepository.IncludeContent)}. */
+  @Test
+  public void testGetArtifactDataByPayload() throws Exception {
+    // Resource backed artifact
+    ArtifactSpec resourceSpec = new ArtifactSpec()
+        .setUrl("test")
+        .setIsHttpResponse(false);
+
+    addUncommitted(resourceSpec);
+
+    assertArtifactDataFromPayload(resourceSpec, LockssRepository.IncludeContent.NEVER);
+    assertArtifactDataFromPayload(resourceSpec, LockssRepository.IncludeContent.ALWAYS);
+
+    // Test IF_SMALL behavior with resource artifacts
+    ArtifactSpec resourceSpecUnderThreshold = new ArtifactSpec()
+        .setContentLength(ArtifactsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD)
+        .setUrl("test")
+        .setIsHttpResponse(false);
+
+    addUncommitted(resourceSpecUnderThreshold);
+
+    ArtifactSpec resourceSpecOverThreshold = new ArtifactSpec()
+        .setContentLength(ArtifactsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD+1)
+        .setUrl("test")
+        .setIsHttpResponse(false);
+
+    addUncommitted(resourceSpecOverThreshold);
+
+    assertArtifactDataFromPayload(resourceSpecUnderThreshold, LockssRepository.IncludeContent.IF_SMALL);
+    assertArtifactDataFromPayload(resourceSpecOverThreshold, LockssRepository.IncludeContent.IF_SMALL);
+
+    // Test response artifact
+    ArtifactSpec responseSpec = new ArtifactSpec()
+        .setUrl("test")
+        .setIsHttpResponse(true);
+
+    addUncommitted(responseSpec);
+
+    assertArtifactDataFromPayload(responseSpec, LockssRepository.IncludeContent.NEVER);
+    assertArtifactDataFromPayload(responseSpec, LockssRepository.IncludeContent.ALWAYS);
+
+    // Test IF_SMALL behavior with response artifacts
+    ArtifactSpec responseSpecUnderThreshold = new ArtifactSpec()
+        .setContentLength(ArtifactsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD)
+        .setUrl("test")
+        .setIsHttpResponse(true);
+
+    addUncommitted(responseSpecUnderThreshold);
+
+    ArtifactSpec responseSpecOverThreshold = new ArtifactSpec()
+        .setContentLength(ArtifactsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD+1)
+        .setUrl("test")
+        .setIsHttpResponse(true);
+
+    addUncommitted(responseSpecOverThreshold);
+
+    assertArtifactDataFromPayload(responseSpecUnderThreshold, LockssRepository.IncludeContent.IF_SMALL);
+    assertArtifactDataFromPayload(responseSpecOverThreshold, LockssRepository.IncludeContent.IF_SMALL);
+  }
+
+  public void assertArtifactDataFromPayload(ArtifactSpec spec,
+                                            LockssRepository.IncludeContent includeContent) throws Exception {
+
+    ArtifactData ad = repoClient.getArtifactDataByPayload(
+        spec.getArtifact(), includeContent);
+
+    assertNotNull(ad);
+
+    // Resource type artifacts should never have an HTTP status line
+    assertNull(ad.getHttpStatus());
+    assertFalse(ad.isHttpResponse());
+
+    // Cannot generally assert headers because we only transmit a select number of them
+    // assertEquals(spec.getHeaders(), RepoUtil.mapFromHttpHeaders(ad.getHttpHeaders()));
+
+    // Assert Content-Type matches
+    Assertions.assertEquals(
+        spec.getHeaders().get(HttpHeaders.CONTENT_TYPE),
+        ad.getHttpHeaders().getFirst(HttpHeaders.CONTENT_TYPE));
+
+    Assertions.assertEquals(spec.getContentLength(), ad.getContentLength());
+    Assertions.assertEquals(spec.getContentDigest(), ad.getContentDigest());
+
+    if (spec.getStorageUrl() != null) {
+      Assertions.assertEquals(spec.getStorageUrl(), ad.getStorageUrl());
+    }
+
+    boolean expectContent = includeContent == LockssRepository.IncludeContent.ALWAYS ||
+        (spec.getContentLength() <= ArtifactsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD &&
+            includeContent == LockssRepository.IncludeContent.IF_SMALL);
+
+    if (expectContent) {
+      new LockssTestCase5().assertSameBytes(
+          spec.getInputStream(), ad.getInputStream(), spec.getContentLength());
+    } else {
+      assertThrows(IllegalStateException.class, () -> ad.getInputStream(), "created without one");
     }
   }
 
