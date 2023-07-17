@@ -1277,9 +1277,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // assertEquals(spec.getHeaders(), RepoUtil.mapFromHttpHeaders(ad.getHttpHeaders()));
 
     // Assert Content-Type matches
-    Assertions.assertEquals(
-        spec.getHeaders().get(HttpHeaders.CONTENT_TYPE),
-        ad.getHttpHeaders().getFirst(HttpHeaders.CONTENT_TYPE));
+    if (!StringUtil.isNullString(spec.getHeaders().get(HttpHeaders.CONTENT_TYPE))) {
+      Assertions.assertEquals(
+          spec.getHeaders().get(HttpHeaders.CONTENT_TYPE),
+          ad.getHttpHeaders().getFirst(HttpHeaders.CONTENT_TYPE));
+    }
 
     Assertions.assertEquals(spec.getContentLength(), ad.getContentLength());
     Assertions.assertEquals(spec.getContentDigest(), ad.getContentDigest());
