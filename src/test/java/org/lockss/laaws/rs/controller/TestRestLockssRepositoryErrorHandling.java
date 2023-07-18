@@ -15,6 +15,7 @@ import org.junit.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -24,6 +25,7 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactData;
 import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
@@ -82,7 +84,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
    * Internal LOCKSS repository used by the embedded LOCKSS Repository Service.
    */
   @Autowired
-  protected LockssRepository internalRepo;
+  protected BaseLockssRepository internalRepo;
 
 //  /**
 //   * Test configuration beans.
@@ -327,17 +329,24 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
   @Test
   public void testGetArtifact() throws Exception {
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace("ns1")
+        .setArtifactUuid("artifactid1")
+        .setUrl("test")
+        .setContentLength(1)
+        .setContentDigest("test")
+        .setCollectionDate(0);
+
     // Initialize the internal mock LOCKSS repository
     initInternalLockssRepository();
 
     //// LockssNoSuchArtifactIdException
-    String artifactId = "artifact";
-    Exception e = new LockssNoSuchArtifactIdException("Non-existent artifact ID: " + artifactId);
+    Exception e = new LockssNoSuchArtifactIdException("Non-existent artifact ID: " + spec.getArtifactUuid());
 
-    doThrow(e).when(internalRepo).getArtifactData("namespace", "artifact");
+    doThrow(e).when(internalRepo).getArtifactData(spec.getNamespace(), spec.getArtifactUuid());
 
-    assertThrowsMatch(LockssNoSuchArtifactIdException.class, "Artifact not found", () ->
-        clientRepo.getArtifactData("namespace", "artifact"));
+    assertThrowsMatch(LockssNoSuchArtifactIdException.class, "Artifact not found",
+        () -> clientRepo.getArtifactData(spec.getArtifact(), LockssRepository.IncludeContent.ALWAYS));
 
     // Reset mock
     reset(internalRepo);
@@ -345,10 +354,10 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Generic LockssRestServiceException
     doThrow(new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR, "Test error message", null, "/test/path"))
-        .when(internalRepo).getArtifactData("namespace", "artifact");
+        .when(internalRepo).getArtifactData(spec.getNamespace(), spec.getArtifactUuid());
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getArtifactData("namespace", "artifact"),
+        () -> clientRepo.getArtifactData(spec.getArtifact(), LockssRepository.IncludeContent.ALWAYS),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.UNSPECIFIED_ERROR);
 
@@ -358,10 +367,10 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// IOException
     doThrow(new IOException("Test error message"))
-        .when(internalRepo).getArtifactData("namespace", "artifact");
+        .when(internalRepo).getArtifactData(spec.getNamespace(), spec.getArtifactUuid());
 
     assertLockssRestHttpException(
-        (Executable) () -> clientRepo.getArtifactData("namespace", "artifact"),
+        () -> clientRepo.getArtifactData(spec.getArtifact(), LockssRepository.IncludeContent.ALWAYS),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
   }
