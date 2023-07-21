@@ -75,6 +75,7 @@ import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
@@ -340,7 +341,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String)}.
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean, String)}.
    */
   @Test
   public void testAddArtifacts() throws Exception {
@@ -560,7 +561,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean)}.
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean, String)}.
    */
   @Test
   public void testAddArtifactsDupCheck() throws Exception {
@@ -788,7 +789,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     spec.generateContent();
 
-    Artifact result = repository.addArtifact(spec.getArtifactData());
+    Artifact result = repoClient.addArtifact(spec.getArtifactData());
     assertNotNull(result);
   }
 
