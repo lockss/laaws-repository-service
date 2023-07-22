@@ -877,6 +877,9 @@ definitions:
       collectionDate:
         type: "integer"
         format: "int64"
+      storeDate:
+        type: "integer"
+        format: "int64"
       state:
         type: "string"
   artifact:
