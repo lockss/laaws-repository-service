@@ -1007,6 +1007,29 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     testDeleteAllArtifacts();
   }
 
+  @Test
+  public void testArtifactStoreDate() throws Exception {
+    runTestArtifactStoreDate(false);
+    runTestArtifactStoreDate(true);
+  }
+
+  public void runTestArtifactStoreDate(boolean useMultipartEndpoint) throws Exception {
+    repoClient.setUseMultipartEndpoint(useMultipartEndpoint);
+
+    long SIM_TIME = 543212;
+    TimeBase.setSimulated(SIM_TIME);
+    ArtifactSpec spec = ArtifactSpec.forNsAuUrl(NS1, AUID1, URL1)
+        .toCommit(true).setContentLength(42);
+    Artifact newArt = addUncommitted(spec);
+    ArtifactData ad = repoClient.getArtifactData(newArt);
+    assertEquals(SIM_TIME, ad.getStoreDate());
+
+    Artifact commArt = commit(spec, newArt);
+    spec.assertArtifact(repoClient, commArt);
+    ArtifactData ad2 = repoClient.getArtifactData(newArt);
+    assertEquals(SIM_TIME, ad2.getStoreDate());
+  }
+
   /** Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}. */
   @Test
   public void testConditionalContent() throws IOException {
