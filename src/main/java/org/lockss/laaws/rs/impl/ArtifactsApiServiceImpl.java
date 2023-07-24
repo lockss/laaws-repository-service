@@ -461,7 +461,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       respHeaders.setContentLength(ad.getContentLength());
       respHeaders.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
 
-      respHeaders.set(ArtifactConstants.ARTIFACT_STORE_DATE,
+      respHeaders.set(ArtifactConstants.ARTIFACT_STORE_DATE_KEY,
           DateTimeFormatter.ISO_INSTANT
               .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
 
@@ -554,7 +554,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       restResponseHeaders.set(ArtifactConstants.INCLUDES_CONTENT,
           String.valueOf(!onlyHeaders));
 
-      restResponseHeaders.set(ArtifactConstants.ARTIFACT_STORE_DATE,
+      restResponseHeaders.set(ArtifactConstants.ARTIFACT_STORE_DATE_KEY,
           DateTimeFormatter.ISO_INSTANT
               .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
 
