@@ -52,8 +52,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -459,6 +461,10 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       respHeaders.setContentLength(ad.getContentLength());
       respHeaders.set(ArtifactConstants.ARTIFACT_DIGEST_KEY, ad.getContentDigest());
 
+      respHeaders.set(ArtifactConstants.ARTIFACT_STORE_DATE_KEY,
+          DateTimeFormatter.ISO_INSTANT
+              .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
+
       if (includeContent == LockssRepository.IncludeContent.ALWAYS ||
          (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
              ad.getContentLength() <= smallContentThreshold)) {
@@ -547,6 +553,10 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           ad.isHttpResponse() ? "response" : "resource");
       restResponseHeaders.set(ArtifactConstants.INCLUDES_CONTENT,
           String.valueOf(!onlyHeaders));
+
+      restResponseHeaders.set(ArtifactConstants.ARTIFACT_STORE_DATE_KEY,
+          DateTimeFormatter.ISO_INSTANT
+              .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
 
       return new ResponseEntity<>(resource, restResponseHeaders, HttpStatus.OK);
     } catch (LockssNoSuchArtifactIdException e) {
