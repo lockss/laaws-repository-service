@@ -377,7 +377,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     //// Test adding artifacts from an uncompressed WARC archive with success
     {
       int numArtifacts = 10;
-      boolean isCompressed = false;
       List<ArtifactSpec> specs = new ArrayList<>(numArtifacts);
 
       // Write test WARC
@@ -401,7 +400,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       log.debug("Calling REST addArtifacts");
 
       Iterable<ImportStatus> iter = repoClient.addArtifacts(
-          namespace, auId, dfos.getDeleteOnCloseInputStream(), LockssRepository.ArchiveType.WARC, isCompressed);
+          namespace, auId, dfos.getDeleteOnCloseInputStream(), LockssRepository.ArchiveType.WARC);
 
       List<ImportStatus> result = ListUtil.fromIterable(iter);
       ImportStatus last = result.get(result.size() - 1);
@@ -440,7 +439,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     //// Test adding artifacts from a GZIP compressed WARC archive with success
     {
       int numArtifacts = 10;
-      boolean isCompressed = true;
       List<ArtifactSpec> specs = new ArrayList<>(numArtifacts);
 
       // Write test WARC
@@ -469,7 +467,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       try (InputStream fileInput = Files.newInputStream(tmpFile.toPath())) {
         Iterable<ImportStatus> iter = repoClient.addArtifacts(
-            namespace, auId, fileInput, LockssRepository.ArchiveType.WARC, isCompressed);
+            namespace, auId, fileInput, LockssRepository.ArchiveType.WARC);
 
         List<ImportStatus> result = ListUtil.fromIterable(iter);
 
@@ -508,7 +506,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     //// Test adding artifacts from a WARC archive with only partial success
     {
       int numArtifacts = 10;
-      boolean isCompressed = false;
       List<ArtifactSpec> specs = new ArrayList<>(numArtifacts);
 
       // Write test WARC
@@ -537,7 +534,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       // Call addArtifacts REST endpoint
       Iterable<ImportStatus> iter = repoClient.addArtifacts(
-          namespace, auId, dfos.getDeleteOnCloseInputStream(), LockssRepository.ArchiveType.WARC, isCompressed);
+          namespace, auId, dfos.getDeleteOnCloseInputStream(), LockssRepository.ArchiveType.WARC);
 
       List<ImportStatus> result = ListUtil.fromIterable(iter);
 
@@ -660,7 +657,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       repoClient.addArtifacts(namespace, auId,
                               dfos2.getDeleteOnCloseInputStream(),
                               LockssRepository.ArchiveType.WARC,
-                              false, true);
+                              false);
 
     List<ImportStatus> results3 = ListUtil.fromIterable(iter3);
     assertEquals(3, results3.size());
@@ -703,7 +700,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       repoClient.addArtifacts(namespace, auId,
                               dfos.getDeleteOnCloseInputStream(),
                               LockssRepository.ArchiveType.WARC,
-                              false, false, "500|404|401");
+                              false, "500|404|401");
     List<ImportStatus> results = ListUtil.fromIterable(iter);
     assertEquals(3, results.size());
     assertEquals(ImportStatus.StatusEnum.OK, results.get(0).getStatus());
