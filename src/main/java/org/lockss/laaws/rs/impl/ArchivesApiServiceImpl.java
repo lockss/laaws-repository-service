@@ -79,13 +79,11 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
     if (archiveType.equals(APPLICATION_WARC)) {
       try {
-        boolean isCompressed = StringUtil.endsWithIgnoreCase(
-            archive.getOriginalFilename(), WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
         boolean needCacheInvalidate = false;
 
         try (InputStream input = archive.getInputStream();
              ImportStatusIterable result =
-                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, isCompressed, storeDuplicate, excludeStatusPattern)) {
+                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, storeDuplicate, excludeStatusPattern)) {
 
           try (DeferredTempFileOutputStream out =
                    new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
