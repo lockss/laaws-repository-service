@@ -656,8 +656,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Iterable<ImportStatus> iter3 =
       repoClient.addArtifacts(namespace, auId,
                               dfos2.getDeleteOnCloseInputStream(),
-                              LockssRepository.ArchiveType.WARC,
-                              false);
+                              LockssRepository.ArchiveType.WARC, true);
 
     List<ImportStatus> results3 = ListUtil.fromIterable(iter3);
     assertEquals(3, results3.size());
