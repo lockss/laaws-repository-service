@@ -32,22 +32,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.lockss.laaws.rs.api.ChecksumalgorithmsApiDelegate;
+import org.lockss.log.L4JLogger;
+import org.lockss.spring.base.BaseSpringApiServiceImpl;
+import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.StringUtil;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import javax.servlet.http.HttpServletRequest;
 import java.security.Provider;
 import java.security.Security;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import javax.servlet.http.HttpServletRequest;
-import org.lockss.laaws.rs.api.ChecksumalgorithmsApiDelegate;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.log.L4JLogger;
-import org.lockss.spring.base.BaseSpringApiServiceImpl;
-import org.lockss.spring.error.LockssRestServiceException;
-import org.lockss.util.StringUtil;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
 
 /**
  * Service for accessing the supported checksum algorithms.

@@ -35,12 +35,16 @@ package org.lockss.laaws.rs.impl;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.VolatileLockssRepository;
 import org.lockss.laaws.rs.impl.WaybackApiServiceImpl.ClosestArtifact;
-import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.model.CdxRecord;
+import org.lockss.laaws.rs.model.CdxRecords;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.VolatileLockssRepository;
 import org.lockss.spring.test.SpringLockssTestCase4;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.rest.repo.model.ArtifactData;
+import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
@@ -67,6 +71,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
    */
   @Before
   public void setUpArtifactDataStore() throws Exception {
+    getMockLockssDaemon().setAppRunning(true);
     repository = new VolatileLockssRepository();
     repository.initRepository();
   }

@@ -32,18 +32,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Optional;
-import javax.servlet.http.HttpServletRequest;
 import org.lockss.laaws.rs.api.RepoinfoApiDelegate;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.model.RepositoryInfo;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.model.RepositoryInfo;
+import org.lockss.util.storage.StorageInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Optional;
 
 /**
  * Service for obtaining the properties of a repository.
@@ -97,6 +99,26 @@ public class RepoinfoApiServiceImpl extends BaseSpringApiServiceImpl
 
       throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
 	  errorMessage, e);
+    }
+  }
+
+  @Override
+  public ResponseEntity<StorageInfo> getStorageInfo() {
+    log.debug2("Invoked");
+
+    ServiceImplUtil.checkRepositoryReady(repo, null);
+
+    try {
+      StorageInfo result = repo.getStorageInfo();
+      log.debug2("result = {}", result);
+      return new ResponseEntity<>(result, HttpStatus.OK);
+    } catch (Exception e) {
+      String errorMessage =
+          "Exception caught trying to provide the repository storage information.";
+      log.warn(errorMessage, e);
+
+      throw new LockssRestServiceException(HttpStatus.INTERNAL_SERVER_ERROR,
+          errorMessage, e);
     }
   }
 

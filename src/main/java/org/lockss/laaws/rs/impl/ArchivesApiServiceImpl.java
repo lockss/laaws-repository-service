@@ -6,16 +6,18 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.commons.io.FileUtils;
 import org.archive.format.warc.WARCConstants;
 import org.lockss.laaws.rs.api.ArchivesApiDelegate;
-import org.lockss.laaws.rs.core.ImportStatusIterable;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.model.ImportStatus;
-import org.lockss.laaws.rs.util.NamedInputStreamResource;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.StringUtil;
 import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.model.ImportStatus;
+import org.lockss.util.rest.repo.util.ArtifactCache;
+import org.lockss.util.rest.repo.util.ImportStatusIterable;
+import org.lockss.util.rest.repo.util.NamedInputStreamResource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -26,9 +28,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.jms.JMSException;
+import javax.jms.Message;
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.*;
 
 @Service
 public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements ArchivesApiDelegate {
@@ -53,13 +58,17 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
    * @param auId         A {@link String} containing the AUID of the artifacts.
    * @param archive      A {@link MultipartFile} containing the archive.
    * @param namespace    A {@link String} containing the namespace of the artifacts.
+   * @param storeDuplicate    A {@link Boolean} indicating whether artifacts whose content is identical to the previous version should be stored
+   * @param excludeStatusPattern    A {@link String} containing a regexp.  WARC records whose HTTP response status code matches will not be added to the repository
    * @return
    */
   @Override
-  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace) {
+  public ResponseEntity<Resource> addArtifacts(String auId, MultipartFile archive, String namespace, Boolean storeDuplicate, String excludeStatusPattern) {
     log.debug("archive.name = {}", archive.getName());
     log.debug("archive.origFileName = {}", archive.getOriginalFilename());
     log.debug("archive.type = {}", archive.getContentType());
+    if (!StringUtil.isNullString(excludeStatusPattern))
+      log.debug("excludeStatusPattern = {}", excludeStatusPattern);
 
     String parsedRequest = String.format("namespace: %s, auId: %s, requestUrl: %s",
         namespace, auId, ServiceImplUtil.getFullRequestUrl(request));
@@ -70,12 +79,11 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
     if (archiveType.equals(APPLICATION_WARC)) {
       try {
-        boolean isCompressed = StringUtil.endsWithIgnoreCase(
-            archive.getOriginalFilename(), WARCConstants.DOT_COMPRESSED_WARC_FILE_EXTENSION);
+        boolean needCacheInvalidate = false;
 
         try (InputStream input = archive.getInputStream();
              ImportStatusIterable result =
-                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, isCompressed)) {
+                 repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, storeDuplicate, excludeStatusPattern)) {
 
           try (DeferredTempFileOutputStream out =
                    new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
@@ -86,10 +94,17 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
             // Write result to temporary file
             for (ImportStatus status : result) {
+              if (ImportStatus.StatusEnum.OK == status.getStatus()) {
+                needCacheInvalidate = true;
+              }
               objWriter.writeValue(out, status);
             }
 
             out.flush();
+
+            if (needCacheInvalidate) {
+              sendCacheInvalidateAu(ArtifactCache.InvalidateOp.Commit, auId);
+            }
 
             // Set Content-Length of file
             HttpHeaders headers = new HttpHeaders();
@@ -109,6 +124,29 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
       String errorMessage = "Archive not supported";
       throw new LockssRestServiceException(LockssRestHttpException.ServerErrorType.NONE,
           HttpStatus.BAD_REQUEST, errorMessage, parsedRequest);
+    }
+  }
+
+  @javax.annotation.PostConstruct
+  private void init() {
+    setUpJms(JMS_SEND,
+        RestLockssRepository.REST_ARTIFACT_CACHE_ID,
+        RestLockssRepository.REST_ARTIFACT_CACHE_TOPIC);
+  }
+
+  protected void sendCacheInvalidateAu(ArtifactCache.InvalidateOp op,
+                                       String auid) {
+    if (jmsProducer != null && auid != null) {
+      Map<String, Object> map = new HashMap<>();
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION,
+          RestLockssRepository.REST_ARTIFACT_CACHE_MSG_ACTION_INVALIDATE_AU);
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_OP, op.toString());
+      map.put(RestLockssRepository.REST_ARTIFACT_CACHE_MSG_KEY, auid);
+      try {
+        jmsProducer.sendMap(map);
+      } catch (JMSException e) {
+        log.error("Couldn't send cache invalidate notification", e);
+      }
     }
   }
 

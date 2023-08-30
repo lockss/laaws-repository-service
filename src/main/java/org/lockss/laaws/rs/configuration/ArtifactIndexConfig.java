@@ -32,12 +32,12 @@ package org.lockss.laaws.rs.configuration;
 
 import org.lockss.app.LockssApp;
 import org.lockss.config.ConfigManager;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.index.DispatchingArtifactIndex;
-import org.lockss.laaws.rs.io.index.LocalArtifactIndex;
-import org.lockss.laaws.rs.io.index.VolatileArtifactIndex;
-import org.lockss.laaws.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.index.ArtifactIndex;
+import org.lockss.rs.io.index.DispatchingArtifactIndex;
+import org.lockss.rs.io.index.LocalArtifactIndex;
+import org.lockss.rs.io.index.VolatileArtifactIndex;
+import org.lockss.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;

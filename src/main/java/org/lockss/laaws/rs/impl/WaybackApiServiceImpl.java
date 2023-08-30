@@ -4,12 +4,18 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.DeferredFileOutputStream;
 import org.archive.wayback.surt.SURTTokenizer;
 import org.lockss.laaws.rs.api.WaybackApiDelegate;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.io.storage.warc.WarcArtifactDataStore;
-import org.lockss.laaws.rs.model.*;
+import org.lockss.laaws.rs.model.CdxRecord;
+import org.lockss.laaws.rs.model.CdxRecords;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.rest.repo.model.ArtifactData;
+import org.lockss.util.rest.repo.model.ArtifactIdentifier;
+import org.lockss.util.rest.repo.model.ArtifactVersions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -33,7 +39,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   private static String charsetName = StandardCharsets.UTF_8.name();
 
   @Autowired
-  LockssRepository repo;
+  BaseLockssRepository repo;
 
   private final HttpServletRequest request;
 
@@ -486,7 +492,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
         // Create the result for this artifact.
         CdxRecord record = getCdxRecord(
-            repo.getArtifactData(artifact.getNamespace(), artifactUuid));
+            repo.getArtifactData(artifact, LockssRepository.IncludeContent.NEVER));
         log.trace("record = {}", record);
 
         // Add this artifact to the results.

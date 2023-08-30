@@ -31,10 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.impl;
 
+import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.api.StatusApiDelegate;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.util.rest.status.ApiStatus;
 import org.lockss.spring.status.SpringLockssBaseApiController;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.status.ApiStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -55,6 +56,8 @@ public class StatusApiServiceImpl extends SpringLockssBaseApiController
    */
   @Override
   public ApiStatus getApiStatus() {
-    return getDefaultApiStatus();
+    ApiStatus apistat = super.getDefaultApiStatus();
+    apistat.setReady(apistat.isReady() && repo.isReady());
+    return apistat;
   }
 }

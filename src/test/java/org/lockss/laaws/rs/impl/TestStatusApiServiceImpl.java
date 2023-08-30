@@ -40,6 +40,9 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.app.*;
 import org.lockss.util.rest.status.ApiStatus;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.rs.BaseLockssRepository;
+import org.lockss.rs.io.index.*;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -81,6 +84,7 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
   public void setUpBeforeEachTest() throws IOException {
     log.debug2("port = {}", port);
 
+    getMockLockssDaemon().setAppRunning(true);
     // Set up the temporary directory where the test data will reside.
     setUpTempDirectory(TestStatusApiServiceImpl.class.getCanonicalName());
 
@@ -158,6 +162,9 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
     return cmdLineArgs;
   }
 
+  @Autowired
+  LockssRepository repo;
+
   /**
    * Runs the status-related tests.
    *
@@ -177,10 +184,24 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
     ApiStatus expected = new ApiStatus("swagger/swagger.yaml");
     expected.setReady(true);
     expected.setReadyTime(LockssApp.getLockssApp().getReadyTime());
-    expected.setPluginsReady(LockssDaemon.getLockssDaemon().areLoadablePluginsReady());
+    expected.setStartupStatus(LockssDaemon.getLockssDaemon().getStartupStatus());
 
     JSONAssert.assertEquals(expected.toJson(), successResponse.getBody(),
 	false);
+
+    // ensure that repo.isReady() is included in ApiStatus.getReady()
+    // (lots of assumptions here about the implementation classes used
+    // in the test.)
+    VolatileArtifactIndex index =
+      (VolatileArtifactIndex)((BaseLockssRepository)repo).getArtifactIndex();
+    index.setState(AbstractArtifactIndex.ArtifactIndexState.STOPPED);
+    ResponseEntity<String> resp2 = new TestRestTemplate().exchange(
+	getTestUrlTemplate("/status"), HttpMethod.GET, null, String.class);
+    assertEquals(HttpStatus.OK, resp2.getStatusCode());
+
+    expected.setReady(false);
+    JSONAssert.assertEquals(expected.toJson(), resp2.getBody(), false);
+    index.setState(AbstractArtifactIndex.ArtifactIndexState.RUNNING);
 
     log.debug2("Done");
   }

@@ -35,13 +35,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.RepoinfoApiController;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactPageInfo;
-import org.lockss.laaws.rs.model.AuidPageInfo;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.UrlUtil;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.rest.repo.model.ArtifactPageInfo;
+import org.lockss.util.rest.repo.model.AuidPageInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -79,7 +79,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //    private ArtifactDataStore artifactStore;
 
     @MockBean
-    private LockssRepository repo;
+    private BaseLockssRepository repo;
 
     // The value of the Authorization header to be used when calling the REST
     // service.

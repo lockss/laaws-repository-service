@@ -30,40 +30,38 @@
 package org.lockss.laaws.rs.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.core.LockssNoSuchArtifactIdException;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.io.storage.warc.ArtifactState;
-import org.lockss.laaws.rs.io.storage.warc.ArtifactStateEntry;
-import org.lockss.laaws.rs.model.Artifact;
-import org.lockss.laaws.rs.model.ArtifactData;
-import org.lockss.laaws.rs.model.ArtifactIdentifier;
-import org.lockss.laaws.rs.model.AuSize;
-import org.lockss.laaws.rs.util.ArtifactDataUtil;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.LockssUncheckedException;
-import org.lockss.util.rest.RestUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
-import org.lockss.util.rest.exception.LockssRestInvalidResponseException;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.RestLockssRepository;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.rest.repo.model.ArtifactData;
+import org.lockss.util.rest.repo.model.ArtifactIdentifier;
+import org.lockss.util.rest.repo.model.AuSize;
+import org.lockss.util.rest.repo.util.ArtifactConstants;
+import org.lockss.util.rest.repo.util.ArtifactDataUtil;
+import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequest;
-import org.springframework.http.converter.FormHttpMessageConverter;
+import org.springframework.http.converter.ResourceHttpMessageConverter;
 import org.springframework.mock.http.MockHttpOutputMessage;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.RequestMatcher;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -73,8 +71,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 
-import static org.lockss.laaws.rs.util.ArtifactDataUtil.generateMultipartMapFromArtifactData;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl.APPLICATION_HTTP_RESPONSE;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 /**
@@ -86,7 +84,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
     private final static String BASEURL = "http://localhost:24610";
     private final static ObjectMapper mapper = new ObjectMapper();
-    protected RestLockssRepository repository;
+    protected RestLockssRepository repoClient;
     protected MockRestServiceServer mockServer;
 
     /**
@@ -102,9 +100,9 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
       // Must create the RestLockssRepository before the
       // MockRestServiceServer, as the latter replaces the RequestFactory
       // in the RestTemplate with its own mock RequestFactory
-      repository = new RestLockssRepository(new URL(BASEURL), userName, password);
+      repoClient = new RestLockssRepository(new URL(BASEURL), userName, password);
 
-      mockServer = MockRestServiceServer.createServer(repository.getRestTemplate());
+      mockServer = MockRestServiceServer.createServer(repoClient.getRestTemplate());
     }
 
     @Test
@@ -116,7 +114,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
-        Iterable<String> namespaces = repository.getNamespaces();
+        Iterable<String> namespaces = repoClient.getNamespaces();
         mockServer.verify();
 
         assertNotNull(namespaces);
@@ -132,7 +130,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("[\"ns1\"]", MediaType.APPLICATION_JSON));
 
-        Iterable<String> namespaces = repository.getNamespaces();
+        Iterable<String> namespaces = repoClient.getNamespaces();
         mockServer.verify();
 
         assertNotNull(namespaces);
@@ -152,193 +150,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssRestHttpException.class,
 		      "500",
-		      () -> {repository.getNamespaces();});
+		      () -> repoClient.getNamespaces());
         mockServer.verify();
-    }
-
-    @Test
-    public void testIsArtifactCommitted_iae() throws Exception {
-        try {
-            repository.isArtifactCommitted("ns1", null);
-            fail("Should have thrown IllegalArgumentException");
-        } catch (IllegalArgumentException iae) {}
-
-        try {
-            repository.isArtifactCommitted("ns1", "");
-            fail("Should have thrown IllegalArgumentException");
-      } catch (IllegalArgumentException iae) {}
-    }
-
-    @Test
-    public void testIsArtifactCommitted_missingheader() throws Exception {
-
-        // ******************************
-        // Reference artifact and headers
-        // ******************************
-
-        // Setup reference artifact data headers
-        HttpHeaders referenceHeaders = new HttpHeaders();
-        referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key1", "value2");
-        referenceHeaders.add("key2", "value3");
-
-	String testData = "hello world";
-
-        // Setup reference artifact data
-        ArtifactData reference = new ArtifactData(
-            new ArtifactIdentifier("artifact1", "ns1", "auid1", "url1", 2),
-            referenceHeaders,
-            new ByteArrayInputStream(testData.getBytes()),
-            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-            new URI("storageUrl1"),
-            null
-        );
-
-        reference.setContentDigest("test");
-        reference.setContentLength(testData.length());
-
-        // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
-            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
-        );
-
-        // ****************************
-        // Setup mocked server response
-        // ****************************
-
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
-
-        // Setup mocked server response
-        URI endpoint = new URI(BASEURL + "/artifacts/artifact1?namespace=ns1&includeContent=IF_SMALL");
-
-        mockServer
-            .expect(uriRequestTo(endpoint))
-            .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
-
-	assertThrowsMatch(LockssRestInvalidResponseException.class,
-			  "Missing artifact repository state",
-			  () -> {repository.isArtifactCommitted("ns1",
-								"artifact1");});
-        mockServer.verify();
-    }
-
-    @Test
-    public void testIsArtifactCommitted_true() throws Exception {
-
-        // ******************************
-        // Reference artifact and headers
-        // ******************************
-
-        // Setup reference artifact data headers
-        HttpHeaders referenceHeaders = new HttpHeaders();
-        referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key1", "value2");
-        referenceHeaders.add("key2", "value3");
-
-	String testData = "hello world";
-
-        String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
-
-        // Setup reference artifact data
-        ArtifactData reference = new ArtifactData(
-            new ArtifactIdentifier("artifact1", "ns1", "auid1", "url1", 2),
-            referenceHeaders,
-            new ByteArrayInputStream(testData.getBytes()),
-            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-            new URI("storageUrl1"),
-            mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState());
-
-        reference.setContentDigest("test");
-        reference.setContentLength(testData.length());
-
-        // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
-            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
-        );
-
-        // ****************************
-        // Setup mocked server response
-        // ****************************
-
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
-
-        // Setup mocked server response
-        URI endpoint = new URI(BASEURL + "/artifacts/artifact1?namespace=ns1&includeContent=IF_SMALL");
-
-        mockServer
-            .expect(uriRequestTo(endpoint))
-            .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
-
-        Boolean result = repository.isArtifactCommitted("ns1", "artifact1");
-        mockServer.verify();
-        assertTrue(result);
-    }
-
-    @Test
-    public void testIsArtifactCommitted_false() throws Exception {
-
-        // ******************************
-        // Reference artifact and headers
-        // ******************************
-
-        // Setup reference artifact data headers
-        HttpHeaders referenceHeaders = new HttpHeaders();
-        referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key1", "value2");
-        referenceHeaders.add("key2", "value3");
-
-	String testData = "hello world";
-
-        String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"UNCOMMITTED\"}";
-
-        // Setup reference artifact data
-        ArtifactData reference = new ArtifactData(
-            new ArtifactIdentifier("artifact1", "ns1", "auid1", "url1", 2),
-            referenceHeaders,
-            new ByteArrayInputStream(testData.getBytes()),
-            new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK"),
-            new URI("storageUrl1"),
-            mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState());
-
-        reference.setContentDigest("test");
-        reference.setContentLength(testData.length());
-
-        // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
-            reference, LockssRepository.IncludeContent.IF_SMALL, 4096L
-        );
-
-        // ****************************
-        // Setup mocked server response
-        // ****************************
-
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
-        MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
-
-        // Setup mocked server response
-        URI endpoint = new URI(BASEURL + "/artifacts/artifact1?namespace=ns1&includeContent=IF_SMALL");
-
-        mockServer
-            .expect(uriRequestTo(endpoint))
-            .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
-
-        Boolean result = repository.isArtifactCommitted("ns1", "artifact1");
-        mockServer.verify();
-        assertFalse(result);
     }
 
     @Test
@@ -349,7 +162,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
-        Artifact result = repository.getArtifact("ns1", "auid1", "url1");
+        Artifact result = repoClient.getArtifact("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNull(result);
@@ -363,7 +176,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Artifact result = repository.getArtifact("ns1", "auid1", "url1");
+        Artifact result = repoClient.getArtifact("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNull(result);
@@ -377,7 +190,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Artifact result = repository.getArtifact("ns1", "auid1", "url1");
+        Artifact result = repoClient.getArtifact("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNull(result);
@@ -392,7 +205,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
                     MediaType.APPLICATION_JSON));
 
-        Artifact result = repository.getArtifact("ns1", "auid1", "url1");
+        Artifact result = repoClient.getArtifact("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -408,7 +221,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withServerError());
 
-        Artifact result = repository.getArtifact("ns1", "auid1", "url1");
+        Artifact result = repoClient.getArtifact("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNull(result);
@@ -417,7 +230,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     @Test
     public void testAddArtifact_iae() throws Exception {
         try {
-            repository.addArtifact(null);
+            repoClient.addArtifact(null);
             fail("Should have thrown IllegalArgumentException");
         } catch (IllegalArgumentException iae) {}
     }
@@ -434,15 +247,14 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         String js1 = "{\"artifactUuid\": \"test\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
 
-        Artifact result = repository.addArtifact(
+        Artifact result = repoClient.addArtifact(
             new ArtifactData(
                 new ArtifactIdentifier("1", "ns1", "auid1", "url1", 2),
                 new HttpHeaders(),
                 new ByteArrayInputStream(buf),
                 new BasicStatusLine(
                     new ProtocolVersion("protocol1", 4, 5), 3, null),
-                new URI("storageUrl1"),
-                mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState()));
+                new URI("storageUrl1")));
 
         mockServer.verify();
 
@@ -462,14 +274,13 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         String js1 = "{\"artifactId\":\"1\",\"entryDate\":0,\"committed\":\"true\",\"deleted\":\"false\"}";
 
         try {
-            repository.addArtifact(
+            repoClient.addArtifact(
                 new ArtifactData(
                     new ArtifactIdentifier("1", "ns1", "auid1", "url1", 2),
                     new HttpHeaders(),
                     new ByteArrayInputStream(new byte[]{}),
                     new BasicStatusLine(new ProtocolVersion("protocol1", 4, 5), 3, null),
-                    new URI("storageUrl1"),
-                    mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState()));
+                    new URI("storageUrl1")));
 
             fail("Should have thrown IOException");
         } catch (IOException ioe) {}
@@ -477,21 +288,31 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactData_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/artifacts/artifactid1?namespace=ns1&includeContent=ALWAYS");
+        URI endpoint = new URI(BASEURL + "/artifacts/artifactid1/response?includeContent=ALWAYS&namespace=ns1");
 
         mockServer
             .expect(uriRequestTo(endpoint))
             .andExpect(method(HttpMethod.GET))
             .andRespond(withServerError());
 
+        // FIXME: This is ugly - need any Artifact to trigger the mock error response
+        ArtifactSpec spec = new ArtifactSpec()
+            .setNamespace("ns1")
+            .setArtifactUuid("artifactid1")
+            .setUrl("test")
+            .setStorageUrl(URI.create("test"))
+            .setContentLength(1)
+            .setContentDigest("test")
+            .setCollectionDate(0);
+
         try {
-            repository.getArtifactData("ns1", "artifactid1");
+            repoClient.getArtifactData(spec.getArtifact());
             fail("Should have thrown IOException");
-        } catch (IOException ioe) {}
+        } catch (IOException e) {}
     }
 
     /**
-     * Test for {@link RestLockssRepository#getArtifactData(String, String, LockssRepository.IncludeContent)}.
+     * Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}.
      *
      * @throws Exception
      */
@@ -515,63 +336,49 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     }
 
     public void runTestGetArtifactData(LockssRepository.IncludeContent includeContent,
-                                       boolean isHttpResponse, Boolean isSmall) throws Exception {
+                                       boolean isHttpResponse, boolean isSmall) throws Exception {
 
-        // ******************************
-        // Reference artifact and headers
-        // ******************************
+        ArtifactSpec spec = new ArtifactSpec()
+            .setNamespace("ns")
+            .setArtifactUuid("artifact")
+            .setAuid("auid")
+            .setUrl("url")
+            .setStorageUrl(URI.create("storageUrl"))
+            .setVersion(1)
+            .setIsHttpResponse(isHttpResponse)
+            .generateContent();
 
-        // Setup reference artifact data headers
-        HttpHeaders referenceHeaders = new HttpHeaders();
-        referenceHeaders.add("key1", "value1");
-        referenceHeaders.add("key1", "value2");
-        referenceHeaders.add("key2", "value3");
-
-        String content = "\"Dog watched his human cry, concerned. Where was human's smile? Probably lost somewhere, " +
-            "dog thought. That was OK. Dog knew how to fetch.\"";
-
-        BasicStatusLine httpStatus = !isHttpResponse ?
-            null : new BasicStatusLine(new ProtocolVersion("HTTP", 1, 1), 200, "OK");
-
-        String js1 = "{\"artifactUuid\": \"artifact\", \"entryDate\": 1234, \"artifactState\": \"COPIED\"}";
-
-        // Setup reference artifact data
-        ArtifactData reference = new ArtifactData(
-            new ArtifactIdentifier("artifact", "namespace", "auid", "url", 1),
-            referenceHeaders,
-            new ByteArrayInputStream(content.getBytes()),
-            httpStatus,
-            new URI("storageUrl1"),
-            mapper.readValue(js1, ArtifactStateEntry.class).getArtifactState());
-
-        reference.setContentLength(content.length());
-        reference.setContentDigest("some made-up hash");
-
-        // Convenience variables
+        ArtifactData reference = spec.getArtifactData();
         ArtifactIdentifier refId = reference.getIdentifier();
-        ArtifactState refArtifactState = reference.getArtifactState();
-
-        // Artifact is small if its size is less than or equal to the threshold
-        long includeContentMaxSize = (isSmall == null || isSmall == true) ? content.length() : content.length() - 1;
-
-        // Multipart response parts
-        MultiValueMap<String, Object> parts = generateMultipartMapFromArtifactData(
-            reference, includeContent, includeContentMaxSize
-        );
 
         // ****************************
         // Setup mocked server response
         // ****************************
 
-        // Convert multipart response and its parts to a byte array
-        FormHttpMessageConverter converter = new FormHttpMessageConverter();
-        converter.setPartConverters(RestUtil.getRestTemplate().getMessageConverters());
+        ArtifactData ad = spec.getArtifactData(!isHttpResponse);
+        assertEquals(isHttpResponse, ad.isHttpResponse());
+
+        ResourceHttpMessageConverter converter = new ResourceHttpMessageConverter();
         MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
-        converter.write(parts, MediaType.MULTIPART_FORM_DATA, outputMessage);
+
+        boolean onlyHeaders = includeContent == LockssRepository.IncludeContent.NEVER ||
+            (includeContent == LockssRepository.IncludeContent.IF_SMALL && !isSmall);
+
+        InputStream httpResponseStream = onlyHeaders ?
+            new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :
+            ad.getResponseInputStream();
+
+        InputStreamResource resource = new InputStreamResource(httpResponseStream);
+        converter.write(resource, APPLICATION_HTTP_RESPONSE, outputMessage);
+
+        HttpHeaders outputHeaders = outputMessage.getHeaders();
+        outputHeaders.setContentType(APPLICATION_HTTP_RESPONSE);
+        outputHeaders.set(ArtifactConstants.ARTIFACT_DATA_TYPE, ad.isHttpResponse() ? "response" : "resource");
+        outputHeaders.set(ArtifactConstants.INCLUDES_CONTENT, String.valueOf(!onlyHeaders));
 
         // Build expected endpoint
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASEURL);
-        builder.path(String.format("/artifacts/%s", refId.getUuid()));
+        builder.path(String.format("/artifacts/%s/response", refId.getUuid()));
         builder.queryParam("namespace", refId.getNamespace());
         builder.queryParam("includeContent", includeContent);
 
@@ -581,14 +388,15 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             // FIXME: Why doesn't this work?
 //             .andExpect(queryParam("includeContent", String.valueOf(includeContent)))
             .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputMessage.getHeaders().getContentType()));
+            .andRespond(withSuccess(outputMessage.getBodyAsBytes(), outputHeaders.getContentType())
+                    .headers(outputHeaders));
 
         // ************************************
         // Verify result from getArtifactData()
         // ************************************
 
         // Fetch artifact data
-        ArtifactData result = repository.getArtifactData(refId.getNamespace(), refId.getUuid(), includeContent);
+        ArtifactData result = repoClient.getArtifactData(spec.getArtifact(), includeContent);
         assertNotNull(result);
 
         // Verify we made the expected REST API call
@@ -602,13 +410,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals(refId.getUri(), result.getIdentifier().getUri());
         assertEquals(refId.getVersion(), result.getIdentifier().getVersion());
 
-        // Verify artifact repository state
-        assertNotNull(result.getArtifactState());
-
-        // FIXME: ArtifactStateEntry now records ArtifactState
-        assertEquals(refArtifactState.isCommitted(), result.getArtifactState().isCommitted());
-        assertEquals(refArtifactState.isDeleted(), result.getArtifactState().isDeleted());
-
         // Verify misc. artifact properties
         assertEquals(reference.getContentLength(), result.getContentLength());
         assertEquals(reference.getContentDigest(), result.getContentDigest());
@@ -616,12 +417,13 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         // Verify artifact HTTP status is present if expected
         if (isHttpResponse) {
             // Verify artifact header equality (only HTTP response artifacts)
+            HttpHeaders referenceHeaders = reference.getHttpHeaders();
             assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
                 && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
 
             // Assert artifact HTTP response status matches
             assertArrayEquals(
-                ArtifactDataUtil.getHttpStatusByteArray(httpStatus),
+                ArtifactDataUtil.getHttpStatusByteArray(reference.getHttpStatus()),
                 ArtifactDataUtil.getHttpStatusByteArray(result.getHttpStatus())
             );
         } else {
@@ -637,8 +439,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             assertTrue(result.hasContentInputStream());
             InputStream inputStream = result.getInputStream();
             assertNotNull(inputStream);
-            assertInputStreamMatchesString(content, inputStream);
-
+            assertInputStreamMatchesString(spec.getContent(), inputStream);
         } else {
             // Assert artifact has no content
             assertFalse(result.hasContentInputStream());
@@ -651,12 +452,12 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     @Test
     public void testCommitArtifact_iae() throws Exception {
         try {
-            repository.commitArtifact(null, null);
+            repoClient.commitArtifact(null, null);
             fail("Should have thrown IllegalArgumentException");
         } catch (IllegalArgumentException iae) {}
 
         try {
-            repository.commitArtifact("ns1", null);
+            repoClient.commitArtifact("ns1", null);
             fail("Should have thrown IllegalArgumentException");
       } catch (IllegalArgumentException iae) {}
     }
@@ -672,7 +473,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.PUT))
                 .andRespond(withSuccess("{\"uuid\":\"1\",\"version\":2}", MediaType.APPLICATION_JSON).headers(mockHeaders));
 
-        Artifact result = repository.commitArtifact("ns1", "artifact1");
+        Artifact result = repoClient.commitArtifact("ns1", "artifact1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -689,7 +490,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withServerError());
 
         try {
-            repository.commitArtifact("ns1", "artifact1");
+            repoClient.commitArtifact("ns1", "artifact1");
             fail("Should have thrown IOException");
         } catch (IOException ioe) {}
     }
@@ -697,12 +498,12 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     @Test
     public void testDeleteArtifact_iae() throws Exception {
         try {
-            repository.deleteArtifact(null, null);
+            repoClient.deleteArtifact(null, null);
             fail("Should have thrown IllegalArgumentException");
         } catch (IllegalArgumentException iae) {}
 
         try {
-            repository.deleteArtifact("ns1", null);
+            repoClient.deleteArtifact("ns1", null);
             fail("Should have thrown IllegalArgumentException");
       } catch (IllegalArgumentException iae) {}
     }
@@ -715,7 +516,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.DELETE))
                 .andRespond(withSuccess());
 
-        repository.deleteArtifact("ns1", "artifact1");
+        repoClient.deleteArtifact("ns1", "artifact1");
         mockServer.verify();
     }
 
@@ -728,7 +529,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 	  .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         try {
-	    repository.deleteArtifact("ns1", "artifact1");
+	    repoClient.deleteArtifact("ns1", "artifact1");
             fail("Should have thrown LockssNoSuchArtifactIdException");
       } catch (LockssNoSuchArtifactIdException iae) {}
         mockServer.verify();
@@ -743,7 +544,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withServerError());
 
         try {
-            repository.deleteArtifact("ns1", "artifact1");
+            repoClient.deleteArtifact("ns1", "artifact1");
             fail("Should have thrown IOException");
         } catch (IOException ioe) {
 	  log.debug("Logging trace of IOException", ioe);
@@ -760,7 +561,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"auids\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Iterable<String> auIds = repository.getAuIds("ns1");
+        Iterable<String> auIds = repoClient.getAuIds("ns1");
         mockServer.verify();
 
         assertNotNull(auIds);
@@ -776,7 +577,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"auids\":[\"auid1\"], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Iterable<String> auIds = repository.getAuIds("ns1");
+        Iterable<String> auIds = repoClient.getAuIds("ns1");
         mockServer.verify();
 
         assertNotNull(auIds);
@@ -797,7 +598,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssRestHttpException.class,
 		      "500 Internal Server Error",
-		      () -> {repository.getAuIds("ns1");});
+		      () -> repoClient.getAuIds("ns1"));
         mockServer.verify();
     }
 
@@ -811,7 +612,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "400 Bad Request",
-		      () -> {repository.getArtifacts("ns1", "auid1");});
+		      () -> repoClient.getArtifacts("ns1", "auid1"));
         mockServer.verify();
     }
 
@@ -823,7 +624,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Iterable<Artifact> result = repository.getArtifacts("ns1", "auid1");
+        Iterable<Artifact> result = repoClient.getArtifacts("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -838,7 +639,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifacts("ns1", "auid1");
+        Iterable<Artifact> result = repoClient.getArtifacts("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -854,7 +655,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
                     MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifacts("ns1", "auid1");
+        Iterable<Artifact> result = repoClient.getArtifacts("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -875,7 +676,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> {repository.getArtifacts("ns1", "auid1");});
+		      () -> repoClient.getArtifacts("ns1", "auid1"));
         mockServer.verify();
     }
 
@@ -889,8 +690,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "400 Bad Request",
-		      () -> {repository.getArtifactsAllVersions("ns1",
-								"auid1");});
+		      () -> repoClient.getArtifactsAllVersions("ns1", "auid1"));
         mockServer.verify();
     }
 
@@ -902,7 +702,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1");
+        Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -917,7 +717,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1");
+        Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -933,7 +733,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
                     MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1");
+        Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -954,8 +754,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> {repository.getArtifactsAllVersions("ns1",
-								"auid1");});
+		      () -> repoClient.getArtifactsAllVersions("ns1", "auid1"));
         mockServer.verify();
     }
 
@@ -969,9 +768,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "400 Bad Request",
-		      () -> {repository.getArtifactsWithPrefix("ns1",
-							       "auid1",
-							       "url1");});
+		      () -> repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1"));
         mockServer.verify();
     }
 
@@ -983,7 +780,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Iterable<Artifact> result = repository.getArtifactsWithPrefix("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -998,7 +795,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsWithPrefix("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1014,7 +811,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
                     MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsWithPrefix("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1035,9 +832,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> {repository.getArtifactsWithPrefix("ns1",
-							       "auid1",
-							       "url1");});
+		      () -> repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1"));
         mockServer.verify();
     }
 
@@ -1051,7 +846,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 			  "400 Bad Request",
-		      () -> {repository.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");});
+		      () -> repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1"));
         mockServer.verify();
     }
 
@@ -1063,7 +858,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Iterable<Artifact> result = repository.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1078,7 +873,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1094,7 +889,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
                     MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1115,9 +910,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> {repository.getArtifactsWithPrefixAllVersions("ns1",
-									  "auid1",
-									  "url1");});
+		      () -> repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1"));
         mockServer.verify();
     }
 
@@ -1131,9 +924,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 			  "400 Bad Request",
-			  () -> {repository.getArtifactsAllVersions("ns1",
-								    "auid1",
-								    "url1");});
+			  () -> repoClient.getArtifactsAllVersions("ns1", "auid1", "url1"));
         mockServer.verify();
     }
 
@@ -1145,7 +936,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1160,7 +951,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1176,7 +967,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":2}], \"pageInfo\":{}}",
                     MediaType.APPLICATION_JSON));
 
-        Iterable<Artifact> result = repository.getArtifactsAllVersions("ns1", "auid1", "url1");
+        Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1", "url1");
         mockServer.verify();
 
         assertNotNull(result);
@@ -1197,9 +988,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 			  "500 Internal Server Error",
-			  () -> {repository.getArtifactsAllVersions("ns1",
-								    "auid1",
-								    "url1");});
+			  () -> repoClient.getArtifactsAllVersions("ns1", "auid1", "url1"));
         mockServer.verify();
     }
 
@@ -1244,7 +1033,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .andExpect(method(HttpMethod.GET))
             .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
-        Artifact result = repository.getArtifactVersion("ns1", "auid1", "url1", 123);
+        Artifact result = repoClient.getArtifactVersion("ns1", "auid1", "url1", 123);
         mockServer.verify();
 
         assertNull(result);
@@ -1258,7 +1047,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
-        Artifact result = repository.getArtifactVersion("ns1", "auid1", "url1", 123);
+        Artifact result = repoClient.getArtifactVersion("ns1", "auid1", "url1", 123);
         mockServer.verify();
 
         assertNull(result);
@@ -1272,7 +1061,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
-        Artifact result = repository.getArtifactVersion("ns1", "auid1", "url1", 123);
+        Artifact result = repoClient.getArtifactVersion("ns1", "auid1", "url1", 123);
         mockServer.verify();
 
         assertNull(result);
@@ -1287,7 +1076,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[{\"uuid\":\"1\",\"version\":123}], \"pageInfo\":{}}",
                     MediaType.APPLICATION_JSON));
 
-        Artifact result = repository.getArtifactVersion("ns1", "auid1", "url1", 123);
+        Artifact result = repoClient.getArtifactVersion("ns1", "auid1", "url1", 123);
         mockServer.verify();
 
         assertNotNull(result);
@@ -1303,7 +1092,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withServerError());
 
-        Artifact result = repository.getArtifactVersion("ns1", "auid1", "url1", 123);
+        Artifact result = repoClient.getArtifactVersion("ns1", "auid1", "url1", 123);
         mockServer.verify();
 
         assertNull(result);
@@ -1318,7 +1107,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
         assertThrows(LockssRestHttpException.class,
-            (Executable) () -> repository.auSize("ns1", "auid1"));
+                     () -> repoClient.auSize("ns1", "auid1"));
 
         mockServer.verify();
     }
@@ -1332,7 +1121,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThrows(LockssRestHttpException.class,
-            (Executable) () -> repository.auSize("ns1", "auid1"));
+                     () -> repoClient.auSize("ns1", "auid1"));
 
         mockServer.verify();
     }
@@ -1345,7 +1134,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .andExpect(method(HttpMethod.GET))
             .andRespond(withSuccess("{\"totalAllVersions\":\"0\",\"totalLatestVersions\":\"0\",\"totalWarcSize\":\"0\"}", MediaType.APPLICATION_JSON));
 
-        AuSize auSize = repository.auSize("ns1", "auid1");
+        AuSize auSize = repoClient.auSize("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(auSize);
@@ -1362,7 +1151,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             .andExpect(method(HttpMethod.GET))
             .andRespond(withSuccess("{\"totalAllVersions\":\"12345\",\"totalLatestVersions\":\"54321\",\"totalWarcSize\":\"67890\"}", MediaType.APPLICATION_JSON));
 
-        AuSize auSize = repository.auSize("ns1", "auid1");
+        AuSize auSize = repoClient.auSize("ns1", "auid1");
         mockServer.verify();
 
         assertNotNull(auSize);
@@ -1380,7 +1169,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withServerError());
 
         assertThrows(LockssRestHttpException.class,
-            (Executable) () -> repository.auSize("ns1", "auid1"));
+                     () -> repoClient.auSize("ns1", "auid1"));
 
         mockServer.verify();
     }

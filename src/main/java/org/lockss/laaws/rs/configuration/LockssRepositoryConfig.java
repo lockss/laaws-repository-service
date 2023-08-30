@@ -32,22 +32,19 @@ package org.lockss.laaws.rs.configuration;
 
 import org.lockss.app.LockssDaemon;
 import org.lockss.jms.JMSManager;
-import org.lockss.laaws.rs.core.BaseLockssRepository;
-import org.lockss.laaws.rs.core.LockssRepository;
-import org.lockss.laaws.rs.core.RestLockssRepository;
-import org.lockss.laaws.rs.io.index.ArtifactIndex;
-import org.lockss.laaws.rs.io.storage.ArtifactDataStore;
-import org.lockss.laaws.rs.util.JmsFactorySource;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
+import org.lockss.rs.io.index.ArtifactIndex;
+import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.util.Deadline;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.repo.util.JmsFactorySource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
-import java.util.List;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal repository.
@@ -75,11 +72,20 @@ public class LockssRepositoryConfig {
    * @throws IOException
    */
   @Bean
-  public LockssRepository createInitializedRepository() throws IOException {
-    // Create and initialize the LockssRepository instance
-    LockssRepository repo = createLockssRepository();
+  public BaseLockssRepository createInitializedRepository() throws IOException {
+    BaseLockssRepository repo = createLockssRepository();
 
-    repo.initRepository();
+    // Initialize the repository in a separate thread
+    new Thread(() -> {
+      try {
+        log.debug("Initializing LOCKSS repository from thread");
+        repo.initRepository();
+      } catch (IOException e) {
+        String errMsg = "Failed to initialize internal LOCKSS repository";
+        log.error(errMsg, e);
+        throw new IllegalStateException(errMsg);
+      }
+    }).start();
 
     // Start a new thread to handle JMS messages to this LockssRepository
     // XXX wrong method, below is public
@@ -94,7 +100,7 @@ public class LockssRepositoryConfig {
    * @return
    * @throws IOException
    */
-  public LockssRepository createLockssRepository() throws IOException {
+  public BaseLockssRepository createLockssRepository() throws IOException {
     log.debug("Starting internal LOCKSS repository [repoSpec: {}]", repoProps.getRepositorySpec());
 
     switch (repoProps.getRepositoryType()) {
@@ -109,47 +115,47 @@ public class LockssRepositoryConfig {
         // respectively.
         return new BaseLockssRepository(stateDir, index, store);
 
-      case "rest":
-        if (repoProps.getRepoSpecParts().length <= 1) {
-          log.error("No REST endpoint specified");
-          throw new IllegalArgumentException("No REST endpoint specified");
-        }
-
-        String repositoryRestUrl = repoProps.getRepoSpecParts()[1];
-
-        log.debug("repositoryRestUrl = {}", repositoryRestUrl);
-
-        // Get the REST client credentials.
-        List<String> restClientCredentials =
-            LockssDaemon.getLockssDaemon().getRestClientCredentials();
-
-        log.trace("restClientCredentials = {}", restClientCredentials);
-
-        String userName = null;
-        String password = null;
-
-        // Check whether there is a user name.
-        if (restClientCredentials != null && restClientCredentials.size() > 0) {
-          // Yes: Get the user name.
-          userName = restClientCredentials.get(0);
-
-          log.trace("userName = " + userName);
-
-          // Check whether there is a user password.
-          if (restClientCredentials.size() > 1) {
-            // Yes: Get the user password.
-            password = restClientCredentials.get(1);
-          }
-
-          // Check whether no configured user was found.
-          if (userName == null || password == null) {
-            String errMsg = "No user has been configured for authentication";
-            log.error(errMsg);
-            throw new IllegalArgumentException(errMsg);
-          }
-        }
-
-        return new RestLockssRepository(new URL(repositoryRestUrl), userName, password);
+//      case "rest":
+//        if (repoProps.getRepoSpecParts().length <= 1) {
+//          log.error("No REST endpoint specified");
+//          throw new IllegalArgumentException("No REST endpoint specified");
+//        }
+//
+//        String repositoryRestUrl = repoProps.getRepoSpecParts()[1];
+//
+//        log.debug("repositoryRestUrl = {}", repositoryRestUrl);
+//
+//        // Get the REST client credentials.
+//        List<String> restClientCredentials =
+//            LockssDaemon.getLockssDaemon().getRestClientCredentials();
+//
+//        log.trace("restClientCredentials = {}", restClientCredentials);
+//
+//        String userName = null;
+//        String password = null;
+//
+//        // Check whether there is a user name.
+//        if (restClientCredentials != null && restClientCredentials.size() > 0) {
+//          // Yes: Get the user name.
+//          userName = restClientCredentials.get(0);
+//
+//          log.trace("userName = " + userName);
+//
+//          // Check whether there is a user password.
+//          if (restClientCredentials.size() > 1) {
+//            // Yes: Get the user password.
+//            password = restClientCredentials.get(1);
+//          }
+//
+//          // Check whether no configured user was found.
+//          if (userName == null || password == null) {
+//            String errMsg = "No user has been configured for authentication";
+//            log.error(errMsg);
+//            throw new IllegalArgumentException(errMsg);
+//          }
+//        }
+//
+//        return new RestLockssRepository(new URL(repositoryRestUrl), userName, password);
 
       default:
         // Unknown repository specification
@@ -168,24 +174,42 @@ public class LockssRepositoryConfig {
   void initJmsFactory(LockssRepository repo) {
     if (repo instanceof JmsFactorySource) {
       JmsFactorySource jmsSource = (JmsFactorySource) repo;
-      LockssDaemon daemon = null;
-      while (daemon == null) {
-        try {
-          daemon = LockssDaemon.getLockssDaemon();
-        } catch (IllegalStateException e) {
-          log.warn("getLockssDaemon() timed out");
-        }
+      LockssDaemon daemon = getRunningLockssDaemon();
+
+      if (daemon == null) {
+        throw new IllegalStateException("LOCKSS daemon failed to start");
       }
+
       try {
-        while (!daemon.waitUntilAppRunning(Deadline.in(5 * 60 * 1000))) ;
         JMSManager mgr = daemon.getManagerByType(JMSManager.class);
         jmsSource.setJmsFactory(mgr.getJmsFactory());
         log.info("Stored JmsFactory in {}", jmsSource);
       } catch (IllegalArgumentException e) {
         log.warn("Couldn't get JmsManager", e);
-      } catch (InterruptedException e) {
-        // exit
       }
     }
+  }
+
+  LockssDaemon getRunningLockssDaemon() {
+    LockssDaemon daemon = null;
+
+    while (daemon == null) {
+      try {
+        daemon = LockssDaemon.getLockssDaemon();
+      } catch (IllegalStateException e) {
+        log.warn("getLockssDaemon() timed out");
+      }
+    }
+
+    try {
+      while (!daemon.waitUntilAppRunning(Deadline.in(5 * 60 * 1000))) {
+        log.warn("Still waiting for LOCKSS daemon to start");
+      }
+      return daemon;
+    } catch (InterruptedException e) {
+      // exit
+    }
+
+    return null;
   }
 }

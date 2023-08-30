@@ -24,6 +24,7 @@
 pom.xml
 README.md
 src/main/resources/application.properties
+src/generated/java/org/lockss/laaws/rs/RFC3339DateFormat.java
 src/generated/java/org/lockss/laaws/*/Swagger2SpringBoot.java
 src/generated/java/org/lockss/laaws/*/api/ApiException.java
 src/generated/java/org/lockss/laaws/*/api/NotFoundException.java
@@ -32,6 +33,8 @@ src/generated/java/org/lockss/laaws/*/model/Artifact.java
 src/generated/java/org/lockss/laaws/*/model/ArtifactProperties.java
 src/generated/java/org/lockss/laaws/*/model/ArtifactPageInfo.java
 src/generated/java/org/lockss/laaws/*/model/AuidPageInfo.java
+src/generated/java/org/lockss/laaws/*/model/AuSize.java
+src/generated/java/org/lockss/laaws/*/model/ImportStatus.java
 src/generated/java/org/lockss/laaws/*/model/PageInfo.java
 src/generated/java/org/lockss/laaws/*/model/RepositoryInfo.java
 src/generated/java/org/lockss/laaws/*/model/StorageInfo.java
