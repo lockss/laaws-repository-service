@@ -45,7 +45,7 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
-import static org.lockss.app.ManagerDescs.ACCOUNT_MANAGER_DESC;
+import static org.lockss.app.ManagerDescs.*;
 
 /**
  * The Spring-Boot application.
@@ -59,6 +59,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private static final ManagerDesc[] myManagerDescs = {
+      STATE_MANAGER_DESC,
       ACCOUNT_MANAGER_DESC,
       new ManagerDesc(managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName())
   };
