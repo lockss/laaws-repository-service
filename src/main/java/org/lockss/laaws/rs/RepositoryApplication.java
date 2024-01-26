@@ -40,7 +40,6 @@ import org.lockss.spring.base.BaseSpringBootApplication;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.solr.SolrAutoConfiguration;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
@@ -50,7 +49,7 @@ import static org.lockss.app.ManagerDescs.*;
 /**
  * The Spring-Boot application.
  */
-@SpringBootApplication(exclude = {SolrAutoConfiguration.class})
+@SpringBootApplication()
 @EnableSwagger2
 public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
