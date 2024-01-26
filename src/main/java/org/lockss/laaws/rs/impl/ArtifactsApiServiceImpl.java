@@ -47,7 +47,7 @@ import org.springframework.web.multipart.commons.CommonsMultipartFile;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -950,7 +950,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   // JMS /////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
 
-  @javax.annotation.PostConstruct
+  @jakarta.annotation.PostConstruct
   private void init() {
     setUpJms(JMS_BOTH,
         RestLockssRepository.REST_ARTIFACT_CACHE_ID,
