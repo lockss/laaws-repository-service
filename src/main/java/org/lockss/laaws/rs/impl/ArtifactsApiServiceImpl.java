@@ -1,6 +1,7 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.io.IOUtils;
@@ -8,7 +9,6 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
-import org.lockss.laaws.rs.multipart.DigestFileItem;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactData;
@@ -18,6 +18,7 @@ import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.StringUtil;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
+import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.jms.JmsUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.multipart.MultipartResponse;
@@ -42,16 +43,17 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.multipart.commons.CommonsMultipartFile;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.DigestOutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -234,7 +236,15 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       validateUri(artifactId.getUri(), parsedRequest);
 
       // Construct ArtifactData from payload part
-      ArtifactData ad = WarcArtifactData.fromResource(payload.getInputStream());
+      DeferredTempFileOutputStream dtfos = new DeferredTempFileOutputStream(1024*1024);
+      String DEFAULT_DIGEST_ALGORITHM = "SHA-256";
+      DigestOutputStream dos =
+          new DigestOutputStream(dtfos, MessageDigest.getInstance(DEFAULT_DIGEST_ALGORITHM));
+      IOUtils.copy(payload.getInputStream(), dos);
+      dos.close();
+      dtfos.close();
+
+      ArtifactData ad = WarcArtifactData.fromResource(dtfos.getDeleteOnCloseInputStream());
 
       // Set artifact identifier
       ad.setIdentifier(artifactId);
@@ -242,13 +252,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       ad.setContentLength(payload.getSize());
 
       // Set artifact data digest
-      DigestFileItem item =
-          (DigestFileItem)((CommonsMultipartFile)payload).getFileItem();
-
-      String contentDigest = String.format("%s:%s",
-          item.getDigest().getAlgorithm(),
-          new String(Hex.encodeHex(item.getDigest().digest())));
-
+      MessageDigest md = dos.getMessageDigest();
+      String contentDigest = String.format("%s:%s", DEFAULT_DIGEST_ALGORITHM, new String(Hex.encodeHex(md.digest())));
       ad.setContentDigest(contentDigest);
 
       // Set artifact collection date if provided
@@ -271,8 +276,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         }
       } else {
         // Set artifact's Content-Type to the Content-Type of the part
-        ad.getHttpHeaders().set(HttpHeaders.CONTENT_TYPE,
-            ((CommonsMultipartFile) payload).getFileItem().getContentType());
+        ad.getHttpHeaders()
+            .set(HttpHeaders.CONTENT_TYPE, payload.getContentType());
       }
 
       //// Add artifact to internal repository
@@ -304,6 +309,9 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
       // parsing HTTP request. Return a 400 Bad Request response.
       throw new HttpMessageNotReadableException("Could not read artifact data from content part", e);
+    } catch (NoSuchAlgorithmException e) {
+      // This should not happen with a hardcoded default
+      throw new HttpMessageNotReadableException("Unknown digest algoritm", e);
     }
   }
 
