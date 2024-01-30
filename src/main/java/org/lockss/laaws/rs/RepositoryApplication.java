@@ -40,7 +40,6 @@ import org.lockss.spring.base.BaseSpringBootApplication;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
@@ -50,7 +49,6 @@ import static org.lockss.app.ManagerDescs.*;
  * The Spring-Boot application.
  */
 @SpringBootApplication()
-@EnableSwagger2
 public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
   private static L4JLogger log = L4JLogger.getLogger();
