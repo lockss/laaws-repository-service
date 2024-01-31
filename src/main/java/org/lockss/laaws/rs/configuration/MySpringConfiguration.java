@@ -1,11 +1,13 @@
 package org.lockss.laaws.rs.configuration;
 
+import org.lockss.laaws.rs.multipart.LockssMultipartResolver;
 import org.lockss.util.time.TimeBase;
 import org.springframework.boot.web.error.ErrorAttributeOptions;
 import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MultipartResolver;
 
 import java.util.Map;
 
@@ -22,5 +24,10 @@ public class MySpringConfiguration {
         return attributes;
       }
     };
+  }
+
+  @Bean
+  public MultipartResolver filterMultipartResolver() {
+    return new LockssMultipartResolver();
   }
 }
