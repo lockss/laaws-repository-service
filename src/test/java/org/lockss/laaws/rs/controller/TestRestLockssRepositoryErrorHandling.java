@@ -1,6 +1,7 @@
 package org.lockss.laaws.rs.controller;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
@@ -8,6 +9,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.junit.After;
 import org.junit.Before;
@@ -374,8 +376,15 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
             String.format("http://localhost:%d/artifacts/artifactId?committed=false&namespace=namespace1", port));
 
     // Create a PUT request
-    HttpUriRequest request = new HttpPut(testEndpoint.toURI());
-    request.addHeader("Content-Type", "multipart/form-data");
+    HttpPut request = new HttpPut(testEndpoint.toURI());
+
+    HttpEntity entity = MultipartEntityBuilder.create()
+        .build();
+
+    request.addHeader(entity.getContentType());
+    request.addHeader(entity.getContentEncoding());
+
+    request.setEntity(entity);
 
     // Process request and assert response
     assertLockssRestHttpException(
