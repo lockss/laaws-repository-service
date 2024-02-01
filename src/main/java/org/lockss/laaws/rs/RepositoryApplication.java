@@ -41,7 +41,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.solr.SolrAutoConfiguration;
-import springfox.documentation.swagger2.annotations.EnableSwagger2;
+import org.springframework.context.annotation.ComponentScan;
 
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
@@ -51,7 +51,7 @@ import static org.lockss.app.ManagerDescs.*;
  * The Spring-Boot application.
  */
 @SpringBootApplication(exclude = {SolrAutoConfiguration.class})
-@EnableSwagger2
+@ComponentScan(basePackages = { "org.lockss.laaws.rs", "org.lockss.laaws.rs.api" , "org.lockss.laaws.rs.config"})
 public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
   private static L4JLogger log = L4JLogger.getLogger();
