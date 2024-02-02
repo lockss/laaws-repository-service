@@ -15,7 +15,7 @@
 # may be used to endorse or promote products derived from this software without
 # specific prior written permission.
 #
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
 # ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
@@ -54,7 +54,7 @@ paths:
       summary: Get namespaces of the committed artifacts in the repository
       operationId: getNamespaces
       responses:
-        200:
+        '200':
           description: Status 200
           content:
             application/json:
@@ -101,6 +101,7 @@ paths:
               required:
                 - archive
                 - auid
+              type: object
               properties:
                 auid:
                   type: string
@@ -111,7 +112,7 @@ paths:
                   format: binary
         required: true
       responses:
-        200:
+        '200':
           description: Status of artifacts imported from the archive, maybe partially.
             Return body is a sequence of JSON ImportStatus objects.
           content:
@@ -169,7 +170,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The requested artifacts
           content:
             application/json:
@@ -193,6 +194,7 @@ paths:
               required:
                 - artifactProps
                 - payload
+              type: object
               properties:
                 artifactProps:
                   type: string
@@ -206,13 +208,13 @@ paths:
                   description: HTTP response status and headers (optional)
         required: true
       responses:
-        201:
+        '201':
           description: Artifact created
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/artifact'
-        302:
+        '302':
           description: Duplicate content; artifact not created
           headers:
             Location:
@@ -257,10 +259,10 @@ paths:
               - IF_SMALL
               - ALWAYS
       responses:
-        200:
-          description: 'Multipart/form-data containing the following parts: The artifact
-            properties, HTTP status and headers if present, and the artifact''s payload
-            if requested. See POST /artifacts for more information.'
+        '200':
+          description: "Multipart/form-data containing the following parts:
+           The artifact properties, HTTP status and headers if present, and the artifact's payload if requested. 
+           See POST /artifacts for more information."
           content:
             multipart/form-data:
               schema:
@@ -300,13 +302,14 @@ paths:
             schema:
               required:
                 - committed
+              type: object
               properties:
                 committed:
                   type: boolean
                   description: New commit status of artifact
         required: true
       responses:
-        200:
+        '200':
           description: Artifact updated
           content:
             application/json:
@@ -337,7 +340,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Successfully removed artifact
           content: {}
         default:
@@ -377,7 +380,7 @@ paths:
               - IF_SMALL
               - ALWAYS
       responses:
-        200:
+        '200':
           description: Artifact's payload
           content:
             application/octet-stream:
@@ -421,7 +424,7 @@ paths:
               - IF_SMALL
               - ALWAYS
       responses:
-        200:
+        '200':
           description: Artifact's payload
           content:
             application/http;msgtype=response:
@@ -462,7 +465,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The requested Archival Unit identifiers
           content:
             application/json:
@@ -499,6 +502,7 @@ paths:
             schema:
               required:
                 - op
+              type: object
               properties:
                 op:
                   type: string
@@ -508,7 +512,7 @@ paths:
                     - finish
         required: true
       responses:
-        200:
+        '200':
           description: Bulk operation succeeded
           content: {}
         default:
@@ -569,7 +573,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The requested artifacts
           content:
             application/json:
@@ -623,7 +627,7 @@ paths:
       description: Get the status of the service
       operationId: getStatus
       responses:
-        200:
+        '200':
           description: The status of the service
           content:
             application/json:
@@ -652,8 +656,7 @@ paths:
             default: lockss
         - name: q
           in: query
-          description: Query string. Supported fields are url, type\ \ (urlquery/prefixquery),
-            offset and limit.
+          description: 'Query string. Supported fields are url, type (urlqueryprefixquery), offset and limit.'
           schema:
             type: string
         - name: count
@@ -677,7 +680,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The OpenWayback CDX records of the URL in the namespace
           content:
             application/xml:
@@ -761,7 +764,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The PyWayback CDX records of the URL in the namespace
           content:
             text/plain:
@@ -803,7 +806,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: The contents of the requested WARC archive
           content:
             application/warc:
@@ -824,7 +827,7 @@ paths:
       description: Get a list of the names of the supported checksum algorithms
       operationId: getSupportedChecksumAlgorithms
       responses:
-        200:
+        '200':
           description: The names of the supported checksum algorithms
           content:
             application/json:
@@ -846,7 +849,7 @@ paths:
       description: Get properties of the repository
       operationId: getRepositoryInformation
       responses:
-        200:
+        '200':
           description: The repository information
           content:
             application/json:
@@ -866,7 +869,7 @@ paths:
       description: Get properties of the repository storage
       operationId: getStorageInfo
       responses:
-        200:
+        '200':
           description: The repository storage information
           content:
             application/json:
@@ -971,6 +974,12 @@ components:
         state:
           type: string
     artifact:
+      type: object
+      properties:
+        committed:
+          type: boolean
+        storageUrl:
+          type: string
       allOf:
         - $ref: '#/components/schemas/artifactProperties'
     streamingResponseBody:
@@ -1093,7 +1102,7 @@ components:
           format: int64
         used:
           type: integer
-          description: Used size in bytes of the torage area
+          description: Used size in bytes of the storage area
           format: int64
         avail:
           type: integer
