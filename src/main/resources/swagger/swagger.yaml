@@ -206,7 +206,6 @@ paths:
                 httpResponseHeader:
                   type: string
                   description: HTTP response status and headers (optional)
-        required: true
       responses:
         '201':
           description: Artifact created
