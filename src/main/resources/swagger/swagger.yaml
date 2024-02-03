@@ -290,24 +290,18 @@ paths:
           schema:
             type: string
             default: lockss
+        - name: committed
+          in: query
+          description: Committed status of the artifact
+          schema:
+            type: boolean
+          required: true
         - name: uuid
           in: path
           description: Identifier of the artifact
           required: true
           schema:
             type: string
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              required:
-                - committed
-              type: object
-              properties:
-                committed:
-                  type: boolean
-                  description: New commit status of artifact
-        required: true
       responses:
         '200':
           description: Artifact updated
