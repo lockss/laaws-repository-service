@@ -79,3 +79,5 @@ fixImport $REPOINFO_API org.lockss.laaws.rs.model.StorageInfo org.lockss.util.st
 REPOINFO_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApiDelegate.java
 fixImport $REPOINFO_API_DELEGATE org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
 fixImport $REPOINFO_API_DELEGATE org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
+
+rm src/generated/java/org/lockss/laaws/rs/config/SwaggerDocumentationConfig.java
