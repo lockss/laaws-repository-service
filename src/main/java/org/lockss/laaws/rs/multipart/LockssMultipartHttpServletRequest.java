@@ -47,25 +47,22 @@ POSSIBILITY OF SUCH DAMAGE.
  */
 
 package org.lockss.laaws.rs.multipart;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Serializable;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
 
+import jakarta.servlet.MultipartConfigElement;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Part;
-
+import org.apache.catalina.core.ApplicationPart;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.tomcat.util.buf.MessageBytes;
+import org.apache.tomcat.util.http.Parameters;
+import org.apache.tomcat.util.http.fileupload.FileItem;
+import org.apache.tomcat.util.http.fileupload.FileUpload;
+import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
+import org.apache.tomcat.util.http.fileupload.impl.InvalidContentTypeException;
+import org.apache.tomcat.util.http.fileupload.impl.SizeException;
+import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
+import org.lockss.util.FileUtil;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -79,6 +76,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.support.AbstractMultipartHttpServletRequest;
 import org.springframework.web.multipart.support.StandardMultipartHttpServletRequest;
 import org.springframework.web.multipart.support.StandardServletMultipartResolver;
+
+import java.io.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 
 /**
  * This class is a copy of Spring's {@link StandardMultipartHttpServletRequest}, modified to return
@@ -95,10 +99,12 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   @Nullable
   private Set<String> multipartParameterNames;
 
+  private HttpServletRequest request;
 
   /**
    * Create a new LockssMultipartHttpServletRequest wrapper for the given request,
    * immediately parsing the multipart content.
+   *
    * @param request the servlet request to wrap
    * @throws MultipartException if parsing failed
    */
@@ -108,9 +114,10 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
 
   /**
    * Create a new LockssMultipartHttpServletRequest wrapper for the given request.
-   * @param request the servlet request to wrap
+   *
+   * @param request     the servlet request to wrap
    * @param lazyParsing whether multipart parsing should be triggered lazily on
-   * first access of multipart files or parameters
+   *                    first access of multipart files or parameters
    * @throws MultipartException if an immediate parsing attempt failed
    * @since 3.2.9
    */
@@ -118,15 +125,169 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
       throws MultipartException {
 
     super(request);
+    this.request = request;
     if (!lazyParsing) {
       parseRequest(request);
     }
   }
 
+  @Override
+  public String[] getParameterValues(String name) {
+    return parameters.getParameterValues(name);
+  }
+
+  Collection<Part> parts = null;
+  Parameters parameters;
+
+  @Override
+  public Collection<Part> getParts() throws IOException, ServletException {
+
+    File defaultLocation = FileUtil.createTempDir("multipart", null);
+
+    MultipartConfigElement mce =
+        new MultipartConfigElement(defaultLocation.getAbsolutePath());
+
+    int maxParameterCount = 10;
+    int maxPostSize = 1024*1024*1024;
+
+    if (this.parts == null) {
+      parameters = new Parameters();
+      MessageBytes queryMB = MessageBytes.newInstance();
+      queryMB.setString(request.getQueryString());
+      parameters.setQuery(queryMB);
+      parameters.handleQueryParameters();
+
+      parts = parseParts(parameters, mce, defaultLocation,
+          true,
+          maxParameterCount,
+          maxPostSize,
+          StandardCharsets.UTF_8);
+    }
+
+    return parts;
+  }
+
+  private Collection<Part> parseParts(
+      Parameters parameters,
+      MultipartConfigElement mce,
+      File defaultLocation,
+      boolean createUploadTargets,
+      int maxParameterCount,
+      int maxPostSize,
+      Charset charset
+  ) throws IOException, ServletException {
+    parameters.setLimit(maxParameterCount);
+
+    Collection<Part>parts = new ArrayList<>();
+    boolean success = false;
+    try {
+      File location;
+      String locationStr = mce.getLocation();
+      if (locationStr == null || locationStr.length() == 0) {
+        location = defaultLocation;
+      } else {
+        // If relative, it is relative to TEMPDIR
+        location = new File(locationStr);
+        if (!location.isAbsolute()) {
+          location = new File(defaultLocation, locationStr).getAbsoluteFile();
+        }
+      }
+
+      if (!location.exists() && createUploadTargets) {
+//        log.warn(sm.getString("coyoteRequest.uploadCreate", location.getAbsolutePath(),
+//            getMappingData().wrapper.getName()));
+        if (!location.mkdirs()) {
+//          log.warn(sm.getString("coyoteRequest.uploadCreateFail", location.getAbsolutePath()));
+        }
+      }
+
+      if (!location.isDirectory()) {
+        parameters.setParseFailedReason(Parameters.FailReason.MULTIPART_CONFIG_INVALID);
+        throw new IOException("Upload location invalid: " + location);
+      }
+
+      // Create a new file upload handler
+      DiskFileItemFactory factory = new DiskFileItemFactory();
+      try {
+        factory.setRepository(location.getCanonicalFile());
+      } catch (IOException ioe) {
+        parameters.setParseFailedReason(Parameters.FailReason.IO_ERROR);
+        throw ioe;
+      }
+      factory.setSizeThreshold(mce.getFileSizeThreshold());
+
+      FileUpload upload = new FileUpload();
+      upload.setFileItemFactory(factory);
+      upload.setFileSizeMax(mce.getMaxFileSize());
+      upload.setSizeMax(mce.getMaxRequestSize());
+      if (maxParameterCount > -1) {
+        // There is a limit. The limit for parts needs to be reduced by
+        // the number of parameters we have already parsed.
+        // Must be under the limit else parsing parameters would have
+        // triggered an exception.
+        upload.setFileCountMax(maxParameterCount - parameters.size());
+      }
+
+      try {
+        List<FileItem> items = upload.parseRequest(new ServletRequestContext(request));
+        int postSize = 0;
+        for (FileItem item : items) {
+          ApplicationPart part = new ApplicationPart(item, location);
+          parts.add(part);
+          if (part.getSubmittedFileName() == null) {
+            String name = part.getName();
+            if (maxPostSize >= 0) {
+              // Have to calculate equivalent size. Not completely
+              // accurate but close enough.
+              postSize += name.getBytes(charset).length;
+              // Equals sign
+              postSize++;
+              // Value length
+              postSize += part.getSize();
+              // Value separator
+              postSize++;
+              if (postSize > maxPostSize) {
+                parameters.setParseFailedReason(Parameters.FailReason.POST_TOO_LARGE);
+                throw new IllegalStateException("maxPostSized exceeded");
+              }
+            }
+            String value = null;
+            try {
+              value = part.getString(charset.name());
+            } catch (UnsupportedEncodingException uee) {
+              // Not possible
+            }
+            parameters.addParameter(name, value);
+          }
+        }
+
+        success = true;
+      } catch (InvalidContentTypeException e) {
+        parameters.setParseFailedReason(Parameters.FailReason.INVALID_CONTENT_TYPE);
+        throw new ServletException(e);
+      } catch (SizeException e) {
+        parameters.setParseFailedReason(Parameters.FailReason.POST_TOO_LARGE);
+//      checkSwallowInput();
+        throw new IllegalStateException(e);
+      } catch (IOException e) {
+        parameters.setParseFailedReason(Parameters.FailReason.IO_ERROR);
+        throw e;
+      } catch (IllegalStateException e) {
+        // addParameters() will set parseFailedReason
+//      checkSwallowInput();
+      }
+    } finally {
+      // This might look odd but is correct. setParseFailedReason() only
+      // sets the failure reason if none is currently set. This code could
+      // be more efficient but it is written this way to be robust with
+      // respect to changes in the remainder of the method.
+    }
+    return parts;
+  }
 
   private void parseRequest(HttpServletRequest request) {
     try {
-      Collection<Part> parts = request.getParts();
+      Collection<Part> parts = getParts();
       this.multipartParameterNames = new LinkedHashSet<>(parts.size());
       MultiValueMap<String, MultipartFile> files = new LinkedMultiValueMap<>(parts.size());
       for (Part part : parts) {
@@ -135,14 +296,12 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
         String filename = disposition.getFilename();
         if (filename != null) {
           files.add(part.getName(), new LockssMultipartFile(part, filename));
-        }
-        else {
+        } else {
           this.multipartParameterNames.add(part.getName());
         }
       }
       setMultipartFiles(files);
-    }
-    catch (Throwable ex) {
+    } catch (Throwable ex) {
       handleParseFailure(ex);
     }
   }
@@ -216,8 +375,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
     try {
       Part part = getPart(paramOrFileName);
       return (part != null ? part.getContentType() : null);
-    }
-    catch (Throwable ex) {
+    } catch (Throwable ex) {
       throw new MultipartException("Could not access multipart servlet request", ex);
     }
   }
@@ -232,12 +390,10 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
           headers.put(headerName, new ArrayList<>(part.getHeaders(headerName)));
         }
         return headers;
-      }
-      else {
+      } else {
         return null;
       }
-    }
-    catch (Throwable ex) {
+    } catch (Throwable ex) {
       throw new MultipartException("Could not access multipart servlet request", ex);
     }
   }
