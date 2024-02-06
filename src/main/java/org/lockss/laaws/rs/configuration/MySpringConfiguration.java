@@ -27,7 +27,7 @@ public class MySpringConfiguration {
   }
 
   @Bean
-  public MultipartResolver filterMultipartResolver() {
+  public MultipartResolver multipartResolver() {
     return new LockssMultipartResolver();
   }
 }
