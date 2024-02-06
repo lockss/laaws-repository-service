@@ -842,7 +842,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity updateArtifact(String artifactid, Boolean committed, String namespace) {
+  public ResponseEntity updateArtifact(Boolean committed, String artifactid, String namespace) {
     String parsedRequest = String.format(
         "namespace: %s, artifactid: %s, committed: %s, requestUrl: %s",
         namespace, artifactid, committed, ServiceImplUtil.getFullRequestUrl(request));
