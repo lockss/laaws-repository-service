@@ -973,8 +973,25 @@ components:
           type: boolean
         storageUrl:
           type: string
-      allOf:
-        - $ref: '#/components/schemas/artifactProperties'
+        namespace:
+          type: string
+          default: lockss
+        uuid:
+          type: string
+        auid:
+          type: string
+        uri:
+          type: string
+        version:
+          type: integer
+        contentLength:
+          type: integer
+          format: int64
+        contentDigest:
+          type: string
+        collectionDate:
+          type: integer
+          format: int64
     streamingResponseBody:
       type: object
     apiStatus:
