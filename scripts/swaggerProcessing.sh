@@ -36,6 +36,10 @@ sed -i.backup "s/import $2/import $3/" $JAVA_SRC && rm $JAVA_SRC.backup
 STATUS_API=src/generated/java/org/lockss/laaws/rs/api/StatusApi.java
 fixImport $STATUS_API org.lockss.laaws.rs.model.ApiStatus org.lockss.util.rest.status.ApiStatus
 
+# Edit StatusApiController.java.
+STATUS_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/StatusApiController.java
+fixImport $STATUS_API_CONTROLLER org.lockss.laaws.rs.model.ApiStatus org.lockss.util.rest.status.ApiStatus
+
 # Edit StatusApiDelegate.java.
 STATUS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/StatusApiDelegate.java
 fixImport $STATUS_API_DELEGATE org.lockss.laaws.rs.model.ApiStatus org.lockss.util.rest.status.ApiStatus
@@ -53,6 +57,11 @@ ARTIFACTS_API=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApi.java
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 
+# Edit ArtifactsApiController.java.
+ARTIFACTS_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApiController.java
+fixImport $ARTIFACTS_API_CONTROLLER org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
+fixImport $ARTIFACTS_API_CONTROLLER org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
+
 # Edit ArtifactsApiDelegate.java.
 ARTIFACTS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApiDelegate.java
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
@@ -64,6 +73,12 @@ fixImport $AUS_API org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.re
 fixImport $AUS_API org.lockss.laaws.rs.model.AuidPageInfo org.lockss.util.rest.repo.model.AuidPageInfo
 fixImport $AUS_API org.lockss.laaws.rs.model.AuSize org.lockss.util.rest.repo.model.AuSize
 
+# Edit AusApiController.java.
+AUS_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/AusApiController.java
+fixImport $AUS_API_CONTROLLER org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
+fixImport $AUS_API_CONTROLLER org.lockss.laaws.rs.model.AuidPageInfo org.lockss.util.rest.repo.model.AuidPageInfo
+fixImport $AUS_API_CONTROLLER org.lockss.laaws.rs.model.AuSize org.lockss.util.rest.repo.model.AuSize
+
 # Edit AusApiDelegate.java.
 AUS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/AusApiDelegate.java
 fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
@@ -74,6 +89,11 @@ fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.AuSize org.lockss.util.res
 REPOINFO_API=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApi.java
 fixImport $REPOINFO_API org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
 fixImport $REPOINFO_API org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
+
+# Edit RepoinfoApi.java.
+REPOINFO_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApiController.java
+fixImport $REPOINFO_API_CONTROLLER org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
+fixImport $REPOINFO_API_CONTROLLER org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
 
 # Edit RepoinfoApiDelegate.java.
 REPOINFO_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApiDelegate.java
