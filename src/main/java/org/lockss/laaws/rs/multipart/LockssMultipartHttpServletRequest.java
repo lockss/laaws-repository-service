@@ -398,6 +398,15 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
     }
   }
 
+  @Override
+  public Part getPart(String name) throws IOException, IllegalStateException, ServletException {
+    for (Part part : getParts()) {
+      if (name.equals(part.getName())) {
+        return part;
+      }
+    }
+    return null;
+  }
 
   /**
    * Spring MultipartFile adapter, wrapping a Servlet Part object.
