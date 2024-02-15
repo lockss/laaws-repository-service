@@ -9,6 +9,7 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
+import org.lockss.laaws.rs.multipart.LockssMultipartHttpServletRequest;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactData;
@@ -18,7 +19,6 @@ import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.StringUtil;
 import org.lockss.util.TimerQueue;
 import org.lockss.util.UrlUtil;
-import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.jms.JmsUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.multipart.MultipartResponse;
@@ -51,9 +51,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.DigestOutputStream;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -236,15 +234,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       validateUri(artifactId.getUri(), parsedRequest);
 
       // Construct ArtifactData from payload part
-      DeferredTempFileOutputStream dtfos = new DeferredTempFileOutputStream(1024*1024);
-      String DEFAULT_DIGEST_ALGORITHM = "SHA-256";
-      DigestOutputStream dos =
-          new DigestOutputStream(dtfos, MessageDigest.getInstance(DEFAULT_DIGEST_ALGORITHM));
-      IOUtils.copy(payload.getInputStream(), dos);
-      dos.close();
-      dtfos.close();
-
-      ArtifactData ad = WarcArtifactData.fromResource(dtfos.getDeleteOnCloseInputStream());
+      ArtifactData ad = WarcArtifactData.fromResource(payload.getInputStream());
 
       // Set artifact identifier
       ad.setIdentifier(artifactId);
@@ -252,8 +242,12 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       ad.setContentLength(payload.getSize());
 
       // Set artifact data digest
-      MessageDigest md = dos.getMessageDigest();
-      String contentDigest = String.format("%s:%s", DEFAULT_DIGEST_ALGORITHM, new String(Hex.encodeHex(md.digest())));
+      MessageDigest md =
+          ((LockssMultipartHttpServletRequest.LockssMultipartFile)payload).getDigest();
+
+      String contentDigest = String.format("%s:%s",
+          md.getAlgorithm(), new String(Hex.encodeHex(md.digest())));
+
       ad.setContentDigest(contentDigest);
 
       // Set artifact collection date if provided
@@ -309,9 +303,6 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
       // parsing HTTP request. Return a 400 Bad Request response.
       throw new HttpMessageNotReadableException("Could not read artifact data from content part", e);
-    } catch (NoSuchAlgorithmException e) {
-      // This should not happen with a hardcoded default
-      throw new HttpMessageNotReadableException("Unknown digest algoritm", e);
     }
   }
 

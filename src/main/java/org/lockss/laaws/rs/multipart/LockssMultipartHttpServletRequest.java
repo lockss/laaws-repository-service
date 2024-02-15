@@ -58,7 +58,6 @@ import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.http.Parameters;
 import org.apache.tomcat.util.http.fileupload.FileItem;
 import org.apache.tomcat.util.http.fileupload.FileUpload;
-import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
 import org.apache.tomcat.util.http.fileupload.impl.InvalidContentTypeException;
 import org.apache.tomcat.util.http.fileupload.impl.SizeException;
 import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
@@ -66,6 +65,7 @@ import org.lockss.util.FileUtil;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.lang.Nullable;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.LinkedMultiValueMap;
@@ -82,17 +82,28 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.*;
 
 /**
  * This class is a copy of Spring's {@link StandardMultipartHttpServletRequest}, modified to return
  * {@link LockssMultipartFile} parts. This was necessary because the {@link MultipartFile} API does
- * not expose the part headers but we need {@link MultipartFile#getContentType()} calls to return
+ * not expose the part headers, but we need {@link MultipartFile#getContentType()} calls to return
  * the {@code X-Lockss-Content-Type} header if present, otherwise fallback to {@code Content-Type}.
+ * This allows malformed {@code Content-Type} to be transmitted without parsing into a Spring
+ * {@link MediaType}.
+ * <p>
+ * This class is also necessary to hook into the creation of {@link FileItem} so that we can compute
+ * the {@link MessageDigest} of a part as it is being written to temporary storage. The digest can
+ * then be accessed by controllers (configured with the {@link LockssMultipartResolver}) by calling
+ * {@link LockssMultipartFile#getDigest()}. This avoids controller code from having to write to a
+ * temporary file a second time, only to compute the digest.
  *
  * @see StandardMultipartHttpServletRequest
  * @see StandardServletMultipartResolver
  * @see LockssMultipartResolver
+ * @see DigestFileItemFactory
+ * @see DigestFileItem
  */
 public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServletRequest {
 
@@ -148,7 +159,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
         new MultipartConfigElement(defaultLocation.getAbsolutePath());
 
     int maxParameterCount = 10;
-    int maxPostSize = 1024*1024*1024;
+    int maxPostSize = 1024 * 1024 * 1024;
 
     if (this.parts == null) {
       parameters = new Parameters();
@@ -178,7 +189,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   ) throws IOException, ServletException {
     parameters.setLimit(maxParameterCount);
 
-    Collection<Part>parts = new ArrayList<>();
+    Collection<Part> parts = new ArrayList<>();
     boolean success = false;
     try {
       File location;
@@ -207,7 +218,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
       }
 
       // Create a new file upload handler
-      DiskFileItemFactory factory = new DiskFileItemFactory();
+      DigestFileItemFactory factory = new DigestFileItemFactory();
       try {
         factory.setRepository(location.getCanonicalFile());
       } catch (IOException ioe) {
@@ -232,7 +243,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
         List<FileItem> items = upload.parseRequest(new ServletRequestContext(request));
         int postSize = 0;
         for (FileItem item : items) {
-          ApplicationPart part = new ApplicationPart(item, location);
+          ApplicationPart part = new LockssApplicationPart(item, location);
           parts.add(part);
           if (part.getSubmittedFileName() == null) {
             String name = part.getName();
@@ -295,7 +306,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
         ContentDisposition disposition = ContentDisposition.parse(headerValue);
         String filename = disposition.getFilename();
         if (filename != null) {
-          files.add(part.getName(), new LockssMultipartFile(part, filename));
+          files.add(part.getName(), new LockssMultipartFile((LockssApplicationPart) part, filename));
         } else {
           this.multipartParameterNames.add(part.getName());
         }
@@ -412,15 +423,19 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
    * Spring MultipartFile adapter, wrapping a Servlet Part object.
    */
   @SuppressWarnings("serial")
-  private static class LockssMultipartFile implements MultipartFile, Serializable {
+  public static class LockssMultipartFile implements MultipartFile, Serializable {
 
-    private final Part part;
+    private final LockssApplicationPart part;
 
     private final String filename;
 
-    public LockssMultipartFile(Part part, String filename) {
+    public LockssMultipartFile(LockssApplicationPart part, String filename) {
       this.part = part;
       this.filename = filename;
+    }
+
+    public MessageDigest getDigest() {
+      return ((DigestFileItem) part.getFileItem()).getDigest();
     }
 
     @Override
@@ -482,4 +497,16 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
     }
   }
 
+  private static class LockssApplicationPart extends ApplicationPart {
+    private final FileItem fileItem;
+
+    public LockssApplicationPart(FileItem fileItem, File location) {
+      super(fileItem, location);
+      this.fileItem = fileItem;
+    }
+
+    public FileItem getFileItem() {
+      return fileItem;
+    }
+  }
 }
