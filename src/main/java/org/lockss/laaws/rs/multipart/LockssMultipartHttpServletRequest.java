@@ -86,18 +86,33 @@ import java.security.MessageDigest;
 import java.util.*;
 
 /**
- * This class is a copy of Spring's {@link StandardMultipartHttpServletRequest}, modified to return
- * {@link LockssMultipartFile} parts. This was necessary because the {@link MultipartFile} API does
- * not expose the part headers, but we need {@link MultipartFile#getContentType()} calls to return
- * the {@code X-Lockss-Content-Type} header if present, otherwise fallback to {@code Content-Type}.
- * This allows malformed {@code Content-Type} to be transmitted without parsing into a Spring
- * {@link MediaType}.
+ * Portions of this class were copied from Spring's {@link StandardMultipartHttpServletRequest} and
+ * Tomcat's {@link Request}, and adapted to workaround issues in those implementations that prevent
+ * us from supporting features necessary for the operation of LOCKSS Repository Service:
  * <p>
- * This class is also necessary to hook into the creation of {@link FileItem} so that we can compute
- * the {@link MessageDigest} of a part as it is being written to temporary storage. The digest can
- * then be accessed by controllers (configured with the {@link LockssMultipartResolver}) by calling
- * {@link LockssMultipartFile#getDigest()}. This avoids controller code from having to write to a
- * temporary file a second time, only to compute the digest.
+ * 1. Computing part digests should ideally be done as they're read from the network stream, but it
+ * is not possible to do this early enough: {@link StandardMultipartHttpServletRequest} wraps an
+ * {@link HttpServletRequest} from the servlet framework and calls {@link HttpServletRequest#getParts()}
+ * in its parsing of the request. The Tomcat implementation ({@link Request}), is hardcoded to use
+ * {@link DiskFileItemFactory} and {@link FileUpload} which write parts (over a size threshold) to
+ * temporary files, prior to making them available to controller methods through
+ * {@link StandardMultipartHttpServletRequest.StandardMultipartFile}. Jetty appears to use its own
+ * multipart parsing logic that is similarly hardcoded. I did not check Undertow.
+ * <p>
+ * To work around this, Tomcat's {@link Request#getParts()} and {@link Request#parseParts(boolean)}}
+ * implementations were copied here and adapted to parse the wrapped {@link HttpServletRequest} using
+ * a {@link DigestFileItemFactory}. Since Tomcat's {@link ApplicationPart} does not allow access to
+ * its wrapped {@link FileItem}, and there is no {@code getDigest()} or similar in the {@link Part}
+ * API, it was also necessary to introduce {@link LockssApplicationPart}. Those are in turn used to
+ * construct {@link LockssMultipartFile}s, which are the objects ultimately returned to the REST
+ * controller method.
+ * <p>
+ * 2.Malformed part {@code Content-Type} header handling: We've chosen to transmit the content-type of
+ * an artifact in the part's {@code Content-Type} header. Malformed content types were found to cause
+ * problems during the serialization of a multipart request (and previously, multipart responses). To
+ * work around this, the content type is transmitted via a custom header and falls back to the usual
+ * {@code Content-Type} if it is not present. Support for receiving a part employing this workaround and
+ * returning the intended, malformed type was added to {@link LockssMultipartFile#getContentType()}.
  *
  * @see StandardMultipartHttpServletRequest
  * @see StandardServletMultipartResolver
