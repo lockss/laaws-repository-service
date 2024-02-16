@@ -52,12 +52,14 @@ import jakarta.servlet.MultipartConfigElement;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Part;
+import org.apache.catalina.connector.Request;
 import org.apache.catalina.core.ApplicationPart;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.http.Parameters;
 import org.apache.tomcat.util.http.fileupload.FileItem;
 import org.apache.tomcat.util.http.fileupload.FileUpload;
+import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
 import org.apache.tomcat.util.http.fileupload.impl.InvalidContentTypeException;
 import org.apache.tomcat.util.http.fileupload.impl.SizeException;
 import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
@@ -167,7 +169,6 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
 
   @Override
   public Collection<Part> getParts() throws IOException, ServletException {
-
     File defaultLocation = FileUtil.createTempDir("multipart", null);
 
     MultipartConfigElement mce =
@@ -258,7 +259,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
         List<FileItem> items = upload.parseRequest(new ServletRequestContext(request));
         int postSize = 0;
         for (FileItem item : items) {
-          ApplicationPart part = new LockssApplicationPart(item, location);
+          ApplicationPart part = new LockssApplicationPart((DigestFileItem) item, location);
           parts.add(part);
           if (part.getSubmittedFileName() == null) {
             String name = part.getName();
@@ -450,7 +451,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
     }
 
     public MessageDigest getDigest() {
-      return ((DigestFileItem) part.getFileItem()).getDigest();
+      return part.getDigest();
     }
 
     @Override
@@ -513,15 +514,15 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   }
 
   private static class LockssApplicationPart extends ApplicationPart {
-    private final FileItem fileItem;
+    private final DigestFileItem fileItem;
 
-    public LockssApplicationPart(FileItem fileItem, File location) {
+    public LockssApplicationPart(DigestFileItem fileItem, File location) {
       super(fileItem, location);
       this.fileItem = fileItem;
     }
 
-    public FileItem getFileItem() {
-      return fileItem;
+    public MessageDigest getDigest() {
+      return fileItem.getDigest();
     }
   }
 }
