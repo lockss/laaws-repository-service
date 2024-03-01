@@ -33,11 +33,11 @@ info:
   description: REST API of the LOCKSS Repository Service
   contact:
     name: LOCKSS Support
-    url: https://www.lockss.org/
+    url: 'https://www.lockss.org/'
     email: lockss-support@lockss.org
   license:
     name: BSD-3-Clause
-    url: https://opensource.org/licenses/BSD-3-Clause
+    url: 'https://opensource.org/licenses/BSD-3-Clause'
   version: 2.0.0
 servers:
   - url: http://laaws.lockss.org:443/
@@ -83,18 +83,17 @@ paths:
             default: lockss
         - name: storeDuplicate
           in: query
-          description: If true, artifacts with duplicate content will be stored, otherwise
-            suppressed
+          description: 'If true, artifacts with duplicate content will be stored, otherwise suppressed'
           schema:
             type: boolean
             default: false
         - name: excludeStatusPattern
           in: query
-          description: If supplied, WARC records whose HTTP response status code matches
-            the regular expression will not be imported
+          description: 'If supplied, WARC records whose HTTP response status code matches the regular expression will not be imported'
           schema:
             type: string
       requestBody:
+        required: true
         content:
           multipart/form-data:
             schema:
@@ -104,17 +103,15 @@ paths:
               type: object
               properties:
                 auid:
-                  type: string
                   description: Archival Unit ID (AUID) of new artifact
-                archive:
                   type: string
+                archive:
                   description: Archive data containing artifacts
+                  type: string
                   format: binary
-        required: true
       responses:
         '200':
-          description: Status of artifacts imported from the archive, maybe partially.
-            Return body is a sequence of JSON ImportStatus objects.
+          description: 'Status of artifacts imported from the archive, maybe partially. Return body is a sequence of JSON ImportStatus objects.'
           content:
             application/json:
               schema:
@@ -130,8 +127,7 @@ paths:
     get:
       tags:
         - artifacts
-      summary: Returns all artifacts that match a given a URL or URL prefix and/or
-        version.
+      summary: Returns all artifacts that match a given a URL or URL prefix and/or version.
       operationId: getArtifactsFromAllAus
       parameters:
         - name: namespace
@@ -197,11 +193,11 @@ paths:
               type: object
               properties:
                 artifactProps:
-                  type: string
                   description: Artifact properties (JSON)
-                payload:
                   type: string
+                payload:
                   description: Artifact payload data
+                  type: string
                   format: binary
                 httpResponseHeader:
                   type: string
@@ -220,14 +216,14 @@ paths:
               description: Repository query URL to duplicate artifacts
               schema:
                 type: string
-          content: {}
+          content: { }
         default:
           description: The resulting error payload.
           content:
             application/json:
               schema:
                 type: object
-  /artifacts/{uuid}:
+  '/artifacts/{uuid}':
     get:
       tags:
         - artifacts
@@ -248,8 +244,7 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart
-            response
+          description: Controls whether to include the artifact content part in multipart response
           schema:
             type: string
             default: ALWAYS
@@ -260,7 +255,7 @@ paths:
       responses:
         '200':
           description: "Multipart/form-data containing the following parts:
-           The artifact properties, HTTP status and headers if present, and the artifact's payload if requested. 
+           The artifact properties, HTTP status and headers if present, and the artifact's payload if requested.
            See POST /artifacts for more information."
           content:
             multipart/form-data:
@@ -292,9 +287,9 @@ paths:
         - name: committed
           in: query
           description: Committed status of the artifact
+          required: true
           schema:
             type: boolean
-          required: true
         - name: uuid
           in: path
           description: Identifier of the artifact
@@ -335,7 +330,7 @@ paths:
       responses:
         '200':
           description: Successfully removed artifact
-          content: {}
+          content: { }
         default:
           description: The resulting error payload.
           content:
@@ -363,8 +358,7 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart
-            response
+          description: Controls whether to include the artifact content part in multipart response
           schema:
             type: string
             default: ALWAYS
@@ -490,6 +484,7 @@ paths:
           schema:
             type: string
       requestBody:
+        required: true
         content:
           multipart/form-data:
             schema:
@@ -499,15 +494,13 @@ paths:
               properties:
                 op:
                   type: string
-                  description: Bulk AU transfer operation
                   enum:
                     - start
                     - finish
-        required: true
       responses:
         '200':
           description: Bulk operation succeeded
-          content: {}
+          content: { }
         default:
           description: The resulting error payload.
           content:
@@ -920,13 +913,12 @@ components:
       type: object
       properties:
         artifacts:
-          type: array
           description: The artifacts included in the page
+          type: array
           items:
             $ref: '#/components/schemas/artifact'
         pageInfo:
           $ref: '#/components/schemas/pageInfo'
-      description: A display page of artifacts
     auSize:
       type: object
       properties:
@@ -995,39 +987,40 @@ components:
     streamingResponseBody:
       type: object
     apiStatus:
+      description: The status information of the service
       required:
         - apiVersion
         - ready
       type: object
       properties:
         apiVersion:
-          type: string
           description: The version of the API
+          type: string
         componentName:
-          type: string
           description: The name of the component
+          type: string
         componentVersion:
-          type: string
           description: The version of the component software
+          type: string
         lockssVersion:
-          type: string
           description: The version of the LOCKSS system
-        ready:
-          type: boolean
-          description: The indication of whether the service is available
-        serviceName:
           type: string
+        ready:
+          description: The indication of whether the service is available
+          type: boolean
+        serviceName:
           description: The name of the service
+          type: string
         readyTime:
-          type: integer
           description: The time the service last became ready.
+          type: integer
           format: int64
         reason:
-          type: string
           description: The reason the service isn't ready.
-        startupStatus:
           type: string
+        startupStatus:
           description: Enum indicating progress of plugin/AU processing at startup.
+          type: string
           enum:
             - NONE
             - PLUGINS_CRAWLING
@@ -1036,7 +1029,6 @@ components:
             - PLUGINS_LOADED
             - AUS_STARTING
             - AUS_STARTED
-      description: The status information of the service
     auidPageInfo:
       required:
         - auids
@@ -1044,14 +1036,14 @@ components:
       type: object
       properties:
         auids:
-          type: array
           description: The Archival Unit identifiers included in the page
+          type: array
           items:
             type: string
         pageInfo:
           $ref: '#/components/schemas/pageInfo'
-      description: A display page of Archival Unit identifiers
     pageInfo:
+      description: The information related to pagination of content
       required:
         - continuationToken
         - curLink
@@ -1061,24 +1053,24 @@ components:
       type: object
       properties:
         totalCount:
-          type: integer
           description: The total number of results
+          type: integer
           format: int32
         resultsPerPage:
-          type: integer
           description: The number of results per page
+          type: integer
           format: int32
         continuationToken:
-          type: string
           description: The continuation token
+          type: string
         curLink:
-          type: string
           description: The link of the current request
-        nextLink:
           type: string
+        nextLink:
           description: The link of the next request
-      description: The information related to pagination of content
+          type: string
     repositoryInfo:
+      description: Information about the repository
       required:
         - indexInfo
         - storeInfo
@@ -1088,7 +1080,6 @@ components:
           $ref: '#/components/schemas/storageInfo'
         indexInfo:
           $ref: '#/components/schemas/storageInfo'
-      description: Information about the repository
     storageInfo:
       required:
         - avail
@@ -1098,31 +1089,31 @@ components:
         - size
         - type
         - used
+      description: Information about a repository storage area
       type: object
       properties:
         type:
-          type: string
           description: Type of the storage area
-        name:
           type: string
+        name:
           description: Name of the storage area
+          type: string
         size:
-          type: integer
           description: Size in bytes of the storage area
+          type: integer
           format: int64
         used:
-          type: integer
           description: Used size in bytes of the storage area
+          type: integer
           format: int64
         avail:
-          type: integer
           description: Available size in bytes of the storage area
+          type: integer
           format: int64
         percentUsedString:
+          description: 'Percentage of size used, formatted as a string'
           type: string
-          description: Percentage of size used, formatted as a string
         percentUsed:
-          type: number
           description: Percentage of size used
+          type: number
           format: double
-      description: Information about a repository storage area
