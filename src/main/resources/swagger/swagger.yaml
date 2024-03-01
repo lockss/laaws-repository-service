@@ -198,7 +198,7 @@ paths:
                 payload:
                   description: Artifact payload data
                   type: string
-                  contentMediaType: application/octet-stream
+                  format: binary
                 httpResponseHeader:
                   type: string
                   description: HTTP response status and headers (optional)
@@ -223,7 +223,7 @@ paths:
             application/json:
               schema:
                 type: object
-    '/artifacts/{uuid}':
+  '/artifacts/{uuid}':
     get:
       tags:
         - artifacts
@@ -1117,4 +1117,3 @@ components:
           description: Percentage of size used
           type: number
           format: double
-      description: Information about a repository storage area
