@@ -483,20 +483,14 @@ paths:
           required: true
           schema:
             type: string
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              required:
-                - op
-              type: object
-              properties:
-                op:
-                  type: string
-                  enum:
-                    - start
-                    - finish
+        - name: op
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+            - start
+            - finish
       responses:
         '200':
           description: Bulk operation succeeded
