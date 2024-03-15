@@ -90,7 +90,7 @@ REPOINFO_API=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApi.java
 fixImport $REPOINFO_API org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
 fixImport $REPOINFO_API org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
 
-# Edit RepoinfoApi.java.
+# Edit RepoinfoApiController.java.
 REPOINFO_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApiController.java
 fixImport $REPOINFO_API_CONTROLLER org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
 fixImport $REPOINFO_API_CONTROLLER org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
