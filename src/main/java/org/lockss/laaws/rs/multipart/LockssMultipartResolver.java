@@ -32,14 +32,82 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.multipart;
 
+import jakarta.servlet.MultipartConfigElement;
 import jakarta.servlet.http.HttpServletRequest;
+import org.apache.catalina.connector.Connector;
+import org.lockss.laaws.rs.configuration.RepositoryServiceSpringConfig;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.boot.web.embedded.tomcat.TomcatWebServer;
+import org.springframework.boot.web.server.WebServer;
+import org.springframework.boot.web.servlet.MultipartConfigFactory;
+import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
+import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.multipart.support.StandardServletMultipartResolver;
 
+import java.io.File;
+import java.io.IOException;
+
+/**
+ * The {@link LockssMultipartResolver} overrides
+ * {@link StandardServletMultipartResolver#resolveMultipart(HttpServletRequest)}
+ * to return {@link LockssMultipartHttpServletRequest} objects with our customized
+ * wrapping and handling of multipart {@link HttpServletRequest} objects. It also
+ * handles parameters related to its multipart processing, such as the temporary
+ * directory used, maximum in-memory threshold, etc.
+ * <p>
+ * See {@link LockssMultipartHttpServletRequest} for additional details. The
+ * {@link LockssMultipartResolver} is constructed as a bean in
+ * {@link RepositoryServiceSpringConfig}.
+ */
 public class LockssMultipartResolver extends StandardServletMultipartResolver {
+  private final MultipartConfigFactory multipartConfigFactory;
+
+  @Autowired
+  ServletWebServerApplicationContext context;
+
+  public LockssMultipartResolver(MultipartProperties props) {
+    multipartConfigFactory = new MultipartConfigFactory();
+
+    if (props != null) {
+      multipartConfigFactory.setLocation(props.getLocation());
+      multipartConfigFactory.setMaxFileSize(props.getMaxFileSize());
+      multipartConfigFactory.setMaxRequestSize(props.getMaxRequestSize());
+      multipartConfigFactory.setFileSizeThreshold(props.getFileSizeThreshold());
+    }
+  }
+
   @Override
   public MultipartHttpServletRequest resolveMultipart(HttpServletRequest request) throws MultipartException {
-    return new LockssMultipartHttpServletRequest(request);
+    MultipartConfigElement mce = getMultipartConfigElement();
+    LockssMultipartHttpServletRequest lockssMultipartRequest =
+        new LockssMultipartHttpServletRequest(request, true)
+            .setMultipartConfigElement(mce);
+
+    WebServer ws = context.getWebServer();
+    if (ws instanceof TomcatWebServer) {
+      TomcatWebServer tws = (TomcatWebServer) context.getWebServer();
+      Connector connector = tws.getTomcat().getConnector();
+
+//       lockssMultipartRequest.setMaxPostSize(mce.getMaxRequestSize());
+      lockssMultipartRequest.setMaxPostSize(connector.getMaxPostSize());
+      lockssMultipartRequest.setMaxParameterCount(connector.getMaxParameterCount());
+    }
+
+    return lockssMultipartRequest;
+  }
+
+  public MultipartConfigElement getMultipartConfigElement() {
+    return multipartConfigFactory.createMultipartConfig();
+  }
+
+  public void setUploadTempDir(File uploadTempDir) throws IOException {
+    multipartConfigFactory.setLocation(uploadTempDir.getAbsolutePath());
+  }
+
+  public void setMaxInMemorySize(int maxInMem) {
+    multipartConfigFactory.setFileSizeThreshold(DataSize.ofBytes(maxInMem));
   }
 }
