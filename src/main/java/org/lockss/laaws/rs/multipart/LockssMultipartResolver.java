@@ -65,8 +65,8 @@ import java.io.IOException;
 public class LockssMultipartResolver extends StandardServletMultipartResolver {
   private final MultipartConfigFactory multipartConfigFactory;
 
-  @Autowired
-  ServletWebServerApplicationContext context;
+//  @Autowired
+//  ServletWebServerApplicationContext context;
 
   public LockssMultipartResolver(MultipartProperties props) {
     multipartConfigFactory = new MultipartConfigFactory();
@@ -86,15 +86,15 @@ public class LockssMultipartResolver extends StandardServletMultipartResolver {
         new LockssMultipartHttpServletRequest(request, true)
             .setMultipartConfigElement(mce);
 
-    WebServer ws = context.getWebServer();
-    if (ws instanceof TomcatWebServer) {
-      TomcatWebServer tws = (TomcatWebServer) context.getWebServer();
-      Connector connector = tws.getTomcat().getConnector();
-
-//       lockssMultipartRequest.setMaxPostSize(mce.getMaxRequestSize());
-      lockssMultipartRequest.setMaxPostSize(connector.getMaxPostSize());
-      lockssMultipartRequest.setMaxParameterCount(connector.getMaxParameterCount());
-    }
+//    WebServer ws = context.getWebServer();
+//    if (ws instanceof TomcatWebServer) {
+//      TomcatWebServer tws = (TomcatWebServer) context.getWebServer();
+//      Connector connector = tws.getTomcat().getConnector();
+//
+////       lockssMultipartRequest.setMaxPostSize(mce.getMaxRequestSize());
+//      lockssMultipartRequest.setMaxPostSize(connector.getMaxPostSize());
+//      lockssMultipartRequest.setMaxParameterCount(connector.getMaxParameterCount());
+//    }
 
     return lockssMultipartRequest;
   }
