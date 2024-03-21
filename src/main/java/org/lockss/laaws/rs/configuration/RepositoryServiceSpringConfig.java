@@ -71,9 +71,6 @@ public class RepositoryServiceSpringConfig {
   public static final int DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE =
     4 * (int)FileUtils.ONE_MB;
 
-  // FIXME: This is introducing a circular dependency; Spring is now stricter about
-  //  such offenses, requiring spring.main.allow-circular-references=true to be set
-  @Autowired
   LockssMultipartResolver multipartResolver;
 
   // FIXME: This was a mistake; revert (and make sure to update our clients)
@@ -92,7 +89,8 @@ public class RepositoryServiceSpringConfig {
 
   @Bean
   public LockssMultipartResolver multipartResolver(ObjectProvider<MultipartProperties> multipartPropsProvider) {
-    return new LockssMultipartResolver(multipartPropsProvider.getIfAvailable());
+    multipartResolver = new LockssMultipartResolver(multipartPropsProvider.getIfAvailable());
+    return multipartResolver;
   }
 
   // When ConfigManager is started, register a config callback to set the
