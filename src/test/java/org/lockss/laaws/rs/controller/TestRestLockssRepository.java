@@ -46,6 +46,7 @@ import org.archive.format.warc.WARCConstants;
 import org.junit.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
+import org.lockss.laaws.rs.RepositoryApplication;
 import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.log.L4JLogger;
@@ -108,7 +109,7 @@ import static org.mockito.Mockito.doThrow;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-@ContextConfiguration(classes = { MyTestConfig.class })
+@ContextConfiguration(classes = { MyTestConfig.class, RepositoryApplication.class })
 public class TestRestLockssRepository extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 

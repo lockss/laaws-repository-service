@@ -36,6 +36,7 @@ import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.lockss.laaws.rs.RepositoryApplication;
 import org.lockss.log.L4JLogger;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.LockssUncheckedException;
@@ -79,7 +80,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  * Test of the REST repository client.
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    classes = {RepositoryApplication.class},
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
     private final static String BASEURL = "http://localhost:24610";
