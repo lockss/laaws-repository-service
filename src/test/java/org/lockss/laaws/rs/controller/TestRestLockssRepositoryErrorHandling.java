@@ -16,7 +16,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.RepositoryApplication;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -56,7 +55,7 @@ import static org.mockito.Mockito.*;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ContextConfiguration(classes = { MyTestConfig.class, RepositoryApplication.class })
+@ContextConfiguration(classes = { MyTestConfig.class })
 public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 

@@ -34,9 +34,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.laaws.rs.RepositoryApplication;
 import org.lockss.laaws.rs.api.RepoinfoApiController;
-import org.lockss.laaws.rs.controller.MyTestConfig;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.spring.test.SpringLockssTestCase4;
@@ -49,7 +47,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -69,7 +66,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc()
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
-@ContextConfiguration(classes = { RepositoryApplication.class })
 public class TestReposApiController extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
 
