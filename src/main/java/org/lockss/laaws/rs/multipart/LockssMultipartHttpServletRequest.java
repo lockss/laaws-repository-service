@@ -53,7 +53,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequestWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Part;
-import org.apache.catalina.Context;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.core.ApplicationPart;
 import org.apache.commons.lang3.StringUtils;
@@ -64,13 +63,13 @@ import org.apache.tomcat.util.http.Parameters;
 import org.apache.tomcat.util.http.Parameters.FailReason;
 import org.apache.tomcat.util.http.fileupload.FileItem;
 import org.apache.tomcat.util.http.fileupload.FileUpload;
+import org.apache.tomcat.util.http.fileupload.MultipartStream.MalformedStreamException;
 import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
 import org.apache.tomcat.util.http.fileupload.impl.InvalidContentTypeException;
 import org.apache.tomcat.util.http.fileupload.impl.SizeException;
 import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.lang.Nullable;
@@ -161,6 +160,7 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
    */
   public LockssMultipartHttpServletRequest(HttpServletRequest request, boolean lazyParsing)
       throws MultipartException {
+
 
     super(request);
     if (!lazyParsing) {
@@ -346,6 +346,17 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
       } catch (IOException e) {
         parameters.setParseFailedReason(FailReason.IO_ERROR);
         partsParseException = e;
+        Throwable ppeCause = partsParseException.getCause();
+
+        if (ppeCause instanceof MalformedStreamException) {
+          String clientStr = "[client: " + getRemoteHost() + ", clientIP: " + getRemoteAddr() +"]";
+          String errMsg = "Error processing malformed multipart request from client "
+              + clientStr + ": " + ppeCause.getMessage();
+
+          log.error(errMsg);
+
+          partsParseException = getQuietMultipartStreamException((MalformedStreamException) ppeCause);
+        }
       } catch (IllegalStateException e) {
         // addParameters() will set parseFailedReason
 //        checkSwallowInput();
@@ -360,6 +371,23 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
         parameters.setParseFailedReason(FailReason.UNKNOWN);
       }
     }
+  }
+
+  /**
+   * Given a {@link MalformedStreamException}, return one without a stacktrace, unless logging
+   * at {@code TRACE} level.
+   */
+  private MalformedStreamException getQuietMultipartStreamException(MalformedStreamException mse) {
+    if (!log.isTraceEnabled()) {
+      return new MalformedStreamException(mse.getMessage()) {
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+          return this;
+        }
+      };
+    }
+
+    return mse;
   }
 
   /**

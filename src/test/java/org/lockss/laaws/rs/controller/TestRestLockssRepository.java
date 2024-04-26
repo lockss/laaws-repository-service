@@ -55,6 +55,7 @@ import org.lockss.test.ConfigurationUtil;
 import org.lockss.test.LockssTestCase4;
 import org.lockss.test.RandomInputStream;
 import org.lockss.test.ZeroInputStream;
+import org.lockss.test.ThrowingInputStream;
 import org.lockss.util.ListUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
@@ -765,6 +766,25 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact artifact = repoClient.addArtifact(spec.getArtifactData());
 
     spec.assertArtifact(repoClient, artifact);
+  }
+
+  @Test
+  public void testAddArtifact_midstreamClientError() throws Exception {
+    ArtifactSpec spec = new ArtifactSpec()
+        .setUrl("https://www.lockss.org/")
+        .setContentLength(1024L)
+        .setContentDigest("My SHA256 Hash")
+        .setCollectionDate(TimeBase.nowMs())
+        .setContentGenerator(() ->
+            new ThrowingInputStream(InputStream.nullInputStream(), new IOException(), null));
+
+    // for (int i = 0; i < 3; i++)
+    try {
+      Artifact result = repoClient.addArtifact(spec.getArtifactData());
+      fail("Expected client to throw");
+    } catch (Exception e) {
+      Thread.sleep(1000);
+    }
   }
 
   @Test
