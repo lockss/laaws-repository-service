@@ -161,7 +161,6 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   public LockssMultipartHttpServletRequest(HttpServletRequest request, boolean lazyParsing)
       throws MultipartException {
 
-
     super(request);
     if (!lazyParsing) {
       parseRequest(request);
