@@ -769,14 +769,17 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
-  public void testAddArtifact_midstreamClientError() throws Exception {
+  public void testAddArtifact_EOFClientError() throws Exception {
     ArtifactSpec spec = new ArtifactSpec()
         .setUrl("https://www.lockss.org/")
         .setContentLength(1024L)
         .setContentDigest("My SHA256 Hash")
         .setCollectionDate(TimeBase.nowMs())
         .setContentGenerator(() ->
-            new ThrowingInputStream(InputStream.nullInputStream(), new IOException(), null));
+            new ThrowingInputStream(
+                InputStream.nullInputStream(),
+                new IOException("Simulated IOException"),
+                null));
 
     // for (int i = 0; i < 3; i++)
     try {
