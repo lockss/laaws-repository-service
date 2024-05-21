@@ -49,12 +49,11 @@ import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.log.L4JLogger;
+import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
+import org.lockss.rs.io.index.db.SQLArtifactIndexDbManager;
 import org.lockss.spring.test.SpringLockssTestCase4;
-import org.lockss.test.ConfigurationUtil;
-import org.lockss.test.LockssTestCase4;
-import org.lockss.test.RandomInputStream;
-import org.lockss.test.ZeroInputStream;
+import org.lockss.test.*;
 import org.lockss.util.ListUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
@@ -82,6 +81,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -183,7 +183,10 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   @Autowired
   LockssRepository internalRepo;
-
+  private MockLockssDaemon theDaemon;
+  private SQLArtifactIndexDbManager idxDbManager;
+  private String tempDirPath;
+  private String dbPort;
 
 
   @AfterClass
@@ -218,9 +221,37 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @Before
   public void setUpArtifactDataStore() throws Exception {
     TimeBase.setSimulated();
-    getMockLockssDaemon().setAppRunning(true);
+    // Get the temporary directory used during the test.
+    tempDirPath = setUpDiskSpace();
+
+    theDaemon = getMockLockssDaemon();
+    theDaemon.setAppRunning(true);
+    theDaemon.setDaemonInited(true);
+
+    dbPort = Integer.toString(TcpTestUtil.findUnboundTcpPort());
+    ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
+        dbPort);
+
+    initializeTestDbManager(0 ,2);
+
     internalRepo.initRepository();
     this.repoClient = makeLockssRepository();
+  }
+
+  private void initializeTestDbManager(int initialVersion, int targetVersion) throws IOException {
+    // Set the database log.
+    System.setProperty("derby.stream.error.file",
+        new File(tempDirPath, "derby.log").getAbsolutePath());
+
+    // Create the database manager.
+    idxDbManager = new SQLArtifactIndexDbManager();
+    idxDbManager.initService(theDaemon);
+
+//    assertTrue(repositoryDbManager.setUpDatabase(initialVersion));
+    idxDbManager.setTargetDatabaseVersion(targetVersion);
+    idxDbManager.startService();
+
+    theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
   }
 
   @After

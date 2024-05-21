@@ -1,24 +1,22 @@
 package org.lockss.laaws.rs.controller;
 
-import org.lockss.rs.LocalLockssRepository;
+import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
-import org.lockss.rs.io.index.VolatileArtifactIndex;
+import org.lockss.rs.io.index.db.SQLArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
-import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
+import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
 import org.lockss.test.LockssTestCase4;
 import org.lockss.util.rest.repo.LockssRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lockss.laaws.rs.controller.TestRestLockssRepository.NS1;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.spy;
 
 @TestConfiguration
 public class MyTestConfig {
@@ -30,12 +28,14 @@ public class MyTestConfig {
    * embedded LOCKSS Repository Service.
    */
   @Bean
-  public LockssRepository createInitializedRepository() throws IOException {
+  public LockssRepository createInitializedRepository(
+      @Autowired ArtifactIndex index,
+      @Autowired ArtifactDataStore ds
+  ) throws IOException {
     File stateDir = LockssTestCase4.getTempDir(tmpDirs);
-    File basePath = LockssTestCase4.getTempDir(tmpDirs);
 
     LockssRepository repository =
-        new LocalLockssRepository(stateDir, basePath, NS1);
+        new BaseLockssRepository(stateDir, index, ds);
 
     return spy(repository);
 //    LockssRepository repo = mock(LockssRepository.class);
@@ -47,11 +47,12 @@ public class MyTestConfig {
 
   @Bean
   public ArtifactIndex setArtifactIndex() {
-    return new VolatileArtifactIndex();
+    return new SQLArtifactIndex();
   }
 
   @Bean
-  public ArtifactDataStore setArtifactDataStore() {
-    return new VolatileWarcArtifactDataStore();
+  public ArtifactDataStore setArtifactDataStore() throws IOException {
+    File basePath = LockssTestCase4.getTempDir(tmpDirs);
+    return new LocalWarcArtifactDataStore(basePath);
   }
 }
