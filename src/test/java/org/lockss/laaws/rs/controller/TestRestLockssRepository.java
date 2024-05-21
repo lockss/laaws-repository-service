@@ -232,8 +232,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
         dbPort);
 
-    initializeDerby();
-//    initializePostgreSQL();
+//    initializeDerby();
+    initializePostgreSQL();
 
     internalRepo.initRepository();
     this.repoClient = makeLockssRepository();
