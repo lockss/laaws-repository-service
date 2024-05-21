@@ -68,6 +68,7 @@ import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
+import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -81,7 +82,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -232,13 +232,41 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
         dbPort);
 
-    initializeTestDbManager(0 ,2);
+    initializeDerby();
+//    initializePostgreSQL();
 
     internalRepo.initRepository();
     this.repoClient = makeLockssRepository();
   }
 
-  private void initializeTestDbManager(int initialVersion, int targetVersion) throws IOException {
+  protected void initializePostgreSQL() throws Exception {
+    ConfigurationUtil.addFromArgs(
+        SQLArtifactIndexDbManager.PARAM_DATASOURCE_USER, "postgres",
+        SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgresx");
+
+    ConfigurationUtil.addFromArgs(
+        SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.enabled", "true",
+        SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.initialSize", "2");
+
+    ConfigurationUtil.addFromArgs(
+        SQLArtifactIndexDbManager.PARAM_MAX_RETRY_COUNT, "0",
+        SQLArtifactIndexDbManager.PARAM_RETRY_DELAY, "0");
+
+    ConfigurationUtil.addFromArgs(
+        SQLArtifactIndexDbManager.PARAM_DATASOURCE_CLASSNAME,  PGSimpleDataSource.class.getCanonicalName(),
+        SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgres");
+
+    idxDbManager = new SQLArtifactIndexDbManager();
+    startEmbeddedPgDbManager(idxDbManager);
+    idxDbManager.initService(getMockLockssDaemon());
+
+    idxDbManager.setTargetDatabaseVersion(2);
+    idxDbManager.startService();
+
+    theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
+  }
+
+  private void initializeDerby() throws IOException {
     // Set the database log.
     System.setProperty("derby.stream.error.file",
         new File(tempDirPath, "derby.log").getAbsolutePath());
@@ -247,8 +275,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     idxDbManager = new SQLArtifactIndexDbManager();
     idxDbManager.initService(theDaemon);
 
-//    assertTrue(repositoryDbManager.setUpDatabase(initialVersion));
-    idxDbManager.setTargetDatabaseVersion(targetVersion);
+    idxDbManager.setTargetDatabaseVersion(2);
     idxDbManager.startService();
 
     theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
