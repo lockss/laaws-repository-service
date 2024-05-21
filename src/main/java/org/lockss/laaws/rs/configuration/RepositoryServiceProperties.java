@@ -57,6 +57,15 @@ public class RepositoryServiceProperties {
     return repoSpec.split(":", 2);
   }
 
+  public boolean isSolrArtifactIndex() {
+    return getIndexSpec().equals("solr");
+  }
+
+  public boolean isSqlArtifactIndex() {
+    return getIndexSpec().equals("derby") ||
+           getIndexSpec().equals("pgsql");
+  }
+
   public String getIndexSpec() {
     if (StringUtil.isNullString(indexSpec)) {
       log.error("Missing artifact index configuration");

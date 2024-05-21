@@ -37,6 +37,7 @@ import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.index.DispatchingArtifactIndex;
 import org.lockss.rs.io.index.LocalArtifactIndex;
 import org.lockss.rs.io.index.VolatileArtifactIndex;
+import org.lockss.rs.io.index.db.SQLArtifactIndex;
 import org.lockss.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -124,6 +125,10 @@ public class ArtifactIndexConfig {
         solrIndex = new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials)
             .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
         return solrIndex;
+
+      case "derby":
+      case "pgsql":
+        return new SQLArtifactIndex();
 
       case "dispatching":
         // Create Solr index

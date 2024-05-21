@@ -33,14 +33,20 @@ import org.lockss.app.LockssApp.ManagerDesc;
 import org.lockss.app.LockssDaemon;
 import org.lockss.app.ServiceDescr;
 import org.lockss.config.ConfigManager;
+import org.lockss.laaws.rs.configuration.RepositoryServiceProperties;
 import org.lockss.log.L4JLogger;
 import org.lockss.plugin.PluginManager;
 import org.lockss.repository.RepositoryDbManager;
+import org.lockss.rs.io.index.db.SQLArtifactIndexDbManager;
 import org.lockss.spring.base.BaseSpringBootApplication;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
+
+import java.util.Arrays;
+import java.util.List;
 
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
@@ -55,13 +61,29 @@ public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
   private static L4JLogger log = L4JLogger.getLogger();
 
+  @Autowired
+  private RepositoryServiceProperties repoProps;
+
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private static final ManagerDesc[] myManagerDescs = {
       STATE_MANAGER_DESC,
       ACCOUNT_MANAGER_DESC,
-      new ManagerDesc(managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName())
   };
+
+  private ManagerDesc[] getMyManagerDescs() {
+    List<ManagerDesc> managerDescs = Arrays.asList(myManagerDescs);
+
+    if (repoProps.isSolrArtifactIndex()) {
+      managerDescs.add(new ManagerDesc(
+          managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName()));
+    } else if (repoProps.isSqlArtifactIndex()) {
+      managerDescs.add(new ManagerDesc(
+          managerKey(SQLArtifactIndexDbManager.class), SQLArtifactIndexDbManager.class.getName()));
+    }
+
+    return managerDescs.toArray(new ManagerDesc[0]);
+  }
 
   /**
    * The entry point of the application.
@@ -96,7 +118,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
 	.addAppConfig(PARAM_START_PLUGINS, "false")
 	.addAppDefault(PluginManager.PARAM_START_ALL_AUS, "false")
 	.setSpringApplicatonContext(getApplicationContext())
-	.setAppManagers(myManagerDescs);
+	.setAppManagers(getMyManagerDescs());
 
       LockssApp.startStatic(LockssDaemon.class, spec);
     } else {
