@@ -45,6 +45,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -72,7 +73,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
   };
 
   private ManagerDesc[] getMyManagerDescs() {
-    List<ManagerDesc> managerDescs = Arrays.asList(myManagerDescs);
+    List<ManagerDesc> managerDescs = new ArrayList<>(Arrays.asList(myManagerDescs));
 
     if (repoProps.isSolrArtifactIndex()) {
       managerDescs.add(new ManagerDesc(
