@@ -75,7 +75,13 @@ public class ArtifactIndexConfig {
 
   @Bean
   public ArtifactIndex setArtifactIndex() {
-    return createArtifactIndex(parseIndexSpecs());
+    ArtifactIndex index = createArtifactIndex(parseIndexSpecs());
+
+    if (repoProps.isDispatchingIndexEnabled()) {
+      index = new DispatchingArtifactIndex(index);
+    }
+
+    return index;
   }
 
   @Autowired
@@ -129,13 +135,6 @@ public class ArtifactIndexConfig {
       case "derby":
       case "pgsql":
         return new SQLArtifactIndex();
-
-      case "dispatching":
-        // Create Solr index
-        ArtifactIndex solrIndex = createArtifactIndex("solr");
-
-        // Create Dispatching with Solr
-        return new DispatchingArtifactIndex(solrIndex);
 
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);

@@ -31,6 +31,7 @@ public class RepositoryServiceProperties {
 
   // Artifact index properties
   @Value("${repo.index.spec:#{null}}") String indexSpec;
+  @Value("${repo.index.dispatching.enable:#{false}}") boolean isDispatchingIndexEnabled;
 
   @Value("${repo.persistIndexName:#{null}}") String repoPersistIndexName;
   @Value("${repo.index.local.persistIndexName:#{null}}") String localPersistIndexName;
@@ -64,6 +65,10 @@ public class RepositoryServiceProperties {
   public boolean isSqlArtifactIndex() {
     return getIndexSpec().equals("derby") ||
            getIndexSpec().equals("pgsql");
+  }
+
+  public boolean isDispatchingIndexEnabled() {
+    return isDispatchingIndexEnabled;
   }
 
   public String getIndexSpec() {
