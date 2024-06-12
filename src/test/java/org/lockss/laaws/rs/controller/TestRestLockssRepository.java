@@ -260,7 +260,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     startEmbeddedPgDbManager(idxDbManager);
     idxDbManager.initService(getMockLockssDaemon());
 
-    idxDbManager.setTargetDatabaseVersion(2);
+    idxDbManager.setTargetDatabaseVersion(3);
     idxDbManager.startService();
 
     theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
@@ -275,7 +275,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     idxDbManager = new SQLArtifactIndexDbManager();
     idxDbManager.initService(theDaemon);
 
-    idxDbManager.setTargetDatabaseVersion(2);
+    idxDbManager.setTargetDatabaseVersion(3);
     idxDbManager.startService();
 
     theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
