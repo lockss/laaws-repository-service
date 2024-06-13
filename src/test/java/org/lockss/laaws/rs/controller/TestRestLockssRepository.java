@@ -54,6 +54,7 @@ import org.lockss.rs.LocalLockssRepository;
 import org.lockss.rs.io.index.db.SQLArtifactIndexDbManager;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.*;
+import org.lockss.test.ThrowingInputStream;
 import org.lockss.util.ListUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
@@ -823,6 +824,28 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact artifact = repoClient.addArtifact(spec.getArtifactData());
 
     spec.assertArtifact(repoClient, artifact);
+  }
+
+  @Test
+  public void testAddArtifact_EOFClientError() throws Exception {
+    ArtifactSpec spec = new ArtifactSpec()
+        .setUrl("https://www.lockss.org/")
+        .setContentLength(1024L)
+        .setContentDigest("My SHA256 Hash")
+        .setCollectionDate(TimeBase.nowMs())
+        .setContentGenerator(() ->
+            new ThrowingInputStream(
+                InputStream.nullInputStream(),
+                new IOException("Simulated IOException"),
+                null));
+
+    // for (int i = 0; i < 3; i++)
+    try {
+      Artifact result = repoClient.addArtifact(spec.getArtifactData());
+      fail("Expected client to throw");
+    } catch (Exception e) {
+      Thread.sleep(1000);
+    }
   }
 
   @Test
