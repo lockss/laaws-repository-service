@@ -86,7 +86,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
                  repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, storeDuplicate, excludeStatusPattern)) {
 
           try (DeferredTempFileOutputStream out =
-                   new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
+                   new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), (String) null)) {
 
             ObjectMapper objMapper = new ObjectMapper();
             objMapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
