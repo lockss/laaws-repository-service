@@ -29,7 +29,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --> 
-# LOCKSS Repository Service [![Build Status](https://travis-ci.org/lockss/laaws-repository-service.svg?branch=master)](https://travis-ci.org/lockss/laaws-repository-service)
+# LOCKSS Repository Service
 This is the REST Web Service for the LOCKSS content repository.
 
 ## Note on branches
