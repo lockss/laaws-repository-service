@@ -63,9 +63,9 @@ public class RepositoryApplication extends BaseSpringBootApplication
   private static L4JLogger log = L4JLogger.getLogger();
 
   @Autowired
-  private static RepositoryServiceProperties repoProps;
+  private RepositoryServiceProperties repoProps;
 
-  public static ManagerDesc REPOSITORY_DB_MANAGER_DESC =
+  public ManagerDesc REPOSITORY_DB_MANAGER_DESC =
       new ManagerDesc(
           managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName()) {
         @Override
@@ -74,7 +74,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
         }
       };
 
-  public static ManagerDesc SQLARTIFACTINDEX_DB_MANAGER_DESC =
+  public ManagerDesc SQLARTIFACTINDEX_DB_MANAGER_DESC =
       new ManagerDesc(
           managerKey(SQLArtifactIndexDbManager.class), SQLArtifactIndexDbManager.class.getName()) {
         @Override
@@ -85,7 +85,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
 
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
-  private static final ManagerDesc[] myManagerDescs = {
+  private final ManagerDesc[] myManagerDescs = {
       STATE_MANAGER_DESC,
       ACCOUNT_MANAGER_DESC,
       REPOSITORY_DB_MANAGER_DESC,
