@@ -542,7 +542,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       InputStream httpResponseStream = onlyHeaders ?
             new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :
-            ad.getResponseInputStream();
+            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(ad);
 
       InputStreamResource resource = new InputStreamResource(httpResponseStream);
 

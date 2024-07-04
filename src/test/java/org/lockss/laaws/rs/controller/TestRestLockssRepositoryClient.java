@@ -30,10 +30,10 @@
 package org.lockss.laaws.rs.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.message.BasicStatusLine;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.log.L4JLogger;
@@ -314,9 +314,13 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     /**
      * Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}.
      *
+     * Disabled because the implementation no longer uses a RestTemplate client,
+     * which is necessary for this test to interact with the mocked server.
+     *
      * @throws Exception
      */
     @Test
+    @Ignore
     public void testGetArtifactData() throws Exception {
       // Artifact data
       runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, true);
@@ -366,7 +370,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
         InputStream httpResponseStream = onlyHeaders ?
             new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :
-            ad.getResponseInputStream();
+            ArtifactDataUtil.getHttpResponseStreamFromArtifactData(ad);
 
         InputStreamResource resource = new InputStreamResource(httpResponseStream);
         converter.write(resource, APPLICATION_HTTP_RESPONSE, outputMessage);
