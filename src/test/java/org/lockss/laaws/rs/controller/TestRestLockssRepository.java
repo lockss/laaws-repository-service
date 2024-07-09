@@ -322,10 +322,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact artifact = addUncommitted(spec);
     Artifact committed = commit(spec, artifact);
     spec.assertArtifact(repoClient, committed);
-    ArtifactData ad = repoClient.getArtifactData(committed);
-    assertEquals(headers.getFirst("Content-Type"),
-        ad.getHttpHeaders().getFirst("Content-Type"));
-    assertFalse(ad.isHttpResponse());
+    try (ArtifactData ad = repoClient.getArtifactData(committed)) {
+      assertEquals(headers.getFirst("Content-Type"),
+          ad.getHttpHeaders().getFirst("Content-Type"));
+      assertFalse(ad.isHttpResponse());
+    }
     Artifact copied = waitCopied(spec);
     String path = new URL(copied.getStorageUrl()).getPath();
     String warcstr = StringUtil.fromFile(path);
@@ -792,9 +793,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   @Test
   public void testAddArtifact() throws IOException {
-
     ArtifactSpec spec = new ArtifactSpec()
-        .setUrl("http://hyperwolf.ai/")
+        .setUrl("http://www.lockss.org/")
         .setCollectionDate(1234);
 
     spec.generateContent();
@@ -863,10 +863,10 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact artifact = repoClient.addArtifact(spec.getArtifactData());
 
     // Retrieve the large artifact from the remote Repository service
-    ArtifactData ad = repoClient.getArtifactData(artifact);
-
-    // Assert artifact data against spec
-    spec.assertArtifactData(ad);
+    try (ArtifactData ad = repoClient.getArtifactData(artifact)) {
+      // Assert artifact data against spec
+      spec.assertArtifactData(ad);
+    }
   }
 
   @Test
@@ -1018,13 +1018,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     ArtifactSpec spec = ArtifactSpec.forNsAuUrl(NS1, AUID1, URL1)
         .toCommit(true).setContentLength(42);
     Artifact newArt = addUncommitted(spec);
-    ArtifactData ad = repoClient.getArtifactData(newArt);
-    assertEquals(SIM_TIME, ad.getStoreDate());
+    try (ArtifactData ad = repoClient.getArtifactData(newArt)) {
+      assertEquals(SIM_TIME, ad.getStoreDate());
+    }
 
     Artifact commArt = commit(spec, newArt);
     spec.assertArtifact(repoClient, commArt);
-    ArtifactData ad2 = repoClient.getArtifactData(newArt);
-    assertEquals(SIM_TIME, ad2.getStoreDate());
+    try (ArtifactData ad2 = repoClient.getArtifactData(newArt)) {
+      assertEquals(SIM_TIME, ad2.getStoreDate());
+    }
   }
 
   /** Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}. */
@@ -1210,14 +1212,16 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     ArtifactSpec cspec = anyCommittedSpec();
     if (cspec != null) {
-      ArtifactData ad = repoClient.getArtifactData(cspec.getArtifact());
-      cspec.assertArtifactData(ad);
+      try (ArtifactData ad = repoClient.getArtifactData(cspec.getArtifact())) {
+        cspec.assertArtifactData(ad);
+      }
     }
 
     ArtifactSpec uspec = anyUncommittedSpec();
     if (uspec != null) {
-      ArtifactData ad = repoClient.getArtifactData(uspec.getArtifact());
-      uspec.assertArtifactData(ad);
+      try (ArtifactData ad = repoClient.getArtifactData(uspec.getArtifact())) {
+        uspec.assertArtifactData(ad);
+      }
     }
   }
 
@@ -1517,7 +1521,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       if (spec != null) {
         AuSize auSize1 = repoClient.auSize(spec.getNamespace(), spec.getAuid());
 
-        assertNotNull(repoClient.getArtifactData(spec.getArtifact()));
+        try (ArtifactData ad = repoClient.getArtifactData(spec.getArtifact())) {
+          assertNotNull(ad);
+        }
         assertNotNull(getArtifact(repoClient, spec, false));
         assertNotNull(getArtifact(repoClient, spec, true));
         log.info("Deleting not highest: " + spec);
@@ -1550,7 +1556,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         AuSize auSize1 = repoClient.auSize(spec.getNamespace(), spec.getAuid());
 
         long artsize = spec.getContentLength();
-        assertNotNull(repoClient.getArtifactData(spec.getArtifact()));
+        try (ArtifactData ad = repoClient.getArtifactData(spec.getArtifact())) {
+          assertNotNull(ad);
+        }
         assertNotNull(getArtifact(repoClient, spec, false));
         assertNotNull(getArtifact(repoClient, spec, true));
         log.info("Deleting highest: " + spec);
@@ -1591,7 +1599,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       if (uspec != null) {
         AuSize auSize1 = repoClient.auSize(uspec.getNamespace(), uspec.getAuid());
 
-        assertNotNull(repoClient.getArtifactData(uspec.getArtifact()));
+        try (ArtifactData ad = repoClient.getArtifactData(uspec.getArtifact())) {
+          assertNotNull(ad);
+        }
         assertNull(getArtifact(repoClient, uspec, false));
         assertNotNull(getArtifact(repoClient, uspec, true));
         log.info("Deleting uncommitted: " + uspec);
@@ -1626,7 +1636,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       ArtifactSpec spec = iter.next();
       String ns = spec.getNamespace();
       String id = spec.getArtifactUuid();
-      assertNotNull(repoClient.getArtifactData(spec.getArtifact()));
+      try (ArtifactData ad = repoClient.getArtifactData(spec.getArtifact())) {
+        assertNotNull(ad);
+      }
       // Delete the artifact.
       repoClient.deleteArtifact(ns, id);
 
@@ -2373,7 +2385,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     String newArtUuid = newArt.getUuid();
     assertNotNull(newArtUuid);
     assertFalse(newArt.getCommitted());
-    assertNotNull(repoClient.getArtifactData(newArt));
+    try (ArtifactData newArtifactData = repoClient.getArtifactData(newArt)) {
+      assertNotNull(newArtifactData);
+    }
 
     Artifact oldArt = getArtifact(repoClient, spec, false);
     if (expVers == 0) {
@@ -2432,7 +2446,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact newArt = getArtifact(repoClient, spec, false);
     assertNotNull(newArt);
     assertTrue(newArt.getCommitted());
-    assertNotNull(repoClient.getArtifactData(newArt));
+    try (ArtifactData newArtifactData = repoClient.getArtifactData(newArt)) {
+      assertNotNull(newArtifactData);
+    }
     // Get the same artifact when uncommitted may be included.
     Artifact newArt2 = getArtifact(repoClient, spec, true);
     assertTrue(newArt.equalsExceptStorageUrl(newArt2));
