@@ -3,6 +3,8 @@
 ## 2.15.0
 ## changes since 2.12.0
 * Remove travis CI support
+* Move to OpenAPI 3
+* Move to Java 17
 * Upgrade to Spring 6.x and Spring Boot 3.x related changes
 * Upgrade to Surefire 5.2.2, JUnit 5.9.3 (Surefire's version).
 * Use jakarta components
