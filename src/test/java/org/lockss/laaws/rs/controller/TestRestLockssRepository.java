@@ -49,6 +49,7 @@ import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.LocalLockssRepository;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.ConfigurationUtil;
@@ -100,6 +101,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static java.nio.file.StandardOpenOption.APPEND;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 
 /**
@@ -1180,6 +1182,28 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           highSpec.getUrl()));
     }
 
+  }
+
+  @Test
+  public void testGetArtifactDataStreaming() throws Exception {
+    long len = FileUtils.ONE_GB;
+
+    ArtifactSpec spec =
+        new ArtifactSpec()
+            .setArtifactUuid("artifact-uuid")
+            .setUrl("artifact-url")
+            .setContentGenerator(() -> new ZeroInputStream((byte) 46, len))
+            .setCollectionDate(0);
+
+    doReturn(spec.getArtifactData())
+        .when((BaseLockssRepository)internalRepo)
+        .getArtifactData(
+            (String) argThat(ns -> ns.equals(spec.getNamespace())),
+            (String) argThat(uuid -> uuid.equals(spec.getArtifactUuid())));
+
+    ArtifactData ad = repoClient.getArtifactData(spec.getArtifact());
+
+    spec.assertArtifactData(ad);
   }
 
   /** Test for {@link RestLockssRepository#getArtifactData(Artifact)}. */
