@@ -359,7 +359,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         // Setup mocked server response
         // ****************************
 
-        ArtifactData ad = spec.getArtifactData(!isHttpResponse);
+        ArtifactData ad = spec.getArtifactData();
         assertEquals(isHttpResponse, ad.isHttpResponse());
 
         ResourceHttpMessageConverter converter = new ResourceHttpMessageConverter();
