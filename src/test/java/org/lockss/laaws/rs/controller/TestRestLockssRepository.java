@@ -1196,14 +1196,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .setCollectionDate(0);
 
     doReturn(spec.getArtifactData())
-        .when((BaseLockssRepository)internalRepo)
+        .when((BaseLockssRepository) internalRepo)
         .getArtifactData(
             (String) argThat(ns -> ns.equals(spec.getNamespace())),
             (String) argThat(uuid -> uuid.equals(spec.getArtifactUuid())));
 
-    ArtifactData ad = repoClient.getArtifactData(spec.getArtifact());
-
-    spec.assertArtifactData(ad);
+    try (ArtifactData ad = repoClient.getArtifactData(spec.getArtifact())) {
+      spec.assertArtifactData(ad);
+    }
   }
 
   /** Test for {@link RestLockssRepository#getArtifactData(Artifact)}. */
