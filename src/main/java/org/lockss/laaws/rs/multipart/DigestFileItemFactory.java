@@ -32,9 +32,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.multipart;
 
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.io.FileCleaningTracker;
+import org.apache.tomcat.util.http.fileupload.FileItem;
+import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
 
 import java.io.File;
 
@@ -64,18 +63,9 @@ public class DigestFileItemFactory extends DiskFileItemFactory {
   @Override
   public FileItem createItem(String fieldName, String contentType,
                              boolean isFormField, String fileName) {
-
-    DigestFileItem result = new DigestFileItem(fieldName, contentType,
-        isFormField, fileName, getSizeThreshold(), getRepository());
-
+    final DigestFileItem result = new DigestFileItem(fieldName, contentType,
+    isFormField, fileName, getSizeThreshold(), getRepository());
     result.setDefaultCharset(getDefaultCharset());
-
-    FileCleaningTracker tracker = getFileCleaningTracker();
-
-    if (tracker != null) {
-      tracker.track(result.getTempFile(), result);
-    }
-
     return result;
   }
 }

@@ -32,13 +32,12 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.multipart;
 
-import org.apache.commons.fileupload.disk.DiskFileItem;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.tomcat.util.http.fileupload.disk.DiskFileItem;
+import org.lockss.util.StringUtil;
 import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.UUID;
@@ -59,7 +58,7 @@ public class DigestFileItem extends DiskFileItem {
   }
 
   @Override
-  public OutputStream getOutputStream() throws IOException {
+  public OutputStream getOutputStream() {
     output = new HttpBodyDigestOutputStream(super.getOutputStream());
 
     if (getFieldName().equals(RestLockssRepository.MULTIPART_ARTIFACT_PAYLOAD)) {
@@ -68,7 +67,6 @@ public class DigestFileItem extends DiskFileItem {
 
     return output;
   }
-
 
   /**
    * Returns the {@code X-Lockss-Content-Type} header if present, otherwise the
@@ -80,7 +78,7 @@ public class DigestFileItem extends DiskFileItem {
     String contentType =
         getHeaders().getHeader(ArtifactConstants.X_LOCKSS_CONTENT_TYPE);
 
-    return StringUtils.isEmpty(contentType) ?
+    return StringUtil.isNullString(contentType) ?
         super.getContentType() : contentType;
   }
 

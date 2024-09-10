@@ -420,6 +420,22 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
             HttpHeaders referenceHeaders = reference.getHttpHeaders();
             assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
                 && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
+//            assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
+//                && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
+
+            HttpHeaders actualHeaders = result.getHttpHeaders();
+
+            log.info("ref.keys = {}", referenceHeaders.keySet());
+            log.info("act.keys = {}", actualHeaders.keySet());
+            actualHeaders.remove("Content-Type");
+            assertIterableEquals(referenceHeaders.keySet(), actualHeaders.keySet());
+
+            for (String key : referenceHeaders.keySet()) {
+                log.info("key = {}", key);
+                log.info("ref = {}", referenceHeaders.get(key));
+                log.info("act = {}", actualHeaders.get(key));
+                assertIterableEquals(referenceHeaders.get(key), actualHeaders.get(key));
+            }
 
             // Assert artifact HTTP response status matches
             assertArrayEquals(

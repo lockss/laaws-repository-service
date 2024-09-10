@@ -31,6 +31,7 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.app.LockssDaemon;
+import org.lockss.daemon.LockssThread;
 import org.lockss.jms.JMSManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
@@ -76,7 +77,7 @@ public class LockssRepositoryConfig {
     BaseLockssRepository repo = createLockssRepository();
 
     // Initialize the repository in a separate thread
-    new Thread(() -> {
+    LockssThread.of("Init Repository", () -> {
       try {
         log.debug("Initializing LOCKSS repository from thread");
         repo.initRepository();
@@ -89,7 +90,7 @@ public class LockssRepositoryConfig {
 
     // Start a new thread to handle JMS messages to this LockssRepository
     // XXX wrong method, below is public
-    new Thread(() -> initJmsFactory(repo)).start();
+    LockssThread.of("Init JMS", () -> initJmsFactory(repo)).start();
 
     return repo;
   }

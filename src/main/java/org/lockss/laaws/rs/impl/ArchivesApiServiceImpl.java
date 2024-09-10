@@ -30,7 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
@@ -86,7 +86,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
                  repo.addArtifacts(namespace, auId, input, LockssRepository.ArchiveType.WARC, storeDuplicate, excludeStatusPattern)) {
 
           try (DeferredTempFileOutputStream out =
-                   new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), null)) {
+                   new DeferredTempFileOutputStream((int) (16 * FileUtils.ONE_MB), (String) null)) {
 
             ObjectMapper objMapper = new ObjectMapper();
             objMapper.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
@@ -127,7 +127,7 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
     }
   }
 
-  @javax.annotation.PostConstruct
+  @jakarta.annotation.PostConstruct
   private void init() {
     setUpJms(JMS_SEND,
         RestLockssRepository.REST_ARTIFACT_CACHE_ID,
