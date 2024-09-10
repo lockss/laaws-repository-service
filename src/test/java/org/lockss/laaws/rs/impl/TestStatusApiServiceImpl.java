@@ -32,30 +32,34 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.app.*;
-import org.lockss.util.rest.status.ApiStatus;
-import org.lockss.util.rest.repo.LockssRepository;
-import org.lockss.rs.BaseLockssRepository;
-import org.lockss.rs.io.index.*;
+import org.lockss.app.LockssApp;
+import org.lockss.app.LockssDaemon;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.BaseLockssRepository;
+import org.lockss.rs.io.index.AbstractArtifactIndex;
+import org.lockss.rs.io.index.VolatileArtifactIndex;
 import org.lockss.spring.test.SpringLockssTestCase4;
+import org.lockss.util.rest.repo.LockssRepository;
+import org.lockss.util.rest.status.ApiStatus;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.junit4.SpringRunner;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Test class for org.lockss.laaws.mdq.api.MetadataApiServiceImpl and
@@ -177,8 +181,9 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
     ResponseEntity<String> successResponse = new TestRestTemplate().exchange(
 	getTestUrlTemplate("/status"), HttpMethod.GET, null, String.class);
 
-    HttpStatus statusCode = successResponse.getStatusCode();
-    assertEquals(HttpStatus.OK, statusCode);
+    HttpStatusCode statusCode = successResponse.getStatusCode();
+    HttpStatus status = HttpStatus.valueOf(statusCode.value());
+    assertEquals(HttpStatus.OK, status);
 
     // Get the expected result.
     ApiStatus expected = new ApiStatus("swagger/swagger.yaml");

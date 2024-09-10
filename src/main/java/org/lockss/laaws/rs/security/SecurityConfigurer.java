@@ -44,7 +44,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
  */
 @Configuration
 @EnableWebSecurity
-@EnableGlobalMethodSecurity(prePostEnabled = true)
+//@EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfigurer extends SpringSecurityConfigurer {
   // To use an authentication filter different than the default
   // org.lockss.rs.auth.SpringAuthenticationFilter, override the

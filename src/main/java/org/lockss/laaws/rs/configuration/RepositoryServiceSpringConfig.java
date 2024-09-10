@@ -1,6 +1,6 @@
 /*
 
-Copyright (c) 2000-2022, Board of Trustees of Leland Stanford Jr. University
+Copyright (c) 2000-2024, Board of Trustees of Leland Stanford Jr. University
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -32,22 +32,25 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.configuration;
 
+import jakarta.servlet.MultipartConfigElement;
 import org.apache.commons.io.FileUtils;
 import org.lockss.config.ConfigManager;
-import org.lockss.laaws.rs.multipart.DigestMultipartResolver;
+import org.lockss.laaws.rs.multipart.LockssMultipartResolver;
 import org.lockss.log.L4JLogger;
-import org.lockss.util.io.FileUtil;
+import org.lockss.util.time.TimeBase;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.boot.web.error.ErrorAttributeOptions;
+import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.web.multipart.MultipartResolver;
-import org.springframework.web.multipart.commons.CommonsMultipartResolver;
-import org.springframework.web.servlet.DispatcherServlet;
+import org.springframework.web.context.request.WebRequest;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Spring configuration beans for the Spring-implementation of the LOCKSS Repository Service.
@@ -68,19 +71,12 @@ public class RepositoryServiceSpringConfig {
   public static final int DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE =
     4 * (int)FileUtils.ONE_MB;
 
-  @Autowired
-  CommonsMultipartResolver cmResolver;
+  LockssMultipartResolver multipartResolver;
 
-  /**
-   * Emits a {@link CommonsMultipartResolver} bean for use in Spring's {@link DispatcherServlet}.
-   * <p>
-   * See the javadocs of {@link MultipartResolver} and {@link DispatcherServlet} for details.
-   *
-   * @return A {@link CommonsMultipartResolver} for the Spring-implementation of the LOCKSS Repository Service.
-   */
   @Bean
-  public CommonsMultipartResolver multipartResolver() throws IOException {
-    return new DigestMultipartResolver();
+  public LockssMultipartResolver multipartResolver(ObjectProvider<MultipartProperties> multipartPropsProvider) {
+    multipartResolver = new LockssMultipartResolver(multipartPropsProvider.getIfAvailable());
+    return multipartResolver;
   }
 
   // When ConfigManager is started, register a config callback to set the
@@ -104,19 +100,21 @@ public class RepositoryServiceSpringConfig {
         File tmpdir = new File(ConfigManager.getConfigManager().getTmpDir(), uploadDir);
 
 	try {
-	  log.debug("Setting CommonsMultipartResolver tmpdir to {}", tmpdir);
-	  cmResolver.setUploadTempDir(new FileSystemResource(tmpdir));
+	  log.debug("Setting LockssMultipartResolver tmpdir to {}", tmpdir);
+	  multipartResolver.setUploadTempDir(tmpdir);
+          if (false) throw new IOException();
 	} catch (IOException e) {
-	  log.warn("Couldn't set CommonsMultipartResolver tmpdir to {}",
+	  log.warn("Couldn't set LockssMultipartResolver tmpdir to {}",
 		   tmpdir);
 	}
       }
+
       if (changedKeys.contains(PARAM_MULTIPART_MAX_IN_MEMORY_SIZE)) {
 	int maxInMem = newConfig.getInt(PARAM_MULTIPART_MAX_IN_MEMORY_SIZE,
 					DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE);
-	log.debug("Setting CommonsMultipartResolver maxInMemorySize to {}",
+	log.debug("Setting LockssMultipartResolver maxInMemorySize to {}",
 		  maxInMem);
-	cmResolver.setMaxInMemorySize(maxInMem);
+	multipartResolver.setMaxInMemorySize(maxInMem);
       }
     }
   }

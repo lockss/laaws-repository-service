@@ -40,18 +40,17 @@ import org.lockss.spring.base.BaseSpringBootApplication;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.solr.SolrAutoConfiguration;
-import springfox.documentation.swagger2.annotations.EnableSwagger2;
+import org.springframework.context.annotation.ComponentScan;
 
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
-import static org.lockss.app.ManagerDescs.ACCOUNT_MANAGER_DESC;
+import static org.lockss.app.ManagerDescs.*;
 
 /**
  * The Spring-Boot application.
  */
-@SpringBootApplication(exclude = {SolrAutoConfiguration.class})
-@EnableSwagger2
+@SpringBootApplication()
+@ComponentScan(basePackages = { "org.lockss.laaws.rs", "org.lockss.laaws.rs.api" , "org.lockss.laaws.rs.config"})
 public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
   private static L4JLogger log = L4JLogger.getLogger();
@@ -59,6 +58,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private static final ManagerDesc[] myManagerDescs = {
+      STATE_MANAGER_DESC,
       ACCOUNT_MANAGER_DESC,
       new ManagerDesc(managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName())
   };

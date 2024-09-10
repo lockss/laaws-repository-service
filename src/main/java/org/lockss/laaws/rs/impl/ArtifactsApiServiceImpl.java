@@ -1,6 +1,7 @@
 package org.lockss.laaws.rs.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.commons.io.IOUtils;
@@ -8,7 +9,7 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
-import org.lockss.laaws.rs.multipart.DigestFileItem;
+import org.lockss.laaws.rs.multipart.LockssMultipartHttpServletRequest;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactData;
@@ -42,16 +43,15 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.multipart.commons.CommonsMultipartFile;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageListener;
-import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -242,12 +242,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       ad.setContentLength(payload.getSize());
 
       // Set artifact data digest
-      DigestFileItem item =
-          (DigestFileItem)((CommonsMultipartFile)payload).getFileItem();
+      MessageDigest md =
+          ((LockssMultipartHttpServletRequest.LockssMultipartFile)payload).getDigest();
 
       String contentDigest = String.format("%s:%s",
-          item.getDigest().getAlgorithm(),
-          new String(Hex.encodeHex(item.getDigest().digest())));
+          md.getAlgorithm(), new String(Hex.encodeHex(md.digest())));
 
       ad.setContentDigest(contentDigest);
 
@@ -271,8 +270,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         }
       } else {
         // Set artifact's Content-Type to the Content-Type of the part
-        ad.getHttpHeaders().set(HttpHeaders.CONTENT_TYPE,
-            ((CommonsMultipartFile) payload).getFileItem().getContentType());
+        ad.getHttpHeaders()
+            .set(HttpHeaders.CONTENT_TYPE, payload.getContentType());
       }
 
       //// Add artifact to internal repository
@@ -834,7 +833,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * @return a {@code ResponseEntity<Artifact>}.
    */
   @Override
-  public ResponseEntity updateArtifact(String artifactid, Boolean committed, String namespace) {
+  public ResponseEntity updateArtifact(Boolean committed, String artifactid, String namespace) {
     String parsedRequest = String.format(
         "namespace: %s, artifactid: %s, committed: %s, requestUrl: %s",
         namespace, artifactid, committed, ServiceImplUtil.getFullRequestUrl(request));
@@ -950,7 +949,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   // JMS /////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
 
-  @javax.annotation.PostConstruct
+  @jakarta.annotation.PostConstruct
   private void init() {
     setUpJms(JMS_BOTH,
         RestLockssRepository.REST_ARTIFACT_CACHE_ID,

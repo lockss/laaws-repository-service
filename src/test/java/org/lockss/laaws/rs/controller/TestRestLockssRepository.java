@@ -1,5 +1,4 @@
 /*
-
 Copyright (c) 2000-2022, Board of Trustees of Leland Stanford Jr. University
 
 Redistribution and use in source and binary forms, with or without
@@ -51,13 +50,12 @@ import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.LocalLockssRepository;
-import org.lockss.rs.io.index.ArtifactIndex;
-import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.ConfigurationUtil;
 import org.lockss.test.LockssTestCase4;
 import org.lockss.test.RandomInputStream;
 import org.lockss.test.ZeroInputStream;
+import org.lockss.test.ThrowingInputStream;
 import org.lockss.util.ListUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
@@ -70,18 +68,14 @@ import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.*;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
-import org.lockss.util.rest.repo.util.RepoUtil;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.embedded.LocalServerPort;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -107,7 +101,6 @@ import java.util.zip.GZIPOutputStream;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.spy;
 
 /**
  * Tests an embedded LOCKSS Repository Service instance configured with an internal {@link LocalLockssRepository}.
@@ -116,7 +109,7 @@ import static org.mockito.Mockito.spy;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-@ActiveProfiles("test")
+@ContextConfiguration(classes = { MyTestConfig.class })
 public class TestRestLockssRepository extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 
@@ -192,34 +185,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @Autowired
   LockssRepository internalRepo;
 
-  @TestConfiguration
-  @Profile("test")
-  static class TestLockssRepositoryConfig {
-    /**
-     * Initializes the internal {@link LockssRepository} instance used by the
-     * embedded LOCKSS Repository Service.
-     */
-    @Bean
-    public LockssRepository createInitializedRepository() throws IOException {
-      File stateDir = LockssTestCase4.getTempDir(tmpDirs);
-      File basePath = LockssTestCase4.getTempDir(tmpDirs);
 
-      LockssRepository repository =
-          new LocalLockssRepository(stateDir, basePath, NS1);
-
-      return spy(repository);
-    }
-
-    @Bean
-    public ArtifactIndex setArtifactIndex() {
-      return null;
-    }
-
-    @Bean
-    public ArtifactDataStore setArtifactDataStore() {
-      return null;
-    }
-  }
 
   @AfterClass
   public static void deleteTempDirs() throws Exception {
@@ -367,7 +333,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String)}.
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean, String)}.
    */
   @Test
   public void testAddArtifacts() throws Exception {
@@ -584,7 +550,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean)}.
+   * Test for {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean, String)}.
    */
   @Test
   public void testAddArtifactsDupCheck() throws Exception {
@@ -803,7 +769,42 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
+  public void testAddArtifact_EOFClientError() throws Exception {
+    ArtifactSpec spec = new ArtifactSpec()
+        .setUrl("https://www.lockss.org/")
+        .setContentLength(1024L)
+        .setContentDigest("My SHA256 Hash")
+        .setCollectionDate(TimeBase.nowMs())
+        .setContentGenerator(() ->
+            new ThrowingInputStream(
+                InputStream.nullInputStream(),
+                new IOException("Simulated IOException"),
+                null));
+
+    // for (int i = 0; i < 3; i++)
+    try {
+      Artifact result = repoClient.addArtifact(spec.getArtifactData());
+      fail("Expected client to throw");
+    } catch (Exception e) {
+      Thread.sleep(1000);
+    }
+  }
+
+  @Test
   public void testAddArtifact() throws IOException {
+
+    ArtifactSpec spec = new ArtifactSpec()
+        .setUrl("http://hyperwolf.ai/")
+        .setCollectionDate(1234);
+
+    spec.generateContent();
+
+    Artifact result = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(result);
+  }
+
+  @Test
+  public void testAddArtifact_old() throws IOException {
     // Illegal arguments
     assertThrowsMatch(IllegalArgumentException.class,
         "ArtifactData",

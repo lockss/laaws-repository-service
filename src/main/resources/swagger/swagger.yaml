@@ -13,9 +13,9 @@
 #
 # 3. Neither the name of the copyright holder nor the names of its contributors
 # may be used to endorse or promote products derived from this software without
-# specific prior written permission. 
+# specific prior written permission.
 #
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
 # ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
@@ -27,559 +27,598 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-swagger: "2.0"
+openapi: 3.0.1
 info:
-  title: "LOCKSS Repository Service REST API"
-  version: "2.0.0"
-  description: "REST API of the LOCKSS Repository Service"
+  title: LOCKSS Repository Service REST API
+  description: REST API of the LOCKSS Repository Service
   contact:
-    name: "LOCKSS Support"
-    url: "https://www.lockss.org/"
-    email: "lockss-support@lockss.org"
+    name: LOCKSS Support
+    url: 'https://www.lockss.org/'
+    email: lockss-support@lockss.org
   license:
-    name: "BSD-3-Clause"
-    url: "https://opensource.org/licenses/BSD-3-Clause"
-host: "laaws.lockss.org:443"
-basePath: "/"
+    name: BSD-3-Clause
+    url: 'https://opensource.org/licenses/BSD-3-Clause'
+  version: 2.0.0
+servers:
+  - url: http://laaws.lockss.org:443/
 tags:
   - name: Default
     description: Default section
   - name: repository
     description: Tasks on the repository
-schemes:
-- "http"
-produces:
-- "application/json"
 paths:
   /namespaces:
     get:
       tags:
         - repo
-      summary: "Get namespaces of the committed artifacts in the repository"
+      summary: Get namespaces of the committed artifacts in the repository
       operationId: getNamespaces
-      parameters: []
       responses:
-        200:
-          description: "Status 200"
-          schema:
-            type: "array"
-            items:
-              type: "string"
+        '200':
+          description: Status 200
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /archives:
     post:
       tags:
         - artifacts
-      summary: "Imports artifacts from an archive"
+      summary: Imports artifacts from an archive
       operationId: addArtifacts
-      consumes:
-        - "multipart/form-data"
       parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "query"
-          type: "string"
-          required: false
-          default: "lockss"
-        - name: "auid"
-          in: "formData"
-          required: true
-          type: "string"
-          description: "Archival Unit ID (AUID) of new artifact"
-        - name: "archive"
-          in: "formData"
-          required: true
-          type: "file"
-          description: "Archive data containing artifacts"
-        - name: "storeDuplicate"
-          description: "If true, artifacts with duplicate content will be stored, otherwise suppressed"
-          in: "query"
-          type: "boolean"
-          required: false
-          default: false
-        - name: "excludeStatusPattern"
-          description: "If supplied, WARC records whose HTTP response status code matches the regular expression will not be imported"
-          in: "query"
-          type: "string"
-          required: false
-      responses:
-        200:
-          description: "Status of artifacts imported from the archive, maybe partially. Return body is a sequence of 
-          JSON ImportStatus objects."
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
           schema:
-            type: file
-        400:
-          description: "Invalid input"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to create artifacts"
-        502:
-          description: "Internal error creating artifact"
+            type: string
+            default: lockss
+        - name: storeDuplicate
+          in: query
+          description: 'If true, artifacts with duplicate content will be stored, otherwise suppressed'
+          schema:
+            type: boolean
+            default: false
+        - name: excludeStatusPattern
+          in: query
+          description: 'If supplied, WARC records whose HTTP response status code matches the regular expression will not be imported'
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              required:
+                - archive
+                - auid
+              type: object
+              properties:
+                auid:
+                  description: Archival Unit ID (AUID) of new artifact
+                  type: string
+                archive:
+                  description: Archive data containing artifacts
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 'Status of artifacts imported from the archive, maybe partially. Return body is a sequence of JSON ImportStatus objects.'
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /artifacts:
     get:
       tags:
         - artifacts
-      summary: "Returns all artifacts that match a given a URL or URL prefix and/or version."
+      summary: Returns all artifacts that match a given a URL or URL prefix and/or version.
       operationId: getArtifactsFromAllAus
       parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "query"
-          type: "string"
-          required: false
-          default: "lockss"
-        - name: "url"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The URL contained by the artifacts"
-        - name: "urlPrefix"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The prefix to be matched by the artifact URLs"
-        - name: "versions"
-          in: "query"
-          description: "Versions of the artifacts to return"
-          type: string
-          enum:
-            - all
-            - latest
-          default: all
-        - name: "limit"
-          in: "query"
-          description: "The requested maximum number of artifacts per response"
-          required: false
-          type: "integer"
-        - name: "continuationToken"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The continuation token of the next page of artifacts to\
-          \ be returned"
-      responses:
-        200:
-          description: "The requested artifacts"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
           schema:
-            $ref: '#/definitions/artifactPageInfo'
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "Collection not found"
-        502:
-          description: "Could not read from external resource"
+            type: string
+            default: lockss
+        - name: url
+          in: query
+          description: The URL contained by the artifacts
+          schema:
+            type: string
+        - name: urlPrefix
+          in: query
+          description: The prefix to be matched by the artifact URLs
+          schema:
+            type: string
+        - name: versions
+          in: query
+          description: Versions of the artifacts to return
+          schema:
+            type: string
+            default: all
+            enum:
+              - all
+              - latest
+        - name: limit
+          in: query
+          description: The requested maximum number of artifacts per response
+          schema:
+            type: integer
+        - name: continuationToken
+          in: query
+          description: The continuation token of the next page of artifacts to be returned
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The requested artifacts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/artifactPageInfo'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
     post:
       tags:
         - artifacts
-      summary: "Create an artifact"
+      summary: Create an artifact
       operationId: createArtifact
-      consumes:
-      - "multipart/form-data"
-      parameters:
-      - name: "artifactProps"
-        in: "formData"
-        required: true
-        type: "string"
-        description: "Artifact properties (JSON)"
-      - name: "httpResponseHeader"
-        in: "formData"
-        required: false
-        type: "string"
-        description: "HTTP response status and headers (optional)"
-      - name: "payload"
-        in: "formData"
-        required: true
-        type: "file"
-        description: "Artifact payload data"
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              required:
+                - artifactProps
+                - payload
+              type: object
+              properties:
+                artifactProps:
+                  description: Artifact properties (JSON)
+                  type: string
+                payload:
+                  description: Artifact payload data
+                  type: string
+                  format: binary
+                httpResponseHeader:
+                  type: string
+                  description: HTTP response status and headers (optional)
       responses:
-        201:
-          description: "Artifact created"
-          schema:
-            $ref: "#/definitions/artifact"
-        302:
-          description: "Duplicate content; artifact not created"
+        '201':
+          description: Artifact created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/artifact'
+        '302':
+          description: Duplicate content; artifact not created
           headers:
             Location:
-              type: "string"
-              description: "Repository query URL to duplicate artifacts"
-        400:
-          description: "Invalid input"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to create artifacts"
-        502:
-          description: "Internal error creating artifact"
-  /artifacts/{uuid}:
-    parameters:
-      - name: "namespace"
-        description: "Namespace of the artifacts"
-        in: "query"
-        type: "string"
-        required: false
-        default: "lockss"
-      - name: "uuid"
-        in: "path"
-        required: true
-        type: "string"
-        description: "Identifier of the artifact"
+              description: Repository query URL to duplicate artifacts
+              schema:
+                type: string
+          content: { }
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
+  '/artifacts/{uuid}':
     get:
       tags:
         - artifacts
-      summary: "Get artifact and metadata"
+      summary: Get artifact and metadata
       operationId: getArtifactDataByMultipart
       parameters:
-        - name: "includeContent"
-          in: "query"
-          type: "string"
-          enum: [ "NEVER", "IF_SMALL", "ALWAYS" ]
-          description: "Controls whether to include the artifact content part in multipart response"
-          required: false
-          default: "ALWAYS"
-      produces:
-        - "multipart/form-data"
-        - "application/json"
-      responses:
-        200:
-          description: "Multipart/form-data containing the following parts: The artifact properties, HTTP 
-            status and headers if present, and the artifact's payload if requested. See POST /artifacts for 
-            more information."
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
           schema:
-            type: file
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve artifact"
-        404:
-          description: "Artifact not found"
-        500:
-          description: "Internal Server Error"
-        502:
-          description: "Could not read from external resource"
+            type: string
+            default: lockss
+        - name: uuid
+          in: path
+          description: Identifier of the artifact
+          required: true
+          schema:
+            type: string
+        - name: includeContent
+          in: query
+          description: Controls whether to include the artifact content part in multipart response
+          schema:
+            type: string
+            default: ALWAYS
+            enum:
+              - NEVER
+              - IF_SMALL
+              - ALWAYS
+      responses:
+        '200':
+          description: "Multipart/form-data containing the following parts:
+           The artifact properties, HTTP status and headers if present, and the artifact's payload if requested.
+           See POST /artifacts for more information."
+          content:
+            multipart/form-data:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
     put:
       tags:
         - artifacts
-      summary: "Update the property of an artifact"
+      summary: Update the property of an artifact
       operationId: updateArtifact
-      consumes:
-        - "multipart/form-data"
       parameters:
-        - name: "committed"
-          in: "formData"
-          required: true
-          type: "boolean"
-          description: "New commit status of artifact"
-      responses:
-        200:
-          description: "Artifact updated"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
           schema:
-            $ref: "#/definitions/artifact"
-        400:
-          description: "Invalid input"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to update artifact"
-        404:
-          description: "Artifact not found"
+            type: string
+            default: lockss
+        - name: committed
+          in: query
+          description: Committed status of the artifact
+          required: true
+          schema:
+            type: boolean
+        - name: uuid
+          in: path
+          description: Identifier of the artifact
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Artifact updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/artifact'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
     delete:
       tags:
         - artifacts
-      summary: "Remove an artifact from the repository"
+      summary: Remove an artifact from the repository
       operationId: deleteArtifact
-      consumes:
-        - "application/json"
-      parameters: [ ]
+      parameters:
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
+          schema:
+            type: string
+            default: lockss
+        - name: uuid
+          in: path
+          description: Identifier of the artifact
+          required: true
+          schema:
+            type: string
       responses:
-        200:
-          description: "Successfully removed artifact"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to delete artifact"
-        404:
-          description: "Artifact not found"
-        409:
-          description: "Cannot delete artifact"
+        '200':
+          description: Successfully removed artifact
+          content: { }
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /artifacts/{uuid}/payload:
-    parameters:
-      - name: "namespace"
-        description: "Namespace of the artifacts"
-        in: "query"
-        type: "string"
-        required: false
-        default: "lockss"
-      - name: "uuid"
-        in: "path"
-        required: true
-        type: "string"
-        description: "Identifier of the artifact"
     get:
       tags:
         - artifacts
-      summary: "Get artifact payload"
+      summary: Get artifact payload
       operationId: getArtifactDataByPayload
       parameters:
-        - name: "includeContent"
-          in: "query"
-          type: "string"
-          enum: [ "NEVER", "IF_SMALL", "ALWAYS" ]
-          description: "Controls whether to include the artifact content part in multipart response"
-          required: false
-          default: "ALWAYS"
-      produces:
-        - "application/octet-stream"
-      responses:
-        200:
-          description: "Artifact's payload"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
           schema:
-            type: file
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve artifact"
-        404:
-          description: "Artifact not found"
-        500:
-          description: "Internal Server Error"
-        502:
-          description: "Could not read artifact"
+            type: string
+            default: lockss
+        - name: uuid
+          in: path
+          description: Identifier of the artifact
+          required: true
+          schema:
+            type: string
+        - name: includeContent
+          in: query
+          description: Controls whether to include the artifact content part in multipart response
+          schema:
+            type: string
+            default: ALWAYS
+            enum:
+              - NEVER
+              - IF_SMALL
+              - ALWAYS
+      responses:
+        '200':
+          description: Artifact's payload
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /artifacts/{uuid}/response:
-    parameters:
-      - name: "namespace"
-        description: "Namespace of the artifacts"
-        in: "query"
-        type: "string"
-        required: false
-        default: "lockss"
-      - name: "uuid"
-        in: "path"
-        required: true
-        type: "string"
-        description: "Identifier of the artifact"
     get:
       tags:
         - artifacts
-      summary: "Get artifact data as HTTP response"
+      summary: Get artifact data as HTTP response
       operationId: getArtifactDataByResponse
       parameters:
-        - name: "includeContent"
-          in: "query"
-          type: "string"
-          enum: [ "NEVER", "IF_SMALL", "ALWAYS" ]
-          description: "Controls whether to include the artifact content part in multipart response"
-          required: false
-          default: "ALWAYS"
-      produces:
-        - "application/http;msgtype=response"
-      responses:
-        200:
-          description: "Artifact's payload"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
           schema:
-            type: file
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve artifact"
-        404:
-          description: "Artifact not found"
-        500:
-          description: "Internal Server Error"
-        502:
-          description: "Could not read artifact"
+            type: string
+            default: lockss
+        - name: uuid
+          in: path
+          description: Identifier of the artifact
+          required: true
+          schema:
+            type: string
+        - name: includeContent
+          in: query
+          description: Controls whether to include the artifact content part in multipart
+            response
+          schema:
+            type: string
+            default: ALWAYS
+            enum:
+              - NEVER
+              - IF_SMALL
+              - ALWAYS
+      responses:
+        '200':
+          description: Artifact's payload
+          content:
+            application/http;msgtype=response:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /aus:
     get:
       tags:
         - aus
-      summary: "Get Archival Unit IDs (AUIDs) in a namespace"
-      description: "Get a list of all Archival Unit identifiers in a namespace\
-        \ or a pageful of the list defined by the continuation token and size"
+      summary: Get Archival Unit IDs (AUIDs) in a namespace
+      description: Get a list of all Archival Unit identifiers in a namespace or a
+        pageful of the list defined by the continuation token and size
       operationId: getAus
-      responses:
-        200:
-          description: "The requested Archival Unit identifiers"
-          schema:
-            $ref: '#/definitions/auidPageInfo'
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "No AUIDs in namespace"
-        502:
-          description: "Could not read from external resource"
       parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "query"
-          type: "string"
-          required: false
-          default: "lockss"
-        - name: "limit"
-          in: "query"
-          description: "The requested maximum number of Archival Unit\
-            \ identifiers per response"
-          required: false
-          type: "integer"
-        - name: "continuationToken"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The continuation token of the next page of Archival\
-            \ Unit identifiers to be returned"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
+          schema:
+            type: string
+            default: lockss
+        - name: limit
+          in: query
+          description: The requested maximum number of Archival Unit identifiers per
+            response
+          schema:
+            type: integer
+        - name: continuationToken
+          in: query
+          description: The continuation token of the next page of Archival Unit identifiers
+            to be returned
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The requested Archival Unit identifiers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/auidPageInfo'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /aus/{auid}/bulk:
     post:
       tags:
         - aus
-      summary: "Marks the AUID for bulk artifact transfer"
-      description: ""
+      summary: Marks the AUID for bulk artifact transfer
       operationId: handleBulkAuOp
-      responses:
-        200:
-          description: "Bulk operation succeeded"
-        401:
-          description: "Unauthorized"
-        403:
-          description: "Client is forbidden from performing bulk operation"
-        404:
-          description: "AUID not in bulk mode"
       parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "query"
-          type: "string"
-          required: false
-          default: "lockss"
-        - name: "auid"
-          in: "path"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
+          schema:
+            type: string
+            default: lockss
+        - name: auid
+          in: path
+          description: Archival Unit ID
           required: true
-          type: "string"
-          description: "Archival Unit ID"
-        - name: "op"
-          description: "Bulk AU transfer operation"
-          in: "formData"
+          schema:
+            type: string
+        - name: op
+          in: query
           required: true
-          type: string
-          enum: ["start", "finish"]
+          schema:
+            type: string
+            enum:
+            - start
+            - finish
+      responses:
+        '200':
+          description: Bulk operation succeeded
+          content: { }
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /aus/{auid}/artifacts:
     get:
       tags:
         - artifacts
-      summary: "Get artifacts in an Archival Unit"
-      description: "Get a list of all artifacts in a namespace and Archival\
-        \ Unit or a pageful of the list defined by the continuation token and\
-        \ size"
+      summary: Get artifacts in an Archival Unit
+      description: Get a list of all artifacts in a namespace and Archival Unit or
+        a pageful of the list defined by the continuation token and size
       operationId: getArtifacts
-      responses:
-        200:
-          description: "The requested artifacts"
-          schema:
-            $ref: '#/definitions/artifactPageInfo'
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "AUID not found in namespace"
-        502:
-          description: "Could not read from external resource"
       parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "query"
-          type: "string"
-          required: false
-          default: "lockss"
-        - name: "auid"
-          in: "path"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
+          schema:
+            type: string
+            default: lockss
+        - name: auid
+          in: path
+          description: Identifier of the Archival Unit containing the artifacts
           required: true
-          type: "string"
-          description: "Identifier of the Archival Unit containing the\
-            \ artifacts"
-        - name: "url"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The URL contained by the artifacts"
-        - name: "urlPrefix"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The prefix to be matched by the artifact URLs"
-        - name: "version"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The version of the artifact"
-        - name: "includeUncommitted"
-          in: "query"
-          required: false
-          type: "boolean"
-          description: "Indication of whether uncommitted artifacts should be\
-            \ returned"
-        - name: "limit"
-          in: "query"
-          description: "The requested maximum number of artifacts per response"
-          required: false
-          type: "integer"
-        - name: "continuationToken"
-          in: "query"
-          required: false
-          type: "string"
-          description: "The continuation token of the next page of artifacts to\
-            \ be returned"
+          schema:
+            type: string
+        - name: url
+          in: query
+          description: The URL contained by the artifacts
+          schema:
+            type: string
+        - name: urlPrefix
+          in: query
+          description: The prefix to be matched by the artifact URLs
+          schema:
+            type: string
+        - name: version
+          in: query
+          description: The version of the artifact
+          schema:
+            type: string
+        - name: includeUncommitted
+          in: query
+          description: Indication of whether uncommitted artifacts should be returned
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          description: The requested maximum number of artifacts per response
+          schema:
+            type: integer
+        - name: continuationToken
+          in: query
+          description: The continuation token of the next page of artifacts to be returned
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The requested artifacts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/artifactPageInfo'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /aus/{auid}/size:
     get:
       tags:
         - aus
-      summary: "Get the size of Archival Unit artifacts in a namespace"
+      summary: Get the size of Archival Unit artifacts in a namespace
       operationId: getArtifactsSize
       parameters:
-      - name: "namespace"
-        description: "Namespace of the artifacts"
-        in: "query"
-        type: "string"
-        required: false
-        default: "lockss"
-      - name: "auid"
-        in: "path"
-        required: true
-        type: "string"
-        description: "Identifier of the Archival Unit containing the artifacts"
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
+          schema:
+            type: string
+            default: lockss
+        - name: auid
+          in: path
+          description: Identifier of the Archival Unit containing the artifacts
+          required: true
+          schema:
+            type: string
       responses:
         200:
-          description: "Returns an AuSize containing the sizes of all the artifacts, only the latest artifact \
-          version of all URLs, and the sum of the size of all the underlying WARC files, of an AU."
-          schema:
-            $ref: "#/definitions/auSize"
-        401:
-          description: "Unauthorized request"
-        403:
-          description: "Client not authorized to retrieve data"
-        404:
-          description: "AUID not found in namespace"
-        502:
-          description: "Could not read from external resource"
+          description: Returns an AuSize containing the sizes of all the artifacts,
+            only the latest artifact version of all URLs, and the sum of the size
+            of all the underlying WARC files, of an AU.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/auSize'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /status:
     get:
       tags:
-        - "status"
-      summary: "Get the status of the service"
-      description: "Get the status of the service"
-      operationId: "getStatus"
-      produces:
-        - "application/json"
+        - status
+      summary: Get the status of the service
+      description: Get the status of the service
+      operationId: getStatus
       responses:
-        200:
-          description: "The status of the service"
-          schema:
-            $ref: "#/definitions/apiStatus"
-        401:
-          description: "Unauthorized"
-        500:
-          description: "Internal Server Error"
+        '200':
+          description: The status of the service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/apiStatus'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /wayback/cdx/owb/{namespace}:
     get:
       tags:
@@ -587,52 +626,52 @@ paths:
       summary: Get OpenWayback CDX records
       description: Get the OpenWayback CDX records of a URL in a namespace
       operationId: getCdxOwb
-      produces:
-        - "application/xml"
+      parameters:
+        - name: namespace
+          in: path
+          description: Namespace of the artifacts
+          required: true
+          schema:
+            type: string
+            default: lockss
+        - name: q
+          in: query
+          description: 'Query string. Supported fields are url, type (urlqueryprefixquery), offset and limit.'
+          schema:
+            type: string
+        - name: count
+          in: query
+          description: "."
+          schema:
+            type: integer
+        - name: start_page
+          in: query
+          description: "."
+          schema:
+            type: integer
+        - name: Accept
+          in: header
+          description: The Accept header
+          schema:
+            type: string
+        - name: Accept-Encoding
+          in: header
+          description: The Accept-Encoding header
+          schema:
+            type: string
       responses:
         '200':
           description: The OpenWayback CDX records of the URL in the namespace
-          schema:
-            type: string
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-        '404':
-          description: Namespace/URL not found
-        '500':
-          description: Internal Server Error
-      parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "path"
-          type: "string"
-          required: true
-          default: "lockss"
-        - name: q
-          in: query
-          description: Query string. Supported fields are url, type\
-            \ (urlquery/prefixquery), offset and limit.
-          example: url:http://www.example.org/ type:urlquery limit:100
-          type: string
-        - name: count
-          in: query
-          description: .
-          type: integer
-        - name: start_page
-          in: query
-          description: .
-          type: integer
-        - name: 'Accept'
-          in: header
-          description: The Accept header
-          required: false
-          type: string
-        - name: 'Accept-Encoding'
-          in: header
-          description: The Accept-Encoding header
-          required: false
-          type: string
+          content:
+            application/xml:
+              schema:
+                type: string
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /wayback/cdx/pywb/{namespace}:
     get:
       tags:
@@ -640,70 +679,83 @@ paths:
       summary: Get PyWayback CDX records
       description: Get the PyWayback CDX records of a URL in a namespace
       operationId: getCdxPywb
-      produces:
-        - "text/plain"
-      responses:
-        '200':
-          description: The PyWayback CDX records of the URL in the namespace
+      parameters:
+        - name: namespace
+          in: path
+          description: Namespace of the artifacts
+          required: true
           schema:
             type: string
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden
-        '404':
-          description: Namespace/URL not found
-        '500':
-          description: Internal Server Error
-      parameters:
-        - name: "namespace"
-          description: "Namespace of the artifacts"
-          in: "path"
-          type: "string"
-          required: true
-          default: "lockss"
+            default: lockss
         - name: url
           in: query
           description: The URL for which the CDX records are requested
-          type: string
+          schema:
+            type: string
         - name: limit
           in: query
-          description: .
-          type: integer
+          description: "."
+          schema:
+            type: integer
         - name: matchType
           in: query
-          type: string
-          enum: ["exact", "prefix", "host", "domain", "range"]
+          schema:
+            type: string
+            enum:
+              - exact
+              - prefix
+              - host
+              - domain
+              - range
         - name: sort
           in: query
-          type: string
-          enum: ["default", "closest", "reverse"]
+          schema:
+            type: string
+            enum:
+              - default
+              - closest
+              - reverse
         - name: closest
           in: query
           description: Timestamp for sort=closest mode
-          type: string
-          example: 20030402172120
+          schema:
+            type: string
         - name: output
           in: query
           description: Output format
-          type: string
-          enum: ["cdx", "json"]
+          schema:
+            type: string
+            enum:
+              - cdx
+              - json
         - name: fl
           in: query
           description: Comma-separated list of fields to include in output
-          type: string
-          example: urlkey,timestamp,original,mimetype,statuscode,digest,length,\
-            \offset,filename
-        - name: 'Accept'
+          schema:
+            type: string
+        - name: Accept
           in: header
           description: The Accept header
-          required: false
-          type: string
-        - name: 'Accept-Encoding'
+          schema:
+            type: string
+        - name: Accept-Encoding
           in: header
           description: The Accept-Encoding header
-          required: false
-          type: string
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The PyWayback CDX records of the URL in the namespace
+          content:
+            text/plain:
+              schema:
+                type: string
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
   /wayback/warcs/{fileName}:
     get:
       tags:
@@ -711,319 +763,351 @@ paths:
       summary: Get a WARC archive
       description: Get the contents of a single WARC record as a WARC archive
       operationId: getWarcArchive
-      produces:
-        - "application/warc"
-      responses:
-        '200':
-          description: The contents of the requested WARC archive
-          schema:
-            type: file
-        '401':
-          description: Unauthorized
-        '404':
-          description: WARC archive not found
-        '500':
-          description: Internal Server Error
       parameters:
-        - name: 'fileName'
+        - name: fileName
           in: path
           description: Name of the WARC archive
           required: true
-          type: string
-        - name: 'Accept'
+          schema:
+            type: string
+        - name: Accept
           in: header
           description: The Accept header
-          required: false
-          type: string
-        - name: 'Accept-Encoding'
+          schema:
+            type: string
+        - name: Accept-Encoding
           in: header
           description: The Accept-Encoding header
-          required: false
-          type: string
-        - name: 'Range'
+          schema:
+            type: string
+        - name: Range
           in: header
           description: The Range header
-          required: false
-          type: string
-  '/checksumalgorithms':
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The contents of the requested WARC archive
+          content:
+            application/warc:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
+  /checksumalgorithms:
     get:
       tags:
         - repo
       summary: Get the supported checksum algorithms
       description: Get a list of the names of the supported checksum algorithms
       operationId: getSupportedChecksumAlgorithms
-      produces:
-        - application/json
       responses:
         '200':
           description: The names of the supported checksum algorithms
-          schema:
-            type: array
-            items:
-              type: "string"
-        '400':
-          description: Bad Request
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal Server Error
-  '/repoinfo':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
+  /repoinfo:
     get:
       tags:
         - repo
       summary: Get repository information
       description: Get properties of the repository
       operationId: getRepositoryInformation
-      produces:
-        - application/json
       responses:
         '200':
           description: The repository information
-          schema:
-            $ref: "#/definitions/repositoryInfo"
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal Server Error
-  '/repoinfo/storage':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/repositoryInfo'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
+  /repoinfo/storage:
     get:
       tags:
         - repo
       summary: Get repository storage information
       description: Get properties of the repository storage
       operationId: getStorageInfo
-      produces:
-        - application/json
       responses:
         '200':
           description: The repository storage information
-          schema:
-            $ref: "#/definitions/storageInfo"
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal Server Error
-definitions:
-  importStatus:
-    type: "object"
-    properties:
-      warcId:
-        type: "string"
-      offset:
-        type: "integer"
-        format: "int64"
-      url:
-        type: "string"
-      artifactUuid:
-        type: "string"
-      digest:
-        type: "string"
-      version:
-        type: "integer"
-      status:
-        type: "string"
-        enum:
-          - "OK"
-          - "ERROR"
-          - "DUPLICATE"
-          - "EXCLUDED"
-      statusMessage:
-        type: "string"
-  artifactPageInfo:
-    type: "object"
-    required:
-      - "artifacts"
-      - "pageInfo"
-    properties:
-      artifacts:
-        type: "array"
-        description: "The artifacts included in the page"
-        items:
-          $ref: "#/definitions/artifact"
-      pageInfo:
-        $ref: "#/definitions/pageInfo"
-    description: "A display page of artifacts"
-  auSize:
-    type: "object"
-    properties:
-      totalLatestVersions:
-        type: "integer"
-        format: "int64"
-      totalAllVersions:
-        type: "integer"
-        format: "int64"
-      totalWarcSize:
-        type: "integer"
-        format: "int64"
-  artifactProperties:
-    type: "object"
-    properties:
-      namespace:
-        type: "string"
-        default: "lockss"
-      uuid:
-        type: "string"
-      auid:
-        type: "string"
-      uri:
-        type: "string"
-      version:
-        type: "integer"
-      contentLength:
-        type: "integer"
-        format: "int64"
-      contentDigest:
-        type: "string"
-      collectionDate:
-        type: "integer"
-        format: "int64"
-      storeDate:
-        type: "integer"
-        format: "int64"
-      state:
-        type: "string"
-  artifact:
-    allOf:
-      - $ref: '#/definitions/artifactProperties'
-    type: "object"
-    properties:
-      committed:
-        type: "boolean"
-      storageUrl:
-        type: "string"
-  streamingResponseBody:
-    type: "object"
-  apiStatus:
-    description: "The status information of the service"
-    type: "object"
-    required:
-      - "apiVersion"
-      - "ready"
-    properties:
-      apiVersion:
-        type: "string"
-        description: "The version of the API"
-      componentName:
-        type: "string"
-        description: "The name of the component"
-      componentVersion:
-        type: "string"
-        description: "The version of the component software"
-      lockssVersion:
-        type: "string"
-        description: "The version of the LOCKSS system"
-      ready:
-        type: "boolean"
-        description: "The indication of whether the service is available"
-      serviceName:
-        type: "string"
-        description: "The name of the service"
-      readyTime:
-        type: "integer"
-        format: "int64"
-        description: "The time the service last became ready."
-      reason:
-        type: "string"
-        description: "The reason the service isn't ready."
-      startupStatus:
-        description: "Enum indicating progress of plugin/AU processing at startup."
-        type: string
-        enum:
-          - NONE
-          - PLUGINS_CRAWLING
-          - PLUGINS_COLLECTED
-          - PLUGINS_LOADING
-          - PLUGINS_LOADED
-          - AUS_STARTING
-          - AUS_STARTED
-  auidPageInfo:
-    type: "object"
-    required:
-      - "auids"
-      - "pageInfo"
-    properties:
-      auids:
-        type: "array"
-        description: "The Archival Unit identifiers included in the page"
-        items:
-          type: "string"
-      pageInfo:
-        $ref: "#/definitions/pageInfo"
-    description: "A display page of Archival Unit identifiers"
-  pageInfo:
-    type: "object"
-    required:
-      - "totalCount"
-      - "resultsPerPage"
-      - "continuationToken"
-      - "curLink"
-      - "nextLink"
-    properties:
-      totalCount:
-        type: "integer"
-        format: "int32"
-        description: "The total number of results"
-      resultsPerPage:
-        type: "integer"
-        format: "int32"
-        description: "The number of results per page"
-      continuationToken:
-        type: "string"
-        description: "The continuation token"
-      curLink:
-        type: "string"
-        description: "The link of the current request"
-      nextLink:
-        type: "string"
-        description: "The link of the next request"
-    description: "The information related to pagination of content"
-  repositoryInfo:
-    type: "object"
-    required:
-      - "storeInfo"
-      - "indexInfo"
-    properties:
-      storeInfo:
-        description: "Information about the repository store"
-        $ref: "#/definitions/storageInfo"
-      indexInfo:
-        description: "Information about the repository index"
-        $ref: "#/definitions/storageInfo"
-    description: "Information about the repository"
-  storageInfo:
-    type: "object"
-    required:
-      - "type"
-      - "name"
-      - "size"
-      - "used"
-      - "avail"
-      - "percentUsedString"
-      - "percentUsed"
-    properties:
-      type:
-        description: "Type of the storage area"
-        type: "string"
-      name:
-        description: "Name of the storage area"
-        type: "string"
-      size:
-        description: "Size in bytes of the storage area"
-        type: "integer"
-        format: "int64"
-      used:
-        description: "Used size in bytes of the torage area"
-        type: "integer"
-        format: "int64"
-      avail:
-        description: "Available size in bytes of the storage area"
-        type: "integer"
-        format: "int64"
-      percentUsedString:
-        description: "Percentage of size used, formatted as a string"
-        type: "string"
-      percentUsed:
-        description: "Percentage of size used"
-        type: "number"
-        format: "double"
-    description: "Information about a repository storage area"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/storageInfo'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
+components:
+  schemas:
+    errorResult:
+      type: object
+      required:
+        - message
+        - code
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+        rootCause:
+          type: string
+    importStatus:
+      type: object
+      properties:
+        warcId:
+          type: string
+        offset:
+          type: integer
+          format: int64
+        url:
+          type: string
+        artifactUuid:
+          type: string
+        digest:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+          enum:
+            - OK
+            - ERROR
+            - DUPLICATE
+            - EXCLUDED
+        statusMessage:
+          type: string
+    artifactPageInfo:
+      required:
+        - artifacts
+        - pageInfo
+      type: object
+      properties:
+        artifacts:
+          description: The artifacts included in the page
+          type: array
+          items:
+            $ref: '#/components/schemas/artifact'
+        pageInfo:
+          $ref: '#/components/schemas/pageInfo'
+    auSize:
+      type: object
+      properties:
+        totalLatestVersions:
+          type: integer
+          format: int64
+        totalAllVersions:
+          type: integer
+          format: int64
+        totalWarcSize:
+          type: integer
+          format: int64
+    artifactProperties:
+      type: object
+      properties:
+        namespace:
+          type: string
+          default: lockss
+        uuid:
+          type: string
+        auid:
+          type: string
+        uri:
+          type: string
+        version:
+          type: integer
+        contentLength:
+          type: integer
+          format: int64
+        contentDigest:
+          type: string
+        collectionDate:
+          type: integer
+          format: int64
+        storeDate:
+          type: integer
+          format: int64
+        state:
+          type: string
+    artifact:
+      type: object
+      properties:
+        committed:
+          type: boolean
+        storageUrl:
+          type: string
+        namespace:
+          type: string
+          default: lockss
+        uuid:
+          type: string
+        auid:
+          type: string
+        uri:
+          type: string
+        version:
+          type: integer
+        contentLength:
+          type: integer
+          format: int64
+        contentDigest:
+          type: string
+        collectionDate:
+          type: integer
+          format: int64
+    streamingResponseBody:
+      type: object
+    apiStatus:
+      description: The status information of the service
+      required:
+        - apiVersion
+        - ready
+      type: object
+      properties:
+        apiVersion:
+          description: The version of the API
+          type: string
+        componentName:
+          description: The name of the component
+          type: string
+        componentVersion:
+          description: The version of the component software
+          type: string
+        lockssVersion:
+          description: The version of the LOCKSS system
+          type: string
+        ready:
+          description: The indication of whether the service is available
+          type: boolean
+        serviceName:
+          description: The name of the service
+          type: string
+        readyTime:
+          description: The time the service last became ready.
+          type: integer
+          format: int64
+        reason:
+          description: The reason the service isn't ready.
+          type: string
+        startupStatus:
+          description: Enum indicating progress of plugin/AU processing at startup.
+          type: string
+          enum:
+            - NONE
+            - PLUGINS_CRAWLING
+            - PLUGINS_COLLECTED
+            - PLUGINS_LOADING
+            - PLUGINS_LOADED
+            - AUS_STARTING
+            - AUS_STARTED
+    auidPageInfo:
+      required:
+        - auids
+        - pageInfo
+      type: object
+      properties:
+        auids:
+          description: The Archival Unit identifiers included in the page
+          type: array
+          items:
+            type: string
+        pageInfo:
+          $ref: '#/components/schemas/pageInfo'
+    pageInfo:
+      description: The information related to pagination of content
+      required:
+        - continuationToken
+        - curLink
+        - nextLink
+        - resultsPerPage
+        - totalCount
+      type: object
+      properties:
+        totalCount:
+          description: The total number of results
+          type: integer
+          format: int32
+        resultsPerPage:
+          description: The number of results per page
+          type: integer
+          format: int32
+        continuationToken:
+          description: The continuation token
+          type: string
+        curLink:
+          description: The link of the current request
+          type: string
+        nextLink:
+          description: The link of the next request
+          type: string
+    repositoryInfo:
+      description: Information about the repository
+      required:
+        - indexInfo
+        - storeInfo
+      type: object
+      properties:
+        storeInfo:
+          $ref: '#/components/schemas/storageInfo'
+        indexInfo:
+          $ref: '#/components/schemas/storageInfo'
+    storageInfo:
+      required:
+        - avail
+        - name
+        - percentUsed
+        - percentUsedString
+        - size
+        - type
+        - used
+      description: Information about a repository storage area
+      type: object
+      properties:
+        type:
+          description: Type of the storage area
+          type: string
+        name:
+          description: Name of the storage area
+          type: string
+        size:
+          description: Size in bytes of the storage area
+          type: integer
+          format: int64
+        used:
+          description: Used size in bytes of the storage area
+          type: integer
+          format: int64
+        avail:
+          description: Available size in bytes of the storage area
+          type: integer
+          format: int64
+        percentUsedString:
+          description: 'Percentage of size used, formatted as a string'
+          type: string
+        percentUsed:
+          description: Percentage of size used
+          type: number
+          format: double

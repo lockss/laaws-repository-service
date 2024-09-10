@@ -63,7 +63,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(RepoinfoApiController.class)
-@AutoConfigureMockMvc(secure = false)
+@AutoConfigureMockMvc()
 @ComponentScan(basePackages = { "org.lockss.laaws.rs",
     "org.lockss.laaws.rs.api" })
 public class TestReposApiController extends SpringLockssTestCase4 {

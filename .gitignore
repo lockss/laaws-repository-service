@@ -437,3 +437,4 @@ lib/run-props
 /pom.xml.bak
 /*/pom.xml.bak
 /.surefire-*
+/TAGS
