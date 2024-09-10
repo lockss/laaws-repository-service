@@ -1185,7 +1185,19 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
-  public void testGetArtifactDataStreaming() throws Exception {
+  public void testGetArtifactData_useDTFOS() throws Exception {
+    runTestGetArtifactDataStreaming(true);
+  }
+
+  @Test
+  public void testGetArtifactData_streaming() throws Exception {
+    runTestGetArtifactDataStreaming(false);
+  }
+
+  public void runTestGetArtifactDataStreaming(boolean useDTFOS) throws Exception {
+    // Set whether the client's getArtifactData call should buffer the data in a DTFOS
+    repoClient.setUseDTFOS(useDTFOS);
+
     long len = FileUtils.ONE_GB;
 
     ArtifactSpec spec =
@@ -1193,7 +1205,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .setArtifactUuid("artifact-uuid")
             .setUrl("artifact-url")
             .setContentGenerator(() -> new ZeroInputStream((byte) 46, len))
-            .setCollectionDate(0);
+            .setContentLength(len)
+            .setContentDigest("artifact-digest")
+            .setCollectionDate(TimeBase.nowMs());
 
     doReturn(spec.getArtifactData())
         .when((BaseLockssRepository) internalRepo)
@@ -1203,6 +1217,10 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     try (ArtifactData ad = repoClient.getArtifactData(spec.getArtifact())) {
       spec.assertArtifactData(ad);
+//      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+//      try (DigestInputStream dis = new DigestInputStream(ad.getInputStream(), digest)) {
+//        IOUtils.copy(dis, NullOutputStream.INSTANCE);
+//      }
     }
   }
 
