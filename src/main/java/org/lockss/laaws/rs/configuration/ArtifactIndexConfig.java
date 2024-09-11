@@ -136,6 +136,13 @@ public class ArtifactIndexConfig {
       case "pgsql":
         return new SQLArtifactIndex();
 
+      case "dispatching":
+        // Create Solr index
+        ArtifactIndex solrIndex = createArtifactIndex("solr");
+
+        // Create Dispatching with Solr
+        return new DispatchingArtifactIndex(solrIndex);
+
       default:
         String errMsg = String.format("Unknown artifact index: '%s'", indexType);
         log.error(errMsg);
