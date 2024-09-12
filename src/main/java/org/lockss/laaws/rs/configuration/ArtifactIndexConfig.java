@@ -87,6 +87,9 @@ public class ArtifactIndexConfig {
     return index;
   }
 
+  /**
+   * Constructs an {@link ArtifactIndex} from its specification.
+   */
   private ArtifactIndex createArtifactIndex(String indexType) {
     log.trace("indexType = {}", indexType);
 

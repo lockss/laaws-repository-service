@@ -112,6 +112,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
    * @param args
    *          A String[] with the command line arguments.
    */
+  @Override
   public void run(String... args) {
     // Check whether there are command line arguments available.
     if (args != null && args.length > 0) {
