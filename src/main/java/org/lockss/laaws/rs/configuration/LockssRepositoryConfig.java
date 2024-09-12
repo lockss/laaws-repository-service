@@ -37,7 +37,7 @@ import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
-import org.lockss.util.Deadline;
+import org.lockss.util.time.Deadline;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.util.JmsFactorySource;
 import org.springframework.beans.factory.annotation.Autowired;
