@@ -78,32 +78,13 @@ public class ArtifactIndexConfig {
 
   @Bean
   public ArtifactIndex artifactIndex() {
-    ArtifactIndex index = createArtifactIndex(parseIndexSpecs());
+    ArtifactIndex index = createArtifactIndex(repoProps.getIndexSpec());
 
     if (repoProps.isDispatchingIndexEnabled()) {
       index = new DispatchingArtifactIndex(index);
     }
 
     return index;
-  }
-
-  private String parseIndexSpecs() {
-    switch (repoProps.getRepositoryType()) {
-      case "volatile":
-        // Allow a volatile index to be created so that WARC compression can be configured
-        // in the volatile artifact data store
-        return "volatile";
-
-      case "local":
-        // Support for legacy repo.spec=local:X;Y;Z
-        return "local";
-
-      case "custom":
-        return repoProps.getIndexSpec();
-
-      default:
-        throw new IllegalArgumentException("Repository spec not supported: " + repoProps.getRepositorySpec());
-    }
   }
 
   private ArtifactIndex createArtifactIndex(String indexType) {

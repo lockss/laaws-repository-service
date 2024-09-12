@@ -71,7 +71,32 @@ public class RepositoryServiceProperties {
     return isDispatchingIndexEnabled;
   }
 
+  /**
+   * Returns the index specification for the type of LOCKSS repository configured for use
+   * by this LOCKSS Repository Service.
+   */
+  private String getIndexSpecForRepository() {
+    switch (getRepositoryType()) {
+      case "volatile":
+        // Allow a volatile index to be created so that WARC compression can be configured
+        // in the volatile artifact data store
+        return "volatile";
+
+      case "local":
+        // Support for legacy repo.spec=local:X;Y;Z
+        return "local";
+
+      case "custom":
+        return indexSpec;
+
+      default:
+        throw new IllegalArgumentException("Repository spec not supported: " + getRepositorySpec());
+    }
+  }
+
   public String getIndexSpec() {
+    indexSpec = getIndexSpecForRepository();
+
     if (StringUtil.isNullString(indexSpec)) {
       log.error("Missing artifact index configuration");
       throw new IllegalStateException("Artifact index not configured");
