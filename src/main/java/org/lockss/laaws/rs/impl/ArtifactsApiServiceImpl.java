@@ -12,7 +12,7 @@ import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
 import org.lockss.laaws.rs.multipart.LockssMultipartHttpServletRequest;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
-import org.lockss.rs.io.storage.warc.WarcArtifactData;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataUtil;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -234,7 +234,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       validateUri(artifactId.getUri(), parsedRequest);
 
       // Construct ArtifactData from payload part
-      ArtifactData ad = WarcArtifactData.fromResource(payload.getInputStream());
+      ArtifactData ad = WarcArtifactDataUtil.fromResource(payload.getInputStream());
 
       // Set artifact identifier
       ad.setIdentifier(artifactId);
