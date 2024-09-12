@@ -65,12 +65,15 @@ public class ArtifactIndexConfig {
 
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  private RepositoryServiceProperties repoProps;
+  private final RepositoryServiceProperties repoProps;
+  private final ApplicationArguments appArgs;
   private SolrArtifactIndex solrIndex;
 
   @Autowired
-  public ArtifactIndexConfig(RepositoryServiceProperties repoProps) {
+  public ArtifactIndexConfig(RepositoryServiceProperties repoProps,
+                             ApplicationArguments appArgs) {
     this.repoProps = repoProps;
+    this.appArgs = appArgs;
   }
 
   @Bean
@@ -83,9 +86,6 @@ public class ArtifactIndexConfig {
 
     return index;
   }
-
-  @Autowired
-  private ApplicationArguments appArgs;
 
   private String parseIndexSpecs() {
     switch (repoProps.getRepositoryType()) {
