@@ -78,7 +78,7 @@ public class ArtifactDataStoreConfig {
   }
 
   @Bean
-  public ArtifactDataStore setArtifactDataStore() throws Exception {
+  public ArtifactDataStore artifactDataStore() throws Exception {
     // Create WARC artifact data store and set use WARC compression
     ds = createWarcArtifactDataStore(parseDataStoreSpecs());
 

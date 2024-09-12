@@ -28,7 +28,7 @@ public class MyTestConfig {
    * embedded LOCKSS Repository Service.
    */
   @Bean
-  public LockssRepository createInitializedRepository(
+  public LockssRepository lockssRepository(
       @Autowired ArtifactIndex index,
       @Autowired ArtifactDataStore ds
   ) throws IOException {
@@ -46,12 +46,12 @@ public class MyTestConfig {
   }
 
   @Bean
-  public ArtifactIndex setArtifactIndex() {
+  public ArtifactIndex artifactIndex() {
     return new SQLArtifactIndex();
   }
 
   @Bean
-  public ArtifactDataStore setArtifactDataStore() throws IOException {
+  public ArtifactDataStore artifactDataStore() throws IOException {
     File basePath = LockssTestCase4.getTempDir(tmpDirs);
     return new LocalWarcArtifactDataStore(basePath);
   }

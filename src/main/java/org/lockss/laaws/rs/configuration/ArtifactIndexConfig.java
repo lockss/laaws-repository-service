@@ -77,7 +77,7 @@ public class ArtifactIndexConfig {
   }
 
   @Bean
-  public ArtifactIndex setArtifactIndex() {
+  public ArtifactIndex artifactIndex() {
     ArtifactIndex index = createArtifactIndex(parseIndexSpecs());
 
     if (repoProps.isDispatchingIndexEnabled()) {

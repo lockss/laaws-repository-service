@@ -73,7 +73,7 @@ public class LockssRepositoryConfig {
    * @throws IOException
    */
   @Bean
-  public BaseLockssRepository createInitializedRepository() throws IOException {
+  public BaseLockssRepository lockssRepository() throws IOException {
     BaseLockssRepository repo = createLockssRepository();
 
     // Initialize the repository in a separate thread
