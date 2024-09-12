@@ -111,10 +111,13 @@ public class LockssRepositoryConfig {
         // Local state directory for this Repository Service
         File stateDir = repoProps.getRepositoryStateDir();
 
-        // Configure artifact index and data store individually using Spring beans (see their
-        // configuration beans in) the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
-        // respectively.
-        return new BaseLockssRepository(stateDir, index, store);
+        return new BaseLockssRepository(stateDir, index, store) {
+          @Override
+          public boolean needsReindex() {
+            return repoProps.shouldStartOrResumeReindex() ||
+                   repoProps.indexSpecHasChanged();
+          }
+        };
 
 //      case "rest":
 //        if (repoProps.getRepoSpecParts().length <= 1) {

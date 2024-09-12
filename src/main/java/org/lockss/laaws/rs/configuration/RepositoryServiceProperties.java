@@ -1,11 +1,15 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.StringUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Arrays;
 
 /**
@@ -15,6 +19,10 @@ import java.util.Arrays;
 @Component
 public class RepositoryServiceProperties {
   private final static L4JLogger log = L4JLogger.getLogger();
+  private static final String ARG_START_REINDEX = "--start-reindex";
+
+  @Autowired
+  ApplicationArguments appArgs;
 
   // LOCKSS repository properties
   @Value("${repo.spec:volatile}") String repoSpec;
@@ -167,5 +175,22 @@ public class RepositoryServiceProperties {
 
   public File getRepositoryStateDir() {
     return new File(repoStateDir);
+  }
+
+  public boolean shouldStartOrResumeReindex() {
+    if (repoStateDir == null) {
+      throw new IllegalStateException("Repository state directory not configured");
+    }
+
+    // Path to reindex state file
+    Path reindexStatePath = getRepositoryStateDir().toPath().resolve(WarcArtifactDataStore.REINDEXING_STATE_FILE);
+    File reindexStateFile = reindexStatePath.toFile();
+
+    return reindexStateFile.exists() || appArgs.containsOption(ARG_START_REINDEX);
+  }
+
+  public boolean indexSpecHasChanged() {
+    // TODO: Implement this!
+    return false;
   }
 }
