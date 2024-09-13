@@ -109,7 +109,7 @@ import static org.mockito.Mockito.doThrow;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-@ContextConfiguration(classes = { MyTestConfig.class })
+@ContextConfiguration(classes = { DefaultTestRepositoryApplicationConfiguration.class })
 public class TestRestLockssRepository extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 
