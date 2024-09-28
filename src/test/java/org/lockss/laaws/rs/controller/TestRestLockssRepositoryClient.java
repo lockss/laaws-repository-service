@@ -70,6 +70,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.util.*;
 
 import static org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl.APPLICATION_HTTP_RESPONSE;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -104,6 +105,12 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
       repoClient = new RestLockssRepository(new URL(BASEURL), userName, password);
 
       mockServer = MockRestServiceServer.createServer(repoClient.getRestTemplate());
+    }
+
+    /** Server error getting an Artifact iterator now throws when
+     * iterator is used, not when it's created */
+    void hasNext(Iterable coll) {
+      coll.iterator().hasNext();
     }
 
     @Test
@@ -629,7 +636,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "400 Bad Request",
-		      () -> repoClient.getArtifacts("ns1", "auid1"));
+                      () -> hasNext(repoClient.getArtifacts("ns1", "auid1")));
         mockServer.verify();
     }
 
@@ -642,10 +649,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         Iterable<Artifact> result = repoClient.getArtifacts("ns1", "auid1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -657,10 +664,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifacts("ns1", "auid1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -673,7 +680,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifacts("ns1", "auid1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
@@ -681,6 +687,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -693,7 +700,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> repoClient.getArtifacts("ns1", "auid1"));
+                          () -> repoClient.getArtifacts("ns1", "auid1").iterator().hasNext());
         mockServer.verify();
     }
 
@@ -707,7 +714,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "400 Bad Request",
-		      () -> repoClient.getArtifactsAllVersions("ns1", "auid1"));
+                          () -> repoClient.getArtifactsAllVersions("ns1", "auid1").iterator().hasNext());
         mockServer.verify();
     }
 
@@ -720,10 +727,9 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1");
-        mockServer.verify();
-
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -735,10 +741,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -751,7 +757,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
@@ -759,6 +764,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -771,7 +777,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> repoClient.getArtifactsAllVersions("ns1", "auid1"));
+                      () -> hasNext(repoClient.getArtifactsAllVersions("ns1", "auid1")));
         mockServer.verify();
     }
 
@@ -785,7 +791,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "400 Bad Request",
-		      () -> repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1"));
+                      () -> hasNext(repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1")));
         mockServer.verify();
     }
 
@@ -798,10 +804,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         Iterable<Artifact> result = repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -813,10 +819,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -829,7 +835,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
@@ -837,6 +842,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -849,7 +855,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1"));
+                      () -> hasNext(repoClient.getArtifactsWithPrefix("ns1", "auid1", "url1")));
         mockServer.verify();
     }
 
@@ -863,7 +869,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 			  "400 Bad Request",
-		      () -> repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1"));
+                          () -> hasNext(repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1")));
         mockServer.verify();
     }
 
@@ -876,10 +882,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         Iterable<Artifact> result = repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -891,10 +897,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -907,7 +913,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
@@ -915,6 +920,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -927,7 +933,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 		      "500 Internal Server Error",
-		      () -> repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1"));
+                      () -> hasNext(repoClient.getArtifactsWithPrefixAllVersions("ns1", "auid1", "url1")));
         mockServer.verify();
     }
 
@@ -941,7 +947,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 			  "400 Bad Request",
-			  () -> repoClient.getArtifactsAllVersions("ns1", "auid1", "url1"));
+			  () -> hasNext(repoClient.getArtifactsAllVersions("ns1", "auid1", "url1")));
         mockServer.verify();
     }
 
@@ -954,10 +960,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -969,10 +975,9 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andRespond(withSuccess("{\"artifacts\":[], \"pageInfo\":{}}", MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1", "url1");
-        mockServer.verify();
-
         assertNotNull(result);
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -985,7 +990,6 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                     MediaType.APPLICATION_JSON));
 
         Iterable<Artifact> result = repoClient.getArtifactsAllVersions("ns1", "auid1", "url1");
-        mockServer.verify();
 
         assertNotNull(result);
         assertTrue(result.iterator().hasNext());
@@ -993,6 +997,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         assertEquals("1", artifact.getUuid());
         assertEquals(2, artifact.getVersion().intValue());
         assertFalse(result.iterator().hasNext());
+        mockServer.verify();
     }
 
     @Test
@@ -1005,7 +1010,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
 	assertThrowsMatch(LockssUncheckedException.class,
 			  "500 Internal Server Error",
-			  () -> repoClient.getArtifactsAllVersions("ns1", "auid1", "url1"));
+			  () -> hasNext(repoClient.getArtifactsAllVersions("ns1", "auid1", "url1")));
         mockServer.verify();
     }
 
