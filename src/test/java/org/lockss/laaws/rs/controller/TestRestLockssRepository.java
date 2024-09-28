@@ -1695,6 +1695,40 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  // Exercise a large iterator.  Needs a better test framework to
+  // create 10s of 1000s of Artifact
+  @Test
+  public void testGetLotsOfArtifacts() throws Exception {
+    String anyColl = null;
+    String anyAuid = null;
+
+//     repoClient.startBulkStore(NS1, AUID1);
+    for (int suff = 1; suff <= 100; suff++) {
+    ArtifactSpec spec = new ArtifactSpec()
+      .setNamespace(NS1)
+      .setAuid(AUID1)
+      .setUrl("base" + suff)
+      .setContent(CONTENT1)
+      .setCollectionDate(1234)
+      .toCommit(true);
+
+      ArtifactData ad = spec.getArtifactData();
+      Artifact newArt = repoClient.addArtifact(ad);
+      Artifact commArt = repoClient.commitArtifact(spec.getNamespace(),
+                                                   newArt.getUuid());
+    }
+//     repoClient.finishBulkStore(NS1, AUID1);
+
+    int n = 0;
+    for (Artifact art : repoClient.getArtifacts(NS1, AUID1)) {
+      if ((n % 1000) == 0) {
+        Thread.sleep(500);
+      }
+      n++;
+    }
+    log.debug("Iter returned {} artifacts", n);
+  }
+
   public void testGetAllArtifactsWithPrefix() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
