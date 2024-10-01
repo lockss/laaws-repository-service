@@ -48,6 +48,8 @@ public class RepositoryServiceProperties {
   @Value("${repo.index.solr.solrCollection:#{null}}") String solrCollectionName;
   @Value("${repo.index.solr.hardCommitInterval:15000}") long solrHardCommitInterval;
 
+  private boolean indexNeedsReindex;
+
   public String getRepositorySpec() {
     return repoSpec;
   }
@@ -183,14 +185,15 @@ public class RepositoryServiceProperties {
     }
 
     // Path to reindex state file
-    Path reindexStatePath = getRepositoryStateDir().toPath().resolve(WarcArtifactDataStore.REINDEXING_STATE_FILE);
-    File reindexStateFile = reindexStatePath.toFile();
+    Path reindexStatePath = getRepositoryStateDir().toPath()
+        .resolve(WarcArtifactDataStore.REINDEXING_STATE_FILE);
 
-    return reindexStateFile.exists() || appArgs.containsOption(ARG_START_REINDEX);
+    File reindexingStateFile = reindexStatePath.toFile();
+
+    return indexNeedsReindex || reindexingStateFile.exists() || appArgs.containsOption(ARG_START_REINDEX);
   }
 
-  public boolean indexSpecHasChanged() {
-    // TODO: Implement this!
-    return false;
+  public void setIndexNeedsReindex(boolean indexNeedsReindex) {
+    this.indexNeedsReindex = indexNeedsReindex;
   }
 }

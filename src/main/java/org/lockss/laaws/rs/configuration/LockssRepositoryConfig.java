@@ -114,8 +114,7 @@ public class LockssRepositoryConfig {
         return new BaseLockssRepository(stateDir, index, store) {
           @Override
           public boolean needsReindex() {
-            return repoProps.shouldStartOrResumeReindex() ||
-                   repoProps.indexSpecHasChanged();
+            return repoProps.shouldStartOrResumeReindex();
           }
         };
 

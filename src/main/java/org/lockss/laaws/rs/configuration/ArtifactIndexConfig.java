@@ -30,14 +30,17 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.io.FileUtils;
 import org.lockss.app.LockssApp;
 import org.lockss.config.ConfigManager;
 import org.lockss.log.L4JLogger;
-import org.lockss.rs.io.index.ArtifactIndex;
-import org.lockss.rs.io.index.DispatchingArtifactIndex;
-import org.lockss.rs.io.index.LocalArtifactIndex;
-import org.lockss.rs.io.index.VolatileArtifactIndex;
+import org.lockss.rs.io.index.*;
+import org.lockss.rs.io.index.ArtifactIndexVersion;
 import org.lockss.rs.io.index.db.SQLArtifactIndex;
+import org.lockss.rs.io.index.db.SQLArtifactIndexDbManager;
+import org.lockss.rs.io.index.db.SQLArtifactIndexManagerSql;
 import org.lockss.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +49,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 
 /**
@@ -65,6 +68,11 @@ public class ArtifactIndexConfig {
 
   private final static L4JLogger log = L4JLogger.getLogger();
 
+  private final static ObjectMapper mapper = new ObjectMapper()
+      .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+  public final static String INDEX_VERSION_FILE = "index/version";
+
   private final RepositoryServiceProperties repoProps;
   private final ApplicationArguments appArgs;
   private SolrArtifactIndex solrIndex;
@@ -80,11 +88,52 @@ public class ArtifactIndexConfig {
   public ArtifactIndex artifactIndex() {
     ArtifactIndex index = createArtifactIndex(repoProps.getIndexSpec());
 
+    try {
+      File versionFile = new File(repoProps.getRepositoryStateDir(), INDEX_VERSION_FILE);
+      ArtifactIndexVersion onDiskVersion = readArtifactIndexVersion(versionFile);
+      ArtifactIndexVersion targetVersion = ((AbstractArtifactIndex) index).getArtifactIndexTargetVersion();
+
+      if (!onDiskVersion.equals(targetVersion)) {
+        // Either type changed, version changed, or both changed:
+        // (type changed, version changed)
+        // t t --- sync index
+        // t f --- sync index
+        // f t --- sync index if previousVersion < currentVersion
+        // f f --- nothing to do
+
+        if (!onDiskVersion.getIndexType().equals(targetVersion.getIndexType())) {
+          repoProps.setIndexNeedsReindex(true);
+        } else if (onDiskVersion.getIndexVersion() < targetVersion.getIndexVersion()) {
+          repoProps.setIndexNeedsReindex(true);
+        }
+      }
+
+      recordArtifactIndexVersion(versionFile, targetVersion);
+    } catch (IOException e) {
+      throw new IllegalStateException("Couldn't read artifact index version", e);
+    }
+
     if (repoProps.isDispatchingIndexEnabled()) {
       index = new DispatchingArtifactIndex(index);
     }
 
     return index;
+  }
+
+  private static void recordArtifactIndexVersion(File versionFile, ArtifactIndexVersion version) throws IOException {
+    FileUtils.touch(versionFile);
+    try (BufferedOutputStream fos = new BufferedOutputStream(new FileOutputStream(versionFile))) {
+      mapper.writeValue(fos, version);
+    }
+  }
+
+  private static ArtifactIndexVersion readArtifactIndexVersion(File versionFile) throws IOException {
+    try (InputStream is = new BufferedInputStream(new FileInputStream(versionFile))) {
+      return mapper.readValue(is, ArtifactIndexVersion.class);
+    } catch (FileNotFoundException e) {
+      log.debug("Could not find index version file: " + versionFile);
+      return ArtifactIndexVersion.UNKNOWN;
+    }
   }
 
   /**
@@ -118,7 +167,9 @@ public class ArtifactIndexConfig {
 
       case "derby":
       case "pgsql":
-        return new SQLArtifactIndex();
+        return new SQLArtifactIndex(
+            new SQLArtifactIndexManagerSql(
+                LockssApp.getManagerByTypeStatic(SQLArtifactIndexDbManager.class)));
 
       case "dispatching":
         // Create Solr index
