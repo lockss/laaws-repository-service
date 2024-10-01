@@ -30,10 +30,14 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.io.FileUtils;
 import org.lockss.config.ConfigManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
+import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
 import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.TestingWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
@@ -44,6 +48,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
+import java.io.*;
 import java.util.List;
 
 /**
@@ -52,6 +57,12 @@ import java.util.List;
 @Configuration
 public class ArtifactDataStoreConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
+
+  private final static ObjectMapper mapper = new ObjectMapper()
+      .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+  public final static String DATASTORE_STATE_DIR = "store";
+  public final static String DATASTORE_VERSION_FILE = DATASTORE_STATE_DIR + "/version";
 
   public final static String PARAM_FREE_SPACE_MAP = "org.lockss.repo.testing.freeSpaceMap";
 
@@ -82,8 +93,49 @@ public class ArtifactDataStoreConfig {
     // Create WARC artifact data store and set use WARC compression
     ds = createWarcArtifactDataStore(parseDataStoreSpecs());
 
+    try {
+      File versionFile = new File(repoProps.getRepositoryStateDir(), DATASTORE_VERSION_FILE);
+      ArtifactDataStoreVersion onDiskVersion = readArtifactDataStoreVersion(versionFile);
+      ArtifactDataStoreVersion targetVersion = ((ArtifactDataStore) ds).getDataStoreTargetVersion();
+
+      if (!onDiskVersion.equals(targetVersion)) {
+        if (onDiskVersion == ArtifactDataStoreVersion.UNKNOWN) {
+          log.debug("Initializing data store for the first time");
+          ds.upgradeDatastoreToVersion(0, targetVersion.getDatastoreVersion());
+        } else if (!onDiskVersion.getDatastoreType().equals(targetVersion.getDatastoreType())) {
+          throw new UnsupportedOperationException("Switching data stores is not supported");
+        } else if (onDiskVersion.getDatastoreVersion() < targetVersion.getDatastoreVersion()) {
+          ds.upgradeDatastoreToVersion(
+              onDiskVersion.getDatastoreVersion(),
+              targetVersion.getDatastoreVersion());
+        }
+      }
+
+      recordArtifactDataStoreVersion(versionFile, targetVersion);
+    } catch (IOException e) {
+      throw new IllegalStateException("Couldn't read artifact index version", e);
+    }
+
     // Return the data store
     return ds;
+  }
+
+  private static void recordArtifactDataStoreVersion(File versionFile,
+                                                     ArtifactDataStoreVersion version) throws IOException {
+    // Touch file (and create parent directories if necessary)
+    FileUtils.touch(versionFile);
+    try (BufferedOutputStream fos = new BufferedOutputStream(new FileOutputStream(versionFile))) {
+      mapper.writeValue(fos, version);
+    }
+  }
+
+  private static ArtifactDataStoreVersion readArtifactDataStoreVersion(File versionFile) throws IOException {
+    try (InputStream is = new BufferedInputStream(new FileInputStream(versionFile))) {
+      return mapper.readValue(is, ArtifactDataStoreVersion.class);
+    } catch (FileNotFoundException e) {
+      log.debug("Could not find index version file: " + versionFile);
+      return ArtifactDataStoreVersion.UNKNOWN;
+    }
   }
 
   private String parseDataStoreSpecs() {
