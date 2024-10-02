@@ -167,9 +167,7 @@ public class ArtifactIndexConfig {
 
       case "derby":
       case "pgsql":
-        return new SQLArtifactIndex(
-            new SQLArtifactIndexManagerSql(
-                LockssApp.getManagerByTypeStatic(SQLArtifactIndexDbManager.class)));
+        return new SQLArtifactIndex();
 
       case "dispatching":
         // Create Solr index
