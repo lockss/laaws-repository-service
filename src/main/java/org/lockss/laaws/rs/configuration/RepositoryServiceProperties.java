@@ -1,6 +1,7 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,7 @@ public class RepositoryServiceProperties {
   @Value("${repo.index.solr.hardCommitInterval:15000}") long solrHardCommitInterval;
 
   private boolean indexNeedsReindex;
+  private ArtifactDataStoreVersion dataStoreVersion;
 
   public String getRepositorySpec() {
     return repoSpec;
@@ -195,5 +197,13 @@ public class RepositoryServiceProperties {
 
   public void setIndexNeedsReindex(boolean indexNeedsReindex) {
     this.indexNeedsReindex = indexNeedsReindex;
+  }
+
+  public void setDataStoreVersionFromDisk(ArtifactDataStoreVersion dataStoreVersion) {
+    this.dataStoreVersion = dataStoreVersion;
+  }
+
+  public ArtifactDataStoreVersion getDataStoreVersionFromDisk() {
+    return dataStoreVersion;
   }
 }

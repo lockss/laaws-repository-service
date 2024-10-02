@@ -96,22 +96,7 @@ public class ArtifactDataStoreConfig {
     try {
       File versionFile = new File(repoProps.getRepositoryStateDir(), DATASTORE_VERSION_FILE);
       ArtifactDataStoreVersion onDiskVersion = readArtifactDataStoreVersion(versionFile);
-      ArtifactDataStoreVersion targetVersion = ((ArtifactDataStore) ds).getDataStoreTargetVersion();
-
-      if (!onDiskVersion.equals(targetVersion)) {
-        if (onDiskVersion == ArtifactDataStoreVersion.UNKNOWN) {
-          log.debug("Initializing data store for the first time");
-          ds.upgradeDatastoreToVersion(0, targetVersion.getDatastoreVersion());
-        } else if (!onDiskVersion.getDatastoreType().equals(targetVersion.getDatastoreType())) {
-          throw new UnsupportedOperationException("Switching data stores is not supported");
-        } else if (onDiskVersion.getDatastoreVersion() < targetVersion.getDatastoreVersion()) {
-          ds.upgradeDatastoreToVersion(
-              onDiskVersion.getDatastoreVersion(),
-              targetVersion.getDatastoreVersion());
-        }
-      }
-
-      recordArtifactDataStoreVersion(versionFile, targetVersion);
+      repoProps.setDataStoreVersionFromDisk(onDiskVersion);
     } catch (IOException e) {
       throw new IllegalStateException("Couldn't read artifact index version", e);
     }
@@ -133,7 +118,7 @@ public class ArtifactDataStoreConfig {
     try (InputStream is = new BufferedInputStream(new FileInputStream(versionFile))) {
       return mapper.readValue(is, ArtifactDataStoreVersion.class);
     } catch (FileNotFoundException e) {
-      log.debug("Could not find index version file: " + versionFile);
+      log.debug("Could not find data store version file: " + versionFile);
       return ArtifactDataStoreVersion.UNKNOWN;
     }
   }
