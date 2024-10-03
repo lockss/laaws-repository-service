@@ -51,6 +51,8 @@ import org.springframework.context.event.EventListener;
 import java.io.*;
 import java.util.List;
 
+import static org.lockss.rs.io.storage.warc.WarcArtifactDataStore.DATASTORE_VERSION_FILE;
+
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal artifact data store.
  */
@@ -60,9 +62,6 @@ public class ArtifactDataStoreConfig {
 
   private final static ObjectMapper mapper = new ObjectMapper()
       .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-  public final static String DATASTORE_STATE_DIR = "store";
-  public final static String DATASTORE_VERSION_FILE = DATASTORE_STATE_DIR + "/version";
 
   public final static String PARAM_FREE_SPACE_MAP = "org.lockss.repo.testing.freeSpaceMap";
 
@@ -92,25 +91,17 @@ public class ArtifactDataStoreConfig {
   public ArtifactDataStore artifactDataStore() throws Exception {
     // Create WARC artifact data store and set use WARC compression
     ds = createWarcArtifactDataStore(parseDataStoreSpecs());
-
-    try {
-      File versionFile = new File(repoProps.getRepositoryStateDir(), DATASTORE_VERSION_FILE);
-      ArtifactDataStoreVersion onDiskVersion = readArtifactDataStoreVersion(versionFile);
-      repoProps.setDataStoreVersionFromDisk(onDiskVersion);
-    } catch (IOException e) {
-      throw new IllegalStateException("Couldn't read artifact index version", e);
-    }
-
-    // Return the data store
     return ds;
   }
 
-  private static void recordArtifactDataStoreVersion(File versionFile,
-                                                     ArtifactDataStoreVersion version) throws IOException {
-    // Touch file (and create parent directories if necessary)
-    FileUtils.touch(versionFile);
-    try (BufferedOutputStream fos = new BufferedOutputStream(new FileOutputStream(versionFile))) {
-      mapper.writeValue(fos, version);
+  @Bean
+  public ArtifactDataStoreVersion artifactDataStoreVersion() {
+    try {
+      File versionFile = new File(repoProps.getRepositoryStateDir(), DATASTORE_VERSION_FILE);
+      ArtifactDataStoreVersion onDiskVersion = readArtifactDataStoreVersion(versionFile);
+      return onDiskVersion;
+    } catch (IOException e) {
+      throw new IllegalStateException("Couldn't read artifact index version", e);
     }
   }
 

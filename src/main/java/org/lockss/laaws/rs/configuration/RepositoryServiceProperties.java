@@ -20,7 +20,6 @@ import java.util.Arrays;
 @Component
 public class RepositoryServiceProperties {
   private final static L4JLogger log = L4JLogger.getLogger();
-  private static final String ARG_START_REINDEX = "--start-reindex";
 
   @Autowired
   ApplicationArguments appArgs;
@@ -179,31 +178,5 @@ public class RepositoryServiceProperties {
 
   public File getRepositoryStateDir() {
     return new File(repoStateDir);
-  }
-
-  public boolean shouldStartOrResumeReindex() {
-    if (repoStateDir == null) {
-      throw new IllegalStateException("Repository state directory not configured");
-    }
-
-    // Path to reindex state file
-    Path reindexStatePath = getRepositoryStateDir().toPath()
-        .resolve(WarcArtifactDataStore.REINDEXING_STATE_FILE);
-
-    File reindexingStateFile = reindexStatePath.toFile();
-
-    return indexNeedsReindex || reindexingStateFile.exists() || appArgs.containsOption(ARG_START_REINDEX);
-  }
-
-  public void setIndexNeedsReindex(boolean indexNeedsReindex) {
-    this.indexNeedsReindex = indexNeedsReindex;
-  }
-
-  public void setDataStoreVersionFromDisk(ArtifactDataStoreVersion dataStoreVersion) {
-    this.dataStoreVersion = dataStoreVersion;
-  }
-
-  public ArtifactDataStoreVersion getDataStoreVersionFromDisk() {
-    return dataStoreVersion;
   }
 }
