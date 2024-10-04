@@ -1074,6 +1074,16 @@ components:
           $ref: '#/components/schemas/storageInfo'
         indexInfo:
           $ref: '#/components/schemas/storageInfo'
+        repositoryStatistics:
+          $ref: '#/components/schemas/repositoryStatistics'
+    repositoryStatistics:
+      description: "Various statistics about the repository's internal operation."
+      type: object
+      properties:
+        type:
+          description: "Time spent reiterating a new artifact iterator during continuation."
+          type: integer
+          format: int64
     storageInfo:
       required:
         - avail
