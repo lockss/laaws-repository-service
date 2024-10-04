@@ -31,6 +31,7 @@ import org.lockss.util.rest.repo.util.ArtifactComparators;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.time.Deadline;
+import org.lockss.util.time.TimeBase;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -687,6 +688,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
             // Loop through the artifacts skipping those already returned
             // through a previous response.
+            long skipStarted = TimeBase.nowMs();
             while (iterator.hasNext()) {
               Artifact artifact = iterator.next();
 
@@ -702,6 +704,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
                 break;
               }
             }
+            repo.incTimeSpentReiterating(TimeBase.msSince(skipStarted));
           }
         }
 
