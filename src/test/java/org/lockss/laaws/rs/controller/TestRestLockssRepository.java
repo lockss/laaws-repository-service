@@ -288,6 +288,38 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
+  public void testContinuationAndLimit()  throws Exception {
+    String ns = "test-namespace";
+    String auid = "test-auid";
+
+    // Setup page limit on server
+    ConfigurationUtil.setFromArgs("org.lockss.repository.artifact.pagesize.default", "2");
+
+    List<Artifact> artifacts = new ArrayList<>();
+
+    for (int i = 0; i < 10; i++) {
+      ArtifactSpec spec = new ArtifactSpec()
+          .setNamespace(ns)
+          .setAuid(auid)
+          .setUrl("url" + i)
+          .setCollectionDate(TimeBase.nowMs())
+          .generateContent();
+
+      Artifact addedArtifact =
+          repoClient.addArtifact(spec.getArtifactData());
+
+      Artifact committed = repoClient.commitArtifact(addedArtifact);
+
+      artifacts.add(repoClient.getArtifact(committed.getNamespace(), committed.getAuid(), committed.getUri()));
+    }
+
+    Iterable<Artifact> result = repoClient.getArtifacts(ns, auid);
+
+    assertIterableEquals(artifacts, result);
+
+  }
+
+  @Test
   public void testArtifactSizes() throws IOException {
     for (int size = 0; size < MAX_INCR_FILE; size += 100) {
       testArtifactSize(size);
@@ -1025,11 +1057,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       instantiateScanario(var.toString());
       testAllNoSideEffect();
     }
-  }
-
-  public void testFromAllAusMethods() throws IOException {
-    testGetArtifactsWithUrlFromAllAus();
-    testGetArtifactsWithUrlPrefixFromAllAus();
   }
 
   public void testAllNoSideEffect() throws Exception {
