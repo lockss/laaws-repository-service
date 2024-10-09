@@ -703,7 +703,6 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         }
       }
 
-      // Check whether an iterator is involved in obtaining the response.
       if (iterator != null) {
         // Populate the rest of the results for this response.
         populateArtifacts(iterator, limit, artifacts);
