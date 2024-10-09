@@ -638,10 +638,10 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             errorMessage, parsedRequest);
       }
 
-      Iterable<Artifact> artifactIterable = null;
       List<Artifact> artifacts = new ArrayList<>();
       Iterator<Artifact> iterator = null;
       boolean missingIterator = false;
+      ArtifactContinuationToken responseAct = null;
 
       // Get the iterator hash code (if any) used to provide a previous page
       // of results.
@@ -655,8 +655,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         missingIterator = iterator == null;
       }
 
-      // If we don't already have an existing iterator, perform an index query
-      if (missingIterator) {
+      if (iterator == null) {
+        Iterable<Artifact> artifactIterable = null;
         ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions.toUpperCase());
 
         if (url != null) {
@@ -664,14 +664,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         } else if (urlPrefix != null) {
           artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, artifactVersions);
         }
-      }
 
-      ArtifactContinuationToken responseAct = null;
-
-      // Check whether an iterator is involved in obtaining the response.
-      if (iterator != null || artifactIterable != null) {
-        // Yes: Check whether a new iterator is needed.
-        if (iterator == null) {
+        if (artifactIterable != null) {
           // Yes: Get the iterator pointing to the first page of results.
           iterator = artifactIterable.iterator();
 
@@ -707,7 +701,10 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             repo.incTimeSpentReiterating(TimeBase.msSince(skipStarted));
           }
         }
+      }
 
+      // Check whether an iterator is involved in obtaining the response.
+      if (iterator != null) {
         // Populate the rest of the results for this response.
         populateArtifacts(iterator, limit, artifacts);
 
