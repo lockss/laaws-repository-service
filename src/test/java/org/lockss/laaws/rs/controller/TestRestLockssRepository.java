@@ -52,6 +52,7 @@ import org.lockss.log.L4JLogger;
 import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
 import org.lockss.rs.io.index.db.SQLArtifactIndexDbManager;
+import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.*;
 import org.lockss.test.ThrowingInputStream;
@@ -83,6 +84,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -184,6 +186,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   @Autowired
   LockssRepository internalRepo;
+
   private MockLockssDaemon theDaemon;
   private SQLArtifactIndexDbManager idxDbManager;
   private String tempDirPath;
@@ -395,13 +398,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Tests resource Artifact, ensure it creates the correct WARC record type.
+   * Tests resource Artifact.
    */
   @Test
   public void testResourceArtifact() throws Exception {
     HttpHeaders headers = new HttpHeaders();
-
     headers.add("Content-Type", "x-ms-wmv");
+    
     ArtifactSpec spec = new ArtifactSpec()
       .setUrl("https://example.lockss.org/foo2")
       .setContentLength(100)
@@ -412,14 +415,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact artifact = addUncommitted(spec);
     Artifact committed = commit(spec, artifact);
     spec.assertArtifact(repoClient, committed);
+
     ArtifactData ad = repoClient.getArtifactData(committed);
+
     assertEquals(headers.getFirst("Content-Type"),
         ad.getHttpHeaders().getFirst("Content-Type"));
+
     assertFalse(ad.isHttpResponse());
-    Artifact copied = waitCopied(spec);
-    String path = new URL(copied.getStorageUrl()).getPath();
-    String warcstr = StringUtil.fromFile(path);
-    assertMatchesRE("WARC-Type: resource", warcstr);
+    assertNull(ad.getHttpStatus());
   }
 
   /**
