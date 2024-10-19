@@ -80,18 +80,6 @@ public class TestReposApiController extends SpringLockssTestCase4 {
     @MockBean
     private BaseLockssRepository repo;
 
-    @DynamicPropertySource
-    static void dynamicPropertySet(DynamicPropertyRegistry registry) {
-        registry.add("repo.state.dir", () -> {
-            try {
-                return FileUtil.createTempDir("reposvctest", null);
-            } catch (IOException e) {
-                log.error("Cannot create temp dir", e);
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
     // The value of the Authorization header to be used when calling the REST
     // service.
     private String authHeaderValue = null;
