@@ -35,6 +35,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.RepoinfoApiController;
+import org.lockss.laaws.rs.controller.DefaultTestRepositoryApplicationConfiguration;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.spring.test.SpringLockssTestCase4;
@@ -47,6 +48,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -67,6 +69,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @RunWith(SpringRunner.class)
 @WebMvcTest(RepoinfoApiController.class)
 @AutoConfigureMockMvc()
+// We can't use a @ContextConfiguration here because the tests rely on a @MockBean to mock the
+// internal BaseLockssRepository behavior.
 public class TestReposApiController extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
 
