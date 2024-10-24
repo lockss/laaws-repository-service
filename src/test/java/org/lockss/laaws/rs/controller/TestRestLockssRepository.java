@@ -128,9 +128,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     AUSIZE_ZERO.setTotalWarcSize(0L);
   }
 
-
-  static boolean WRONG = false;
-
   // TEST DATA
 
   // Commonly used artifact identifiers and contents
@@ -1252,14 +1249,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     // Artifact not found
     for (ArtifactSpec spec : notFoundArtifactSpecs()) {
-      log.info("s.b. notfound: " + spec);
+      log.debug2("s.b. notfound: " + spec);
       assertNull("Null or non-existent name shouldn't be found: " + spec,
           getArtifact(repoClient, spec, false));
     }
 
     // Ensure that a no-version retrieval gets the expected highest version
     for (ArtifactSpec highSpec : highestCommittedVerSpec.values()) {
-      log.info("highSpec: " + highSpec);
+      log.debug2("highSpec: " + highSpec);
       highSpec.assertArtifact(repoClient, repoClient.getArtifact(
           highSpec.getNamespace(),
           highSpec.getAuid(),
@@ -1450,7 +1447,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // different version so can't use that here.
 
     for (ArtifactSpec spec : neverFoundArtifactSpecs) {
-      log.info("s.b. notfound: " + spec);
+      log.debug2("s.b. notfound: " + spec);
       assertNull("Null or non-existent name shouldn't be found: " + spec,
           getArtifactVersion(repoClient, spec, 1, false));
       assertNull("Null or non-existent name shouldn't be found: " + spec,
@@ -1482,7 +1479,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     // Ensure that a non-existent version isn't found
     for (ArtifactSpec highSpec : highestVerSpec.values()) {
-      log.info("highSpec: " + highSpec);
+      log.debug2("highSpec: " + highSpec);
       assertNull(repoClient.getArtifactVersion(highSpec.getNamespace(),
           highSpec.getAuid(),
           highSpec.getUrl(),
@@ -2212,7 +2209,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   // Add Artifacts to the repository as specified by the named scenario
   void instantiateScanario(String name) throws IOException {
-    log.info("Adding scenario: " + name);
+    log.info("Setting up scenario: " + name);
     instantiateScanario(getVariantSpecs(name));
   }
 
@@ -2228,7 +2225,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   void logAdded() {
     for (ArtifactSpec spec : addedSpecs) {
-      log.info("spec: " + spec);
+      log.debug2("spec: " + spec);
     }
   }
 
@@ -2369,7 +2366,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       return null;
     } else {
       Pair<String, String> res = set.iterator().next();
-      log.info("Found ns au mismatch: " +
+      log.debug("Found ns au mismatch: " +
           res.getLeft() + ", " + res.getRight());
       logAdded();
       return res;
@@ -2405,7 +2402,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   Artifact getArtifact(LockssRepository repository, ArtifactSpec spec,
                        boolean includeUncommitted) throws IOException {
-    log.info(String.format("getArtifact(%s, %s, %s)",
+    log.debug2(String.format("getArtifact(%s, %s, %s)",
         spec.getNamespace(),
         spec.getAuid(),
         spec.getUrl(),
@@ -2426,7 +2423,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   Artifact getArtifactVersion(LockssRepository repository, ArtifactSpec spec,
                               int ver, boolean includeUncommitted)
       throws IOException {
-    log.info(String.format("getArtifactVersion(%s, %s, %s, %d)",
+    log.debug2(String.format("getArtifactVersion(%s, %s, %s, %d)",
         spec.getNamespace(),
         spec.getAuid(),
         spec.getUrl(),
@@ -2443,7 +2440,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     if (!spec.hasContent()) {
       spec.generateContent();
     }
-    log.info("adding: " + spec);
+    log.debug2("adding: " + spec);
 
     ArtifactData ad = spec.getArtifactData();
     Artifact newArt = repoClient.addArtifact(ad);
@@ -2500,7 +2497,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertFalse(uncommittedArt.getCommitted());
 
     String artUuid = art.getUuid();
-    log.info("committing: " + art);
+    log.debug2("committing: " + art);
     Artifact commArt = repoClient.commitArtifact(spec.getNamespace(), artUuid);
     assertNotNull(commArt);
 
@@ -2557,7 +2554,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Include an uncommitted artifact, if any
     ArtifactSpec uncSpec = anyUncommittedSpecButVer();
     if (uncSpec != null) {
-      log.info("adding an uncommitted spec: " + uncSpec);
+      log.debug2("adding an uncommitted spec: " + uncSpec);
       res.add(uncSpec);
     }
 
