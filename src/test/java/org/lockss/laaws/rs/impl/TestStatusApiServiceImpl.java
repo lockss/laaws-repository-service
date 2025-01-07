@@ -61,10 +61,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Test class for org.lockss.laaws.mdq.api.MetadataApiServiceImpl and
- * org.lockss.laaws.mdq.api.UrlsApiServiceImpl.
- */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
