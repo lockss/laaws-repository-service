@@ -286,7 +286,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         throw new LockssRestServiceException(
             LockssRestHttpException.ServerErrorType.DATA_ERROR,
             HttpStatus.CONFLICT,
-            "Artifact already exists", e, parsedRequest);
+            "Artifact version already exists", e, parsedRequest);
       } catch (IOException e) {
         String errorMessage =
             "Caught IOException while attempting to add an artifact to the repository";
