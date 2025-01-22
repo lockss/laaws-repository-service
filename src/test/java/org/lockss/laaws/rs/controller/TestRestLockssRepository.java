@@ -816,19 +816,19 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     // Give the spec a specific non-existing version and assert success
     assertNull(repoClient.getArtifactVersion(
-        spec.getNamespace(), spec.getAuid(), spec.getUrl(), 3, true));
-    spec.setVersion(3);
-    Artifact a3 = repoClient.addArtifact(spec.getArtifactData());
-    assertNotNull(a3);
-    spec.assertArtifact(repoClient, a3);
-    assertEquals(3, (long)a3.getVersion());
-
-    // Remove version from spec; add again and assert the version is what we expect
-    spec.setVersion(null);
+        spec.getNamespace(), spec.getAuid(), spec.getUrl(), 4, true));
+    spec.setVersion(4);
     Artifact a4 = repoClient.addArtifact(spec.getArtifactData());
     assertNotNull(a4);
     spec.assertArtifact(repoClient, a4);
     assertEquals(4, (long)a4.getVersion());
+
+    // Remove version from spec; add again and assert the version is what we expect
+    spec.setVersion(null);
+    Artifact a5 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a5);
+    spec.assertArtifact(repoClient, a5);
+    assertEquals(5, (long)a5.getVersion());
   }
 
   @Test
@@ -858,7 +858,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testAddArtifact_badRequest() throws Exception {
     // Try adding an artifact with no URL.
     assertThrowsMatch(LockssRestHttpException.class,
-        "400 Bad Request: addArtifact",
+        "400 Bad Request: Could not add artifact to remote repository",
         () -> {
           addUncommitted(new ArtifactSpec().setUrl(null));
         });
