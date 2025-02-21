@@ -22,6 +22,7 @@ import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.multipart.MultipartResponse;
+import org.lockss.util.rest.repo.LockssArtifactAlreadyExistsException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
@@ -217,11 +218,6 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       ArtifactIdentifier artifactId = ArtifactDataUtil.buildArtifactIdentifier(props);
 
-      if (artifactId.getVersion() != null) {
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            "Version property not allowed");
-      }
-
       // Check URI
       validateUri(artifactId.getUri(), parsedRequest);
 
@@ -278,7 +274,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             StringUtil.sizeToString(payload.getSize()));
 
         return new ResponseEntity<>(artifact, HttpStatus.OK);
-
+      } catch (LockssArtifactAlreadyExistsException e) {
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.DATA_ERROR,
+            HttpStatus.CONFLICT,
+            "Artifact version already exists", e, parsedRequest);
       } catch (IOException e) {
         String errorMessage =
             "Caught IOException while attempting to add an artifact to the repository";

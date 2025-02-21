@@ -62,6 +62,7 @@ import org.lockss.util.StringUtil;
 import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.io.FileUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.repo.LockssArtifactAlreadyExistsException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
@@ -882,15 +883,42 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   @Test
   public void testAddArtifact() throws IOException {
-
     ArtifactSpec spec = new ArtifactSpec()
-        .setUrl("http://hyperwolf.ai/")
-        .setCollectionDate(1234);
+        .setUrl("https://www.lockss.org/example");
 
     spec.generateContent();
 
-    Artifact result = repoClient.addArtifact(spec.getArtifactData());
-    assertNotNull(result);
+    // Add an artifact from the spec twice without specify a version
+    Artifact a1 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a1);
+    spec.assertArtifact(repoClient, a1);
+    assertEquals(1, (long)a1.getVersion());
+
+    Artifact a2 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a2);
+    spec.assertArtifact(repoClient, a2);
+    assertEquals(2, (long)a2.getVersion());
+
+    // Give the spec an existing version and assert that it throws LockssArtifactAlreadyExistsException
+    spec.setVersion(2);
+    assertThrows(LockssArtifactAlreadyExistsException.class,
+        () -> repoClient.addArtifact(spec.getArtifactData()));
+
+    // Give the spec a specific non-existing version and assert success
+    assertNull(repoClient.getArtifactVersion(
+        spec.getNamespace(), spec.getAuid(), spec.getUrl(), 4, true));
+    spec.setVersion(4);
+    Artifact a4 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a4);
+    spec.assertArtifact(repoClient, a4);
+    assertEquals(4, (long)a4.getVersion());
+
+    // Remove version from spec; add again and assert the version is what we expect
+    spec.setVersion(null);
+    Artifact a5 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a5);
+    spec.assertArtifact(repoClient, a5);
+    assertEquals(5, (long)a5.getVersion());
   }
 
   @Test
@@ -920,7 +948,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testAddArtifact_badRequest() throws Exception {
     // Try adding an artifact with no URL.
     assertThrowsMatch(LockssRestHttpException.class,
-        "400 Bad Request: addArtifact",
+        "400 Bad Request: Could not add artifact to remote repository",
         () -> {
           addUncommitted(new ArtifactSpec().setUrl(null));
         });
