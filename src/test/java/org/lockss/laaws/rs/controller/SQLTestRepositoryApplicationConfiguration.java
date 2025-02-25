@@ -119,9 +119,8 @@ public class SQLTestRepositoryApplicationConfiguration {
 
   @Bean
   public MockLockssDaemon mockLockssDaemon() throws Exception {
-    theDaemon = new MockLockssDaemon();
-
     ConfigManager cfgMgr = ConfigManager.makeConfigManager();
+    theDaemon = new MockLockssDaemon();
     cfgMgr.initService(theDaemon);
 
     theDaemon.setAppRunning(true);
