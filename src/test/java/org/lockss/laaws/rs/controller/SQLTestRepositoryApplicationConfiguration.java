@@ -33,6 +33,7 @@ package org.lockss.laaws.rs.controller;
 
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import jakarta.annotation.PreDestroy;
+import org.lockss.app.LockssDaemon;
 import org.lockss.config.ConfigManager;
 import org.lockss.config.CurrentConfig;
 import org.lockss.db.DbException;
@@ -96,6 +97,7 @@ public class SQLTestRepositoryApplicationConfiguration {
 
   @Bean
   public LockssRepository lockssRepository(
+      @Autowired MockLockssDaemon theDaemon,
       @Autowired ArtifactIndex index,
       @Autowired ArtifactDataStore ds
   ) throws IOException {
@@ -103,6 +105,8 @@ public class SQLTestRepositoryApplicationConfiguration {
 
     LockssRepository repository =
         new BaseLockssRepository(stateDir, index, ds);
+
+    repository.initRepository();
 
     return spy(repository);
   }
@@ -114,17 +118,27 @@ public class SQLTestRepositoryApplicationConfiguration {
   }
 
   @Bean
-  public ArtifactIndex artifactIndex() throws DbException {
-      ConfigManager mgr = ConfigManager.makeConfigManager(appCtx);
-      ConfigManager.setConfigManager(mgr, appCtx);
+  public MockLockssDaemon mockLockssDaemon() throws Exception {
+    theDaemon = new MockLockssDaemon();
 
-      theDaemon = new MyMockLockssDaemon();
-      theDaemon.setAppRunning(true);
-      theDaemon.setDaemonInited(true);
+    ConfigManager cfgMgr = ConfigManager.makeConfigManager();
+    cfgMgr.initService(theDaemon);
 
-      dbPort = Integer.toString(TcpTestUtil.findUnboundTcpPort());
-      ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
-          dbPort);
+    theDaemon.setAppRunning(true);
+    theDaemon.setDaemonInited(true);
+    theDaemon.setDaemonRunning(true);
+    LockssDaemon.setLockssDaemon(theDaemon);
+
+    return theDaemon;
+  }
+
+  @Bean
+  public ArtifactIndex artifactIndex(MockLockssDaemon theDaemon) throws DbException {
+    ConfigManager mgr = ConfigManager.makeConfigManager(appCtx);
+    ConfigManager.setConfigManager(mgr, appCtx);
+
+    dbPort = Integer.toString(TcpTestUtil.findUnboundTcpPort());
+    ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER, dbPort);
 
     try {
       setUpDiskSpace();
@@ -146,10 +160,6 @@ public class SQLTestRepositoryApplicationConfiguration {
     ConfigurationUtil.addFromArgs(ConfigManager.PARAM_PLATFORM_DISK_SPACE_LIST,
         tmpdir);
     return tmpdir;
-  }
-
-  private static class MyMockLockssDaemon extends MockLockssDaemon {
-    // Intentionally left blank
   }
 
   private void initializePostgreSQL() throws Exception {

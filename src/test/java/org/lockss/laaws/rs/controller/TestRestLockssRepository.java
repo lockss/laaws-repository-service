@@ -51,11 +51,8 @@ import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.log.L4JLogger;
 import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
-import org.lockss.rs.io.index.db.SQLArtifactIndexDbManager;
-import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.*;
-import org.lockss.test.ThrowingInputStream;
 import org.lockss.util.ListUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
@@ -71,7 +68,6 @@ import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
-import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -85,7 +81,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -185,11 +180,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @Autowired
   LockssRepository internalRepo;
 
-  private MockLockssDaemon theDaemon;
-  private SQLArtifactIndexDbManager idxDbManager;
   private String tempDirPath;
   private String dbPort;
-
 
   @AfterClass
   public static void deleteTempDirs() throws Exception {
@@ -207,80 +199,18 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   // the repository
   Map<String, ArtifactSpec> highestCommittedVerSpec = new HashMap<String, ArtifactSpec>();
 
-  /**
-   * Provides a newly built LOCKSS repository implemented by a remote REST
-   * Repository service.
-   *
-   * @return a LockssRepository with the newly built LOCKSS repository.
-   * @throws Exception if there are problems.
-   */
-  public RestLockssRepository makeLockssRepository() throws Exception {
-    log.info("port = " + port);
-    return new RestLockssRepository(
-        new URL(String.format("http://localhost:%d", port)), null, null);
-  }
-
   @Before
   public void setUpArtifactDataStore() throws Exception {
     TimeBase.setSimulated();
     // Get the temporary directory used during the test.
     tempDirPath = setUpDiskSpace();
 
-    theDaemon = getMockLockssDaemon();
-    theDaemon.setAppRunning(true);
-    theDaemon.setDaemonInited(true);
-
     dbPort = Integer.toString(TcpTestUtil.findUnboundTcpPort());
     ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
         dbPort);
 
-//    initializeDerby();
-    initializePostgreSQL();
-
-    internalRepo.initRepository();
-    this.repoClient = makeLockssRepository();
-  }
-
-  protected void initializePostgreSQL() throws Exception {
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_USER, "postgres",
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgresx");
-
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.enabled", "true",
-        SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.initialSize", "2");
-
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.PARAM_MAX_RETRY_COUNT, "0",
-        SQLArtifactIndexDbManager.PARAM_RETRY_DELAY, "0");
-
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_CLASSNAME,  PGSimpleDataSource.class.getCanonicalName(),
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgres");
-
-    idxDbManager = new SQLArtifactIndexDbManager();
-    startEmbeddedPgDbManager(idxDbManager);
-    idxDbManager.initService(getMockLockssDaemon());
-
-    idxDbManager.setTargetDatabaseVersion(4);
-    idxDbManager.startService();
-
-    theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
-  }
-
-  private void initializeDerby() throws IOException {
-    // Set the database log.
-    System.setProperty("derby.stream.error.file",
-        new File(tempDirPath, "derby.log").getAbsolutePath());
-
-    // Create the database manager.
-    idxDbManager = new SQLArtifactIndexDbManager();
-    idxDbManager.initService(theDaemon);
-
-    idxDbManager.setTargetDatabaseVersion(4);
-    idxDbManager.startService();
-
-    theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
+    repoClient = new RestLockssRepository(
+        new URL(String.format("http://localhost:%d", port)), null, null);
   }
 
   @After

@@ -31,6 +31,8 @@ POSSIBILITY OF SUCH DAMAGE.
 */
 package org.lockss.laaws.rs.controller;
 
+import org.lockss.app.LockssDaemon;
+import org.lockss.config.ConfigManager;
 import org.lockss.db.DbException;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
@@ -38,6 +40,7 @@ import org.lockss.rs.io.index.VolatileArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.test.LockssTestCase4;
+import org.lockss.test.MockLockssDaemon;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -55,6 +58,7 @@ import static org.mockito.Mockito.spy;
 public class DefaultTestRepositoryApplicationConfiguration {
   static List<File> tmpDirs = new ArrayList<>();
   private final ApplicationContext appCtx;
+  private MockLockssDaemon theDaemon;
 
   @Autowired
   public DefaultTestRepositoryApplicationConfiguration(ApplicationContext appCtx) {
@@ -63,6 +67,7 @@ public class DefaultTestRepositoryApplicationConfiguration {
 
   @Bean
   public LockssRepository lockssRepository(
+      @Autowired MockLockssDaemon theDaemon,
       @Autowired ArtifactIndex index,
       @Autowired ArtifactDataStore ds
   ) throws IOException {
@@ -71,7 +76,24 @@ public class DefaultTestRepositoryApplicationConfiguration {
     LockssRepository repository =
         new BaseLockssRepository(stateDir, index, ds);
 
+    repository.initRepository();
+
     return spy(repository);
+  }
+
+  @Bean
+  public MockLockssDaemon mockLockssDaemon() throws Exception {
+    theDaemon = new MockLockssDaemon();
+
+    ConfigManager cfgMgr = ConfigManager.makeConfigManager();
+    cfgMgr.initService(theDaemon);
+
+    theDaemon.setAppRunning(true);
+    theDaemon.setDaemonInited(true);
+    theDaemon.setDaemonRunning(true);
+    LockssDaemon.setLockssDaemon(theDaemon);
+
+    return theDaemon;
   }
 
   @Bean
