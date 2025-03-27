@@ -37,5 +37,6 @@ src/generated/java/org/lockss/laaws/*/model/AuSize.java
 src/generated/java/org/lockss/laaws/*/model/ImportStatus.java
 src/generated/java/org/lockss/laaws/*/model/PageInfo.java
 src/generated/java/org/lockss/laaws/*/model/RepositoryInfo.java
+src/generated/java/org/lockss/laaws/*/model/RepositoryStatistics.java
 src/generated/java/org/lockss/laaws/*/model/StorageInfo.java
 src/generated/java/org/lockss/laaws/*/model/StreamingResponseBody.java

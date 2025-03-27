@@ -36,11 +36,15 @@ import org.lockss.jms.JMSManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
+import org.lockss.rs.io.index.ArtifactIndexVersion;
 import org.lockss.rs.io.storage.ArtifactDataStore;
-import org.lockss.util.Deadline;
+import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.time.Deadline;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.util.JmsFactorySource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -54,15 +58,28 @@ import java.io.IOException;
 public class LockssRepositoryConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
+  private static final String ARG_START_REINDEX = "--start-reindex";
+
   private final RepositoryServiceProperties repoProps;
+  private final ArtifactIndexVersion lastRecordedIndexVersion;
+  private final ArtifactDataStoreVersion lastRecordedDatastoreVersion;
+  private final ApplicationArguments appArgs;
   private ArtifactDataStore store;
   private ArtifactIndex index;
 
   @Autowired
-  public LockssRepositoryConfig(RepositoryServiceProperties repoProps, ArtifactIndex index, ArtifactDataStore store) {
+  public LockssRepositoryConfig(RepositoryServiceProperties repoProps,
+                                ArtifactIndex index,
+                                ArtifactDataStore store,
+                                ArtifactIndexVersion lastRecordedIndexVersion,
+                                ArtifactDataStoreVersion lastRecordedDatastoreVersion,
+                                ApplicationArguments appArgs) {
     this.repoProps = repoProps;
     this.index = index;
     this.store = store;
+    this.lastRecordedIndexVersion = lastRecordedIndexVersion;
+    this.lastRecordedDatastoreVersion = lastRecordedDatastoreVersion;
+    this.appArgs = appArgs;
   }
 
   /**
@@ -73,7 +90,7 @@ public class LockssRepositoryConfig {
    * @throws IOException
    */
   @Bean
-  public BaseLockssRepository createInitializedRepository() throws IOException {
+  public BaseLockssRepository lockssRepository() throws IOException {
     BaseLockssRepository repo = createLockssRepository();
 
     // Initialize the repository in a separate thread
@@ -111,10 +128,23 @@ public class LockssRepositoryConfig {
         // Local state directory for this Repository Service
         File stateDir = repoProps.getRepositoryStateDir();
 
-        // Configure artifact index and data store individually using Spring beans (see their
-        // configuration beans in) the ArtifactIndexConfig and ArtifactDataStoreConfig classes,
-        // respectively.
-        return new BaseLockssRepository(stateDir, index, store);
+        // FIXME: Write a Builder?
+        return new BaseLockssRepository(stateDir, index, store) {
+          @Override
+          protected ArtifactDataStoreVersion getLastRecordedArtifactDataStoreVersion() {
+            return lastRecordedDatastoreVersion;
+          }
+
+          @Override
+          protected ArtifactIndexVersion getLastRecordedArtifactIndexVersion() {
+            return lastRecordedIndexVersion;
+          }
+
+          @Override
+          protected boolean isReindexWanted() {
+            return appArgs.containsOption(ARG_START_REINDEX);
+          }
+        };
 
 //      case "rest":
 //        if (repoProps.getRepoSpecParts().length <= 1) {

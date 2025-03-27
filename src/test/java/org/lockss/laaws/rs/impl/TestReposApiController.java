@@ -35,10 +35,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.RepoinfoApiController;
+import org.lockss.laaws.rs.controller.DefaultTestRepositoryApplicationConfiguration;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.UrlUtil;
+import org.lockss.util.io.FileUtil;
 import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactPageInfo;
 import org.lockss.util.rest.repo.model.AuidPageInfo;
@@ -46,12 +48,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.ComponentScan;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,19 +69,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @RunWith(SpringRunner.class)
 @WebMvcTest(RepoinfoApiController.class)
 @AutoConfigureMockMvc()
-@ComponentScan(basePackages = { "org.lockss.laaws.rs",
-    "org.lockss.laaws.rs.api" })
+// We can't use a @ContextConfiguration here because the tests rely on a @MockBean to mock the
+// internal BaseLockssRepository behavior.
 public class TestReposApiController extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
 
     @Autowired
     private MockMvc controller;
-
-//    @MockBean
-//    private ArtifactIndex artifactIndex;
-
-//    @MockBean
-//    private ArtifactDataStore artifactStore;
 
     @MockBean
     private BaseLockssRepository repo;
@@ -84,20 +83,6 @@ public class TestReposApiController extends SpringLockssTestCase4 {
     // The value of the Authorization header to be used when calling the REST
     // service.
     private String authHeaderValue = null;
-
-//    @TestConfiguration
-//    public static class RepoControllerTestConfig {
-//        @Bean
-//        public LockssArtifactClientRepository setRepository() {
-//            return new MockLockssArtifactRepositoryImpl();
-//        }
-//    }
-//
-//
-//    @After
-//    public void tearDown() throws Exception {
-//        // Nothing? Let it the JVM perform a GC
-//    }
 
     @Test
     public void getNamespaces() throws Exception {

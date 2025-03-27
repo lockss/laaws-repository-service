@@ -1,11 +1,16 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.StringUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Arrays;
 
 /**
@@ -15,6 +20,9 @@ import java.util.Arrays;
 @Component
 public class RepositoryServiceProperties {
   private final static L4JLogger log = L4JLogger.getLogger();
+
+  @Autowired
+  ApplicationArguments appArgs;
 
   // LOCKSS repository properties
   @Value("${repo.spec:volatile}") String repoSpec;
@@ -31,6 +39,7 @@ public class RepositoryServiceProperties {
 
   // Artifact index properties
   @Value("${repo.index.spec:#{null}}") String indexSpec;
+  @Value("${repo.index.dispatching.enable:#{false}}") boolean isDispatchingIndexEnabled;
 
   @Value("${repo.persistIndexName:#{null}}") String repoPersistIndexName;
   @Value("${repo.index.local.persistIndexName:#{null}}") String localPersistIndexName;
@@ -38,6 +47,9 @@ public class RepositoryServiceProperties {
   @Value("${repo.index.solr.solrUrl:#{null}}") String solrEndpoint;
   @Value("${repo.index.solr.solrCollection:#{null}}") String solrCollectionName;
   @Value("${repo.index.solr.hardCommitInterval:15000}") long solrHardCommitInterval;
+
+  private boolean indexNeedsReindex;
+  private ArtifactDataStoreVersion dataStoreVersion;
 
   public String getRepositorySpec() {
     return repoSpec;
@@ -57,7 +69,45 @@ public class RepositoryServiceProperties {
     return repoSpec.split(":", 2);
   }
 
+  public boolean isSolrArtifactIndex() {
+    return getIndexSpec().equals("solr");
+  }
+
+  public boolean isSqlArtifactIndex() {
+    return getIndexSpec().equals("derby") ||
+           getIndexSpec().equals("pgsql");
+  }
+
+  public boolean isDispatchingIndexEnabled() {
+    return isDispatchingIndexEnabled;
+  }
+
+  /**
+   * Returns the index specification for the type of LOCKSS repository configured for use
+   * by this LOCKSS Repository Service.
+   */
+  private String getIndexSpecForRepository() {
+    switch (getRepositoryType()) {
+      case "volatile":
+        // Allow a volatile index to be created so that WARC compression can be configured
+        // in the volatile artifact data store
+        return "volatile";
+
+      case "local":
+        // Support for legacy repo.spec=local:X;Y;Z
+        return "local";
+
+      case "custom":
+        return indexSpec;
+
+      default:
+        throw new IllegalArgumentException("Repository spec not supported: " + getRepositorySpec());
+    }
+  }
+
   public String getIndexSpec() {
+    indexSpec = getIndexSpecForRepository();
+
     if (StringUtil.isNullString(indexSpec)) {
       log.error("Missing artifact index configuration");
       throw new IllegalStateException("Artifact index not configured");

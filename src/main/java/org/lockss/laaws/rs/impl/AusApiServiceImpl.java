@@ -252,11 +252,11 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
 
     try {
       boolean isLatestVersion =
-          version == null || version.toLowerCase().equals("latest");
+          version == null || version.equalsIgnoreCase("latest");
       log.trace("isLatestVersion = {}", isLatestVersion);
 
       boolean isAllVersions =
-          version != null && version.toLowerCase().equals("all");
+          version != null && version.equalsIgnoreCase("all");
       log.trace("isAllVersions = {}", isAllVersions);
 
       if (urlPrefix != null && url != null) {

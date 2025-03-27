@@ -30,13 +30,13 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.lockss.app.LockssApp;
 import org.lockss.config.ConfigManager;
 import org.lockss.log.L4JLogger;
-import org.lockss.rs.io.index.ArtifactIndex;
-import org.lockss.rs.io.index.DispatchingArtifactIndex;
-import org.lockss.rs.io.index.LocalArtifactIndex;
-import org.lockss.rs.io.index.VolatileArtifactIndex;
+import org.lockss.rs.io.index.*;
+import org.lockss.rs.io.index.db.SQLArtifactIndex;
 import org.lockss.rs.io.index.solr.SolrArtifactIndex;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,7 +45,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 
 /**
@@ -64,41 +64,54 @@ public class ArtifactIndexConfig {
 
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  private RepositoryServiceProperties repoProps;
+  private final static ObjectMapper mapper = new ObjectMapper()
+      .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+  private final RepositoryServiceProperties repoProps;
+  private final ApplicationArguments appArgs;
   private SolrArtifactIndex solrIndex;
 
   @Autowired
-  public ArtifactIndexConfig(RepositoryServiceProperties repoProps) {
+  public ArtifactIndexConfig(RepositoryServiceProperties repoProps,
+                             ApplicationArguments appArgs) {
     this.repoProps = repoProps;
+    this.appArgs = appArgs;
   }
 
   @Bean
-  public ArtifactIndex setArtifactIndex() {
-    return createArtifactIndex(parseIndexSpecs());
+  public ArtifactIndex artifactIndex() {
+    ArtifactIndex index = createArtifactIndex(repoProps.getIndexSpec());
+
+    if (repoProps.isDispatchingIndexEnabled()) {
+      index = new DispatchingArtifactIndex(index);
+    }
+
+    return index;
   }
 
-  @Autowired
-  private ApplicationArguments appArgs;
-
-  private String parseIndexSpecs() {
-    switch (repoProps.getRepositoryType()) {
-      case "volatile":
-        // Allow a volatile index to be created so that WARC compression can be configured
-        // in the volatile artifact data store
-        return "volatile";
-
-      case "local":
-        // Support for legacy repo.spec=local:X;Y;Z
-        return "local";
-
-      case "custom":
-        return repoProps.getIndexSpec();
-
-      default:
-        throw new IllegalArgumentException("Repository spec not supported: " + repoProps.getRepositorySpec());
+  @Bean
+  public ArtifactIndexVersion artifactIndexVersion() {
+    try {
+      File versionFile = new File(repoProps.getRepositoryStateDir(), AbstractArtifactIndex.INDEX_VERSION_FILE);
+      ArtifactIndexVersion onDiskVersion = readArtifactIndexVersion(versionFile);
+      return onDiskVersion;
+    } catch (IOException e) {
+      throw new IllegalStateException("Couldn't read artifact index version", e);
     }
   }
 
+  public static ArtifactIndexVersion readArtifactIndexVersion(File versionFile) throws IOException {
+    try (InputStream is = new BufferedInputStream(new FileInputStream(versionFile))) {
+      return mapper.readValue(is, ArtifactIndexVersion.class);
+    } catch (FileNotFoundException e) {
+      log.debug("Could not find index version file: " + versionFile);
+      return ArtifactIndexVersion.UNKNOWN;
+    }
+  }
+
+  /**
+   * Constructs an {@link ArtifactIndex} from its specification.
+   */
   private ArtifactIndex createArtifactIndex(String indexType) {
     log.trace("indexType = {}", indexType);
 
@@ -124,6 +137,10 @@ public class ArtifactIndexConfig {
         solrIndex = new SolrArtifactIndex(repoProps.getSolrEndpoint(), credentials)
             .setHardCommitInterval(repoProps.getSolrHardCommitInterval());
         return solrIndex;
+
+      case "derby":
+      case "pgsql":
+        return new SQLArtifactIndex();
 
       case "dispatching":
         // Create Solr index

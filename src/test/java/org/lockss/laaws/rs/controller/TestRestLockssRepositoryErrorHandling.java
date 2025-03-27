@@ -55,7 +55,7 @@ import static org.mockito.Mockito.*;
  */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ContextConfiguration(classes = { MyTestConfig.class })
+@ContextConfiguration(classes = { DefaultTestRepositoryApplicationConfiguration.class })
 public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4 {
   private final static L4JLogger log = L4JLogger.getLogger();
 

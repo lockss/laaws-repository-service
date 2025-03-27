@@ -12,7 +12,7 @@ import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
 import org.lockss.laaws.rs.multipart.LockssMultipartHttpServletRequest;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
-import org.lockss.rs.io.storage.warc.WarcArtifactData;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataUtil;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -22,6 +22,7 @@ import org.lockss.util.UrlUtil;
 import org.lockss.util.jms.JmsUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.multipart.MultipartResponse;
+import org.lockss.util.rest.repo.LockssArtifactAlreadyExistsException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
@@ -31,6 +32,7 @@ import org.lockss.util.rest.repo.util.ArtifactComparators;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.time.Deadline;
+import org.lockss.util.time.TimeBase;
 import org.lockss.util.time.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -57,7 +59,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 import static org.lockss.laaws.rs.impl.ServiceImplUtil.populateArtifacts;
@@ -91,8 +92,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   // that nothing seriously bad happen if they are.
 
   // The artifact iterators used in pagination.
-  private Map<Integer, Iterator<Artifact>> artifactIterators =
-      new ConcurrentHashMap<>();
+  private Map<Integer, Iterator<Artifact>> artifactIterators = null;
 
   @Autowired
   public ArtifactsApiServiceImpl(HttpServletRequest request) {
@@ -134,7 +134,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * be discarded.  Change requires restart to take effect.
    */
   public static final String PARAM_ARTIFACT_ITERATOR_TIMEOUT = PREFIX + "artifact.iterator.timeout";
-  public static final long DEFAULT_ARTIFACT_ITERATOR_TIMEOUT = 48 * TimeUtil.HOUR;
+  public static final long DEFAULT_ARTIFACT_ITERATOR_TIMEOUT = TimeUtil.HOUR;
   private long artifactIteratorTimeout = DEFAULT_ARTIFACT_ITERATOR_TIMEOUT;
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -160,28 +160,21 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       // The first time setConfig() is called, replace the temporary
       // iterator continuation maps
-      if (!(artifactIterators instanceof PassiveExpiringMap)) {
+      if (artifactIterators == null) {
         artifactIterators =
             Collections.synchronizedMap(new PassiveExpiringMap<>(artifactIteratorTimeout));
       }
 
-      if (iteratorMapTimer != null) {
-        TimerQueue.cancel(iteratorMapTimer);
+      if (iteratorMapTimerRequest != null) {
+        TimerQueue.cancel(iteratorMapTimerRequest);
       }
-      TimerQueue.schedule(Deadline.in(1 * TimeUtil.HOUR), 1 * TimeUtil.HOUR,
-          iteratorMapTimeout, null);
+      iteratorMapTimerRequest = TimerQueue.schedule(
+          Deadline.in(30 * TimeUtil.MINUTE), 30 * TimeUtil.MINUTE,
+          (cookie) -> timeoutIterators(artifactIterators), null);
     }
   }
 
-  TimerQueue.Request iteratorMapTimer;
-
-  // Timer callback for periodic removal of timed-out iterator continuations
-  private TimerQueue.Callback iteratorMapTimeout =
-      new TimerQueue.Callback() {
-        public void timerExpired(Object cookie) {
-          timeoutIterators(artifactIterators);
-        }
-      };
+  TimerQueue.Request iteratorMapTimerRequest;
 
   private void timeoutIterators(Map map) {
     // Call isEmpty() for effect - runs removeAllExpired()
@@ -225,16 +218,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       ArtifactIdentifier artifactId = ArtifactDataUtil.buildArtifactIdentifier(props);
 
-      if (artifactId.getVersion() != null) {
-        throw new LockssRestServiceException(HttpStatus.BAD_REQUEST,
-            "Version property not allowed");
-      }
-
       // Check URI
       validateUri(artifactId.getUri(), parsedRequest);
 
       // Construct ArtifactData from payload part
-      ArtifactData ad = WarcArtifactData.fromResource(payload.getInputStream());
+      ArtifactData ad = WarcArtifactDataUtil.fromResource(payload.getInputStream());
 
       // Set artifact identifier
       ad.setIdentifier(artifactId);
@@ -286,7 +274,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             StringUtil.sizeToString(payload.getSize()));
 
         return new ResponseEntity<>(artifact, HttpStatus.OK);
-
+      } catch (LockssArtifactAlreadyExistsException e) {
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.DATA_ERROR,
+            HttpStatus.CONFLICT,
+            "Artifact version already exists", e, parsedRequest);
       } catch (IOException e) {
         String errorMessage =
             "Caught IOException while attempting to add an artifact to the repository";
@@ -646,10 +638,10 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             errorMessage, parsedRequest);
       }
 
-      Iterable<Artifact> artifactIterable = null;
       List<Artifact> artifacts = new ArrayList<>();
       Iterator<Artifact> iterator = null;
       boolean missingIterator = false;
+      ArtifactContinuationToken responseAct = null;
 
       // Get the iterator hash code (if any) used to provide a previous page
       // of results.
@@ -663,20 +655,17 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         missingIterator = iterator == null;
       }
 
-      ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions.toUpperCase());
+      if (iterator == null) {
+        Iterable<Artifact> artifactIterable = null;
+        ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions.toUpperCase());
 
-      if (url != null) {
-        artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, artifactVersions);
-      } else if (urlPrefix != null) {
-        artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, artifactVersions);
-      }
+        if (url != null) {
+          artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, artifactVersions);
+        } else if (urlPrefix != null) {
+          artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, artifactVersions);
+        }
 
-      ArtifactContinuationToken responseAct = null;
-
-      // Check whether an iterator is involved in obtaining the response.
-      if (iterator != null || artifactIterable != null) {
-        // Yes: Check whether a new iterator is needed.
-        if (iterator == null) {
+        if (artifactIterable != null) {
           // Yes: Get the iterator pointing to the first page of results.
           iterator = artifactIterable.iterator();
 
@@ -693,6 +682,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
             // Loop through the artifacts skipping those already returned
             // through a previous response.
+            long skipStarted = TimeBase.nowMs();
             while (iterator.hasNext()) {
               Artifact artifact = iterator.next();
 
@@ -708,10 +698,13 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
                 break;
               }
             }
+            repo.incTimeSpentReiterating(TimeBase.msSince(skipStarted));
           }
         }
+      }
 
-        // Populate the the rest of the results for this response.
+      if (iterator != null) {
+        // Populate the rest of the results for this response.
         populateArtifacts(iterator, limit, artifacts);
 
         // Check whether the iterator may be used in the future to provide more

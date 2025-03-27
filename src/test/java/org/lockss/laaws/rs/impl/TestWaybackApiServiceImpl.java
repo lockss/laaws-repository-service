@@ -440,21 +440,21 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Populate the repository.
     List<Artifact> artifacts = new ArrayList<>();
 
-    artifacts.add( makeArtifact("coll1", "auid1", "www.url4.example.com", 1, MediaType.TEXT_HTML, 312345));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url3.example.com", 1, MediaType.TEXT_HTML, 212345));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 3, MediaType.TEXT_HTML, 134567));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 2, MediaType.TEXT_HTML, 123456));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 1, MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url4.example.com", null, MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url3.example.com", null, MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 134567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 123456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 112345));
 
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 4, MediaType.TEXT_HTML, 45678));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 3, MediaType.TEXT_HTML, 34567));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 2, MediaType.TEXT_HTML, 23456));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 1, MediaType.TEXT_HTML, 12345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 45678));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 34567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 23456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 12345));
 
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url4.example.com", 1, MediaType.TEXT_HTML, 312345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url3.example.com", 1, MediaType.TEXT_HTML, 212345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url2.example.com", 1, MediaType.TEXT_HTML, 112345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url1.example.com", 1, MediaType.TEXT_HTML, 12345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url4.example.com", null, MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url3.example.com", null, MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 12345));
 
     // Get exact CDX records for www.url1.example.com in the first collection.
     String collId = "coll1";

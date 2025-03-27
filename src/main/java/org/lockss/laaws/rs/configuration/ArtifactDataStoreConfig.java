@@ -30,10 +30,14 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.io.FileUtils;
 import org.lockss.config.ConfigManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
+import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
 import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.TestingWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
@@ -44,7 +48,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
+import java.io.*;
 import java.util.List;
+
+import static org.lockss.rs.io.storage.warc.WarcArtifactDataStore.DATASTORE_VERSION_FILE;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal artifact data store.
@@ -52,6 +59,9 @@ import java.util.List;
 @Configuration
 public class ArtifactDataStoreConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
+
+  private final static ObjectMapper mapper = new ObjectMapper()
+      .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
   public final static String PARAM_FREE_SPACE_MAP = "org.lockss.repo.testing.freeSpaceMap";
 
@@ -78,12 +88,30 @@ public class ArtifactDataStoreConfig {
   }
 
   @Bean
-  public ArtifactDataStore setArtifactDataStore() throws Exception {
+  public ArtifactDataStore artifactDataStore() throws Exception {
     // Create WARC artifact data store and set use WARC compression
     ds = createWarcArtifactDataStore(parseDataStoreSpecs());
-
-    // Return the data store
     return ds;
+  }
+
+  @Bean
+  public ArtifactDataStoreVersion artifactDataStoreVersion() {
+    try {
+      File versionFile = new File(repoProps.getRepositoryStateDir(), DATASTORE_VERSION_FILE);
+      ArtifactDataStoreVersion onDiskVersion = readArtifactDataStoreVersion(versionFile);
+      return onDiskVersion;
+    } catch (IOException e) {
+      throw new IllegalStateException("Couldn't read artifact index version", e);
+    }
+  }
+
+  private static ArtifactDataStoreVersion readArtifactDataStoreVersion(File versionFile) throws IOException {
+    try (InputStream is = new BufferedInputStream(new FileInputStream(versionFile))) {
+      return mapper.readValue(is, ArtifactDataStoreVersion.class);
+    } catch (FileNotFoundException e) {
+      log.debug("Could not find data store version file: " + versionFile);
+      return ArtifactDataStoreVersion.UNKNOWN;
+    }
   }
 
   private String parseDataStoreSpecs() {

@@ -33,14 +33,21 @@ import org.lockss.app.LockssApp.ManagerDesc;
 import org.lockss.app.LockssDaemon;
 import org.lockss.app.ServiceDescr;
 import org.lockss.config.ConfigManager;
+import org.lockss.laaws.rs.configuration.RepositoryServiceProperties;
 import org.lockss.log.L4JLogger;
 import org.lockss.plugin.PluginManager;
 import org.lockss.repository.RepositoryDbManager;
+import org.lockss.rs.io.index.db.SQLArtifactIndexDbManager;
 import org.lockss.spring.base.BaseSpringBootApplication;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
@@ -55,12 +62,34 @@ public class RepositoryApplication extends BaseSpringBootApplication
 	implements CommandLineRunner {
   private static L4JLogger log = L4JLogger.getLogger();
 
+  @Autowired
+  private RepositoryServiceProperties repoProps;
+
+  public ManagerDesc REPOSITORY_DB_MANAGER_DESC =
+      new ManagerDesc(
+          managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName()) {
+        @Override
+        public boolean shouldStart(LockssApp app) {
+          return repoProps.isSolrArtifactIndex();
+        }
+      };
+
+  public ManagerDesc SQLARTIFACTINDEX_DB_MANAGER_DESC =
+      new ManagerDesc(
+          managerKey(SQLArtifactIndexDbManager.class), SQLArtifactIndexDbManager.class.getName()) {
+        @Override
+        public boolean shouldStart(LockssApp app) {
+          return repoProps.isSqlArtifactIndex();
+        }
+      };
+
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
-  private static final ManagerDesc[] myManagerDescs = {
+  private final ManagerDesc[] myManagerDescs = {
       STATE_MANAGER_DESC,
       ACCOUNT_MANAGER_DESC,
-      new ManagerDesc(managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName())
+      REPOSITORY_DB_MANAGER_DESC,
+      SQLARTIFACTINDEX_DB_MANAGER_DESC,
   };
 
   /**
@@ -83,6 +112,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
    * @param args
    *          A String[] with the command line arguments.
    */
+  @Override
   public void run(String... args) {
     // Check whether there are command line arguments available.
     if (args != null && args.length > 0) {
