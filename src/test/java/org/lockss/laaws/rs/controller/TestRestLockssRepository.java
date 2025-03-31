@@ -48,6 +48,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
+import org.lockss.laaws.rs.impl.TestStatusApiServiceImpl;
 import org.lockss.log.L4JLogger;
 import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
@@ -69,8 +70,10 @@ import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
@@ -175,6 +178,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   @LocalServerPort
   private int port;
 
+  // The application Context used to specify the command line arguments to be
+  // used for the tests.
+  @Autowired
+  ApplicationContext appCtx;
+
   static List<File> tmpDirs = new ArrayList<>();
 
   @Autowired
@@ -211,6 +219,50 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     repoClient = new RestLockssRepository(
         new URL(String.format("http://localhost:%d", port)), null, null);
+
+    setupLockssApp();
+  }
+  
+  public void setupLockssApp() throws Exception {
+    // Set up the temporary directory where the test data will reside.
+    setUpTempDirectory(TestStatusApiServiceImpl.class.getCanonicalName());
+
+    // Set up the UI port.
+    setUpUiPort(UI_PORT_CONFIGURATION_TEMPLATE, UI_PORT_CONFIGURATION_FILE);
+    
+    // Specify the command line parameters to be used for the tests.
+    List<String> cmdLineArgs = getCommandLineArguments();
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add("test/config/testAuthOn.txt");
+
+    log.info("cmdLineArgs: " + cmdLineArgs);
+
+    // XXX This is kinda wonky.  SpringRunner has already set up the
+    // test environment; this starts (parts of?) it over again
+    CommandLineRunner runner = appCtx.getBean(CommandLineRunner.class);
+    runner.run(cmdLineArgs.toArray(new String[cmdLineArgs.size()]));
+  }
+
+  /**
+   * Provides the standard command line arguments to start the server.
+   *
+   * @return a {@code List<String>} with the command line arguments.
+   */
+  private List<String> getCommandLineArguments() {
+    log.debug2("Invoked");
+
+    List<String> cmdLineArgs = new ArrayList<String>();
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add(getPlatformDiskSpaceConfigPath());
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add(getUiPortConfigFile().getAbsolutePath());
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add("test/config/lockss.txt");
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add("test/config/lockss.opt");
+
+    log.debug2("cmdLineArgs = {}", cmdLineArgs);
+    return cmdLineArgs;
   }
 
   @After

@@ -114,6 +114,8 @@ public class RepositoryApplication extends BaseSpringBootApplication
    */
   @Override
   public void run(String... args) {
+    log.info("lockssDaemon = {}", lockssDaemon);
+
     // Check whether there are command line arguments available.
     if (args != null && args.length > 0) {
       // Yes: Start the LOCKSS daemon.

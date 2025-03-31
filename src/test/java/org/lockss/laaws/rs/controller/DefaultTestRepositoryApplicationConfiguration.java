@@ -96,6 +96,11 @@ public class DefaultTestRepositoryApplicationConfiguration {
   }
 
   @Bean
+  public LockssDaemon lockssDaemon(MockLockssDaemon mockLockssDaemon) {
+    return mockLockssDaemon;
+  }
+
+  @Bean
   public ArtifactIndex artifactIndex() throws DbException {
     return new VolatileArtifactIndex();
   }
