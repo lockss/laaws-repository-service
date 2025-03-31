@@ -34,6 +34,8 @@ package org.lockss.laaws.rs.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.lockss.laaws.rs.api.RepoinfoApiDelegate;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.repo.LockssRepository;
@@ -87,6 +89,7 @@ public class RepoinfoApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Invoked");
 
     ServiceImplUtil.checkRepositoryReady(repo, null);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
 
     try {
       RepositoryInfo result = repo.getRepositoryInfo();
@@ -107,6 +110,7 @@ public class RepoinfoApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Invoked");
 
     ServiceImplUtil.checkRepositoryReady(repo, null);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
 
     try {
       StorageInfo result = repo.getStorageInfo();

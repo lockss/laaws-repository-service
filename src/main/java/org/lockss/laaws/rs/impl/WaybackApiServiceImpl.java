@@ -9,6 +9,8 @@ import org.lockss.laaws.rs.model.CdxRecords;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.repo.LockssRepository;
@@ -96,6 +98,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     // Validate the pagination.
     ServiceImplUtil.validatePagination(count, startPage, parsedRequest);
@@ -199,6 +202,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       // Initialize the results.
@@ -306,6 +310,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       String namespace = ServiceImplUtil.getArchiveFilenameNamespace(

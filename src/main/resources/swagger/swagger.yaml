@@ -53,6 +53,7 @@ paths:
         - repo
       summary: Get namespaces of the committed artifacts in the repository
       operationId: getNamespaces
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       responses:
         '200':
           description: Status 200
@@ -74,6 +75,7 @@ paths:
         - artifacts
       summary: Imports artifacts from an archive
       operationId: addArtifacts
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -129,6 +131,7 @@ paths:
         - artifacts
       summary: Returns all artifacts that match a given a URL or URL prefix and/or version.
       operationId: getArtifactsFromAllAus
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -183,6 +186,7 @@ paths:
         - artifacts
       summary: Create an artifact
       operationId: createArtifact
+      # new roles: ROLE_AU_ADMIN
       requestBody:
         content:
           multipart/form-data:
@@ -229,6 +233,7 @@ paths:
         - artifacts
       summary: Get artifact and metadata
       operationId: getArtifactDataByMultipart
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -277,6 +282,7 @@ paths:
         - artifacts
       summary: Update the property of an artifact
       operationId: updateArtifact
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -314,6 +320,7 @@ paths:
         - artifacts
       summary: Remove an artifact from the repository
       operationId: deleteArtifact
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -343,6 +350,7 @@ paths:
         - artifacts
       summary: Get artifact payload
       operationId: getArtifactDataByPayload
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -386,6 +394,7 @@ paths:
         - artifacts
       summary: Get artifact data as HTTP response
       operationId: getArtifactDataByResponse
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -432,6 +441,7 @@ paths:
       description: Get a list of all Archival Unit identifiers in a namespace or a
         pageful of the list defined by the continuation token and size
       operationId: getAus
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -470,6 +480,7 @@ paths:
         - aus
       summary: Marks the AUID for bulk artifact transfer
       operationId: handleBulkAuOp
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -509,6 +520,7 @@ paths:
       description: Get a list of all artifacts in a namespace and Archival Unit or
         a pageful of the list defined by the continuation token and size
       operationId: getArtifacts
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -571,6 +583,7 @@ paths:
         - aus
       summary: Get the size of Archival Unit artifacts in a namespace
       operationId: getArtifactsSize
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -606,6 +619,7 @@ paths:
       summary: Get the status of the service
       description: Get the status of the service
       operationId: getStatus
+      # no credentials required
       responses:
         '200':
           description: The status of the service
@@ -626,6 +640,7 @@ paths:
       summary: Get OpenWayback CDX records
       description: Get the OpenWayback CDX records of a URL in a namespace
       operationId: getCdxOwb
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: path
@@ -679,6 +694,7 @@ paths:
       summary: Get PyWayback CDX records
       description: Get the PyWayback CDX records of a URL in a namespace
       operationId: getCdxPywb
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: path
@@ -763,6 +779,7 @@ paths:
       summary: Get a WARC archive
       description: Get the contents of a single WARC record as a WARC archive
       operationId: getWarcArchive
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: fileName
           in: path
@@ -806,6 +823,7 @@ paths:
       summary: Get the supported checksum algorithms
       description: Get a list of the names of the supported checksum algorithms
       operationId: getSupportedChecksumAlgorithms
+      # new roles: ROLE_CAUTIOUS
       responses:
         '200':
           description: The names of the supported checksum algorithms
@@ -828,6 +846,7 @@ paths:
       summary: Get repository information
       description: Get properties of the repository
       operationId: getRepositoryInformation
+      # new roles: ROLE_AU_ADMIN
       responses:
         '200':
           description: The repository information
@@ -848,6 +867,7 @@ paths:
       summary: Get repository storage information
       description: Get properties of the repository storage
       operationId: getStorageInfo
+      # new roles: ROLE_AU_ADMIN
       responses:
         '200':
           description: The repository storage information
