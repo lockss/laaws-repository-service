@@ -45,10 +45,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
 import static org.lockss.app.ManagerDescs.*;
@@ -114,8 +110,6 @@ public class RepositoryApplication extends BaseSpringBootApplication
    */
   @Override
   public void run(String... args) {
-    log.info("lockssDaemon = {}", lockssDaemon);
-
     // Check whether there are command line arguments available.
     if (args != null && args.length > 0) {
       // Yes: Start the LOCKSS daemon.
@@ -129,8 +123,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
 	.addAppDefault(PluginManager.PARAM_START_ALL_AUS, "false")
 	.setSpringApplicatonContext(getApplicationContext())
 	.setAppManagers(myManagerDescs);
-
-      LockssApp.startStatic(LockssDaemon.class, spec);
+      startLockssApp(spec);
     } else {
       // No: Do nothing. This happens when a test is started and before the
       // test setup has got a chance to inject the appropriate command line
