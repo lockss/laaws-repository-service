@@ -66,7 +66,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
           managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName()) {
         @Override
         public boolean shouldStart(LockssApp app) {
-          return repoProps.isSolrArtifactIndex();
+          return repoProps.isSolrArtifactIndex() || repoProps.isSqlArtifactIndex();
         }
       };
 
@@ -82,6 +82,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private final ManagerDesc[] myManagerDescs = {
+      CONFIG_DB_MANAGER_DESC, // Started only in testing
       STATE_MANAGER_DESC,
       ACCOUNT_MANAGER_DESC,
       REPOSITORY_DB_MANAGER_DESC,
