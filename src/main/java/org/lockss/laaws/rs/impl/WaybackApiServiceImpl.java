@@ -13,6 +13,7 @@ import org.lockss.spring.auth.AuthUtil;
 import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactData;
@@ -376,6 +377,11 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
           "Cannot get the archive for fileName = '" + fileName + "'";
       log.error(message, iae);
       return getResourceErrorResponseEntity(HttpStatus.BAD_REQUEST, message, iae);
+    } catch (LockssNoSuchArtifactIdException e) {
+      String message =
+          "Cannot get the artifact for fileName = '" + fileName + "'";
+      log.error(message, e);
+      return getResourceErrorResponseEntity(HttpStatus.NOT_FOUND, message, e);
     } catch (Exception e) {
       String message =
           "Cannot get the archive for fileName = '" + fileName + "'";
