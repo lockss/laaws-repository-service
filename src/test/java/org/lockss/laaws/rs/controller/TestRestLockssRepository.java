@@ -48,7 +48,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
-import org.lockss.laaws.rs.impl.TestStatusApiServiceImpl;
 import org.lockss.log.L4JLogger;
 import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
@@ -59,31 +58,42 @@ import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
 import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.io.FileUtil;
+import org.lockss.util.rest.RestUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.multipart.MultipartMessage;
 import org.lockss.util.rest.repo.LockssArtifactAlreadyExistsException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.*;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
+import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
+import org.lockss.util.rest.repo.util.NamedInputStreamResource;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationContext;
-import org.springframework.http.HttpHeaders;
+import org.springframework.core.io.Resource;
+import org.springframework.http.*;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -175,6 +185,18 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   protected static String[] AUIDS = {AUID1, AUID2, "Auid2"};
   protected static String[] URLS = {URL1, URL2, URL2.toUpperCase(), URL3};
 
+  // Credentials.
+  private final Credentials USER_ADMIN =
+      this.new Credentials("lockss-u", "lockss-p");
+  private final Credentials AU_ADMIN =
+      this.new Credentials("au-admin", "I'mAuAdmin");
+  private final Credentials CONTENT_ADMIN =
+      this.new Credentials("content-admin", "I'mContentAdmin");
+  private final Credentials CONTENT_ACCESS =
+      new Credentials("content-access", "I'mContentAdmin");
+  private final Credentials ANYBODY =
+      this.new Credentials("someUser", "somePassword");
+
   @LocalServerPort
   private int port;
 
@@ -217,15 +239,23 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
         dbPort);
 
-    repoClient = new RestLockssRepository(
-        new URL(String.format("http://localhost:%d", port)), null, null);
-
     setupLockssApp();
+    setupRepositoryClient(USER_ADMIN);
+  }
+
+  @Override
+  protected MockLockssDaemon newMockLockssDaemon() {
+    return null;
+  }
+
+  private void setupRepositoryClient(Credentials crd) throws IOException {
+    repoClient = new RestLockssRepository(
+        new URL(String.format("http://localhost:%d", port)), crd.getUser(), crd.getPassword());
   }
   
   public void setupLockssApp() throws Exception {
     // Set up the temporary directory where the test data will reside.
-    setUpTempDirectory(TestStatusApiServiceImpl.class.getCanonicalName());
+    setUpTempDirectory(this.getClass().getCanonicalName());
 
     // Set up the UI port.
     setUpUiPort(UI_PORT_CONFIGURATION_TEMPLATE, UI_PORT_CONFIGURATION_FILE);
@@ -403,6 +433,724 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     assertFalse(ad.isHttpResponse());
     assertNull(ad.getHttpStatus());
+  }
+
+  @Test
+  public void testRoles() throws Exception {
+    RestEndpointCall getNamespaces = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble GET request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/namespaces", null, null);
+
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getNamespaces, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getNamespaces, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getNamespaces, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getNamespaces, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall addArtifactsFromArchive = (Credentials credentials) -> {
+      boolean storeDuplicate = false;
+      String excludeStatusPattern = null;
+
+      // Generate an artifact for the test
+      ArtifactSpec spec = new ArtifactSpec();
+      spec.generateContent();
+
+      MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+
+      // Attach AUID part
+      parts.add("auid", spec.getAuid());
+
+      // Attach archive part
+      HttpHeaders archivePartHeaders = new HttpHeaders();
+
+      // FIXME: Content-Length must be set to avoid the InputStream from being read to
+      //  determine the Content-Length
+      archivePartHeaders.setContentLength(0);
+      MediaType APPLICATION_WARC = MediaType.valueOf("application/warc");
+      archivePartHeaders.setContentType(APPLICATION_WARC);
+
+      InputStream warcArchive = getResourceAsStream("/test.warc");
+      Resource archiveResource = new NamedInputStreamResource("archive", warcArchive);
+
+      parts.add("archive", new HttpEntity<>(archiveResource, archivePartHeaders));
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(parts, requestHeaders);
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", spec.getNamespace());
+      if (storeDuplicate) {
+        queryParams.put("storeDuplicate", "true");
+      }
+      if (!StringUtils.isEmpty(excludeStatusPattern)) {
+        queryParams.put("excludeStatusPattern", excludeStatusPattern);
+      }
+
+      // Build REST endpoint
+      String endpoint = "http://localhost:" + port + "/archives";
+      URI endpointUri = RestUtil.getRestUri(endpoint, null, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Resource> response = testTemplate
+          .exchange(endpointUri, HttpMethod.POST, requestEntity, Resource.class);
+
+      return response;
+    };
+
+    assertResponseStatus(addArtifactsFromArchive, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(addArtifactsFromArchive, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(addArtifactsFromArchive, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getArtifactsFromAllAus = (Credentials credentials) -> {
+      String namespace = null;
+      String prefix = "https://www.lockss.org/";
+      ArtifactVersions versions = ArtifactVersions.ALL;
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("urlPrefix", prefix);
+      queryParams.put("versions", String.valueOf(versions));
+
+      if (namespace != null) {
+        queryParams.put("namespace", namespace);
+      }
+
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      HttpHeaders requestHeaders = new HttpHeaders();
+
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactsFromAllAus, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactsFromAllAus, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getArtifactsFromAllAus, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getArtifactsFromAllAus, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall createArtifact = (Credentials credentials) -> {
+      // Generate an artifact for the test
+      ArtifactSpec spec = new ArtifactSpec()
+          .setUrl("https://www.lockss.org/");
+      spec.generateContent();
+
+      ArtifactData ad = spec.getArtifactData();
+
+      // Transform ArtifactData into multiparts
+      MultiValueMap<String, Object> parts =
+          ArtifactDataUtil.generateMultipartMapFromArtifactData(ad, LockssRepository.IncludeContent.ALWAYS, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(parts, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<MultipartMessage> response = testTemplate
+          .exchange(endpointUri, HttpMethod.POST, requestEntity, MultipartMessage.class);
+
+      return response;
+    };
+
+    assertResponseStatus(createArtifact, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(createArtifact, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(createArtifact, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(createArtifact, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getArtifactDataByMultipart = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+      LockssRepository.IncludeContent includeContent = LockssRepository.IncludeContent.ALWAYS;
+
+      URI endpointUri = artifactByUuidEndpoint(namespace, artifactUuid, includeContent);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setAccept(
+          // Order matters! We expect a multipart response if success or JSON error message otherwise
+          ListUtil.list(MediaType.MULTIPART_FORM_DATA, MediaType.APPLICATION_JSON));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<MultipartMessage> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, MultipartMessage.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactDataByMultipart, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactDataByMultipart, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByMultipart, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByMultipart, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall updateArtifact = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+
+      UriComponentsBuilder builder =
+          UriComponentsBuilder.fromUri(artifactByUuidEndpoint(namespace, artifactUuid, null))
+          .queryParam("committed", "true");
+      URI endpointUri = builder.build().encode().toUri();
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setContentType(MediaType.valueOf("multipart/form-data"));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      MultiValueMap<String, Object> EMPTY_MULTIPART_MAP = new LinkedMultiValueMap<>();
+      HttpEntity requestEntity = new HttpEntity<>(EMPTY_MULTIPART_MAP, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.PUT, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(updateArtifact, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(updateArtifact, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(updateArtifact, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(updateArtifact, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall deleteArtifact = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+
+      URI endpointUri = artifactByUuidEndpoint(namespace, artifactUuid, null);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Void> response = testTemplate
+          .exchange(endpointUri, HttpMethod.DELETE, requestEntity, Void.class);
+
+      return response;
+    };
+
+    assertResponseStatus(deleteArtifact, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(deleteArtifact, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(deleteArtifact, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(deleteArtifact, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getArtifactDataByPayload = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+      LockssRepository.IncludeContent includeContent = LockssRepository.IncludeContent.ALWAYS;
+
+      URI endpointUri =
+          artifactDataEndpointUri(namespace, artifactUuid, "payload", includeContent);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setAccept(ListUtil.list(MediaType.ALL, MediaType.APPLICATION_JSON));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Resource> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, Resource.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactDataByPayload, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactDataByPayload, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByPayload, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByPayload, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getArtifactDataByResponse = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+      LockssRepository.IncludeContent includeContent = LockssRepository.IncludeContent.ALWAYS;
+
+      URI endpointUri =
+          artifactDataEndpointUri(namespace, artifactUuid, "response", includeContent);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      MediaType APPLICATION_HTTP_RESPONSE = MediaType.parseMediaType("application/http;msgtype=response");
+      requestHeaders.setAccept(ListUtil.list(APPLICATION_HTTP_RESPONSE, MediaType.APPLICATION_JSON));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Void> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, Void.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactDataByResponse, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactDataByResponse, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByResponse, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByResponse, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getAus = (Credentials credentials) -> {
+      String namespace = "test";
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+
+      // Build REST endpoint
+      URI endpointUri = RestUtil.getRestUri("http://localhost:" + port + "/aus", null, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getAus, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getAus, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getAus, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getAus, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall handleBulkAuOp = (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+      String op = "start";
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+      queryParams.put("op", op);
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("auid", auid);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/aus/{auid}/bulk", uriParams, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.POST, requestEntity, String.class);
+
+      return response;
+    };
+
+    // The test uses a VolatileArtifactIndex whose startBulkStore and finishBulkStore methods
+    // are inherited from AbstractArtifactIndex and throw UnsupportedOperationException, which
+    // is mapped to a 501 Not Implemented response:
+    assertResponseStatus(handleBulkAuOp, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(handleBulkAuOp, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(handleBulkAuOp, AU_ADMIN, HttpStatus.NOT_IMPLEMENTED);
+    assertResponseStatus(handleBulkAuOp, USER_ADMIN, HttpStatus.NOT_IMPLEMENTED);
+
+    RestEndpointCall getAuArtifacts = (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+      queryParams.put("version", "latest");
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("auid", auid);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/aus/{auid}/artifacts", uriParams, queryParams);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getAuArtifacts, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getAuArtifacts, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getAuArtifacts, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getAuArtifacts, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getAuSize = (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("auid", auid);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/aus/{auid}/artifacts", uriParams, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getAuSize, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getAuSize, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getAuSize, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getAuSize, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getCdxOwb = (Credentials credentials) -> {
+      String namespace = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("q", "url:https://www.lockss.org/");
+//      queryParams.put("count", namespace);
+//      queryParams.put("start_page", namespace);
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("namespace", namespace);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/wayback/cdx/owb/{namespace}", uriParams, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getCdxOwb, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getCdxOwb, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getCdxOwb, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getCdxOwb, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getCdxPywb= (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("url", "https://www.lockss.org/");
+//      queryParams.put("limit", "");
+//      queryParams.put("matchType", "");
+//      queryParams.put("sort", "");
+//      queryParams.put("closest", "");
+//      queryParams.put("output", "");
+//      queryParams.put("fl", "");
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("namespace", namespace);
+
+      // Build REST endpoint
+      URI endpointUri = RestUtil.getRestUri("http://localhost:" + port + "/wayback/cdx/pywb/{namespace}",
+          uriParams, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getCdxPywb, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getCdxPywb, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getCdxPywb, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getCdxPywb, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getWarcArchive = (Credentials credentials) -> {
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("fileName", "test:test.warc");
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/wayback/warcs/{fileName}", uriParams, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Resource> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, Resource.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getWarcArchive, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getWarcArchive, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getWarcArchive, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getWarcArchive, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getChecksumAlgorithms = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/checksumalgorithms", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getChecksumAlgorithms, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getChecksumAlgorithms, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getChecksumAlgorithms, AU_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getChecksumAlgorithms, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getRepoInfo = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/repoinfo", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getRepoInfo, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getRepoInfo, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getRepoInfo, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getRepoInfo, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getStorageInfo = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/repoinfo/storage", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getStorageInfo, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getStorageInfo, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getStorageInfo, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getStorageInfo, USER_ADMIN, HttpStatus.OK);
+  }
+
+  private URI artifactDataEndpointUri(String namespace, String artifactUuid, String responseDataType,
+                                      LockssRepository.IncludeContent includeContent) {
+    Map<String, String> uriParams = new HashMap<>();
+    Map<String, String> queryParams = new HashMap<>();
+
+    // URI path parameters
+    uriParams.put("uuid", artifactUuid);
+    uriParams.put("endpoint", responseDataType);
+
+    // Query parameters
+    if (namespace != null) {
+      queryParams.put("namespace", namespace);
+    }
+
+    if (includeContent != null) {
+      queryParams.put("includeContent", includeContent.toString());
+    }
+
+    return RestUtil.getRestUri("http://localhost:" + port + "/artifacts/{uuid}/{endpoint}",
+        uriParams, queryParams);
+  }
+
+  private URI artifactByUuidEndpoint(String namespace,
+                                     String artifactUuid, LockssRepository.IncludeContent includeContent) {
+    Map<String, String> uriParams = new HashMap<>();
+    uriParams.put("uuid", artifactUuid);
+
+    Map<String, String> queryParams = new HashMap<>();
+
+    if (namespace != null) {
+      queryParams.put("namespace", namespace);
+    }
+
+    if (includeContent != null) {
+      // includeContent defaults to ALWAYS but lets be explicit to avoid confusion
+      queryParams.put("includeContent", includeContent.toString());
+    }
+
+    return RestUtil.getRestUri("http://localhost:" + port + "/artifacts/{uuid}", uriParams, queryParams);
+  }
+
+  private void assertResponseStatus(RestEndpointCall call, Credentials cred, HttpStatus expectedStatus)
+      throws IOException {
+    ResponseEntity<?> response = call.execute(cred);
+
+    // Get the response status.
+    HttpStatusCode statusCode = response.getStatusCode();
+    HttpStatus status = HttpStatus.valueOf(statusCode.value());
+    assertEquals(expectedStatus, status);
+  }
+
+  private interface RestEndpointCall {
+    ResponseEntity<?> execute(Credentials credentials) throws IOException;
   }
 
   /**
@@ -864,7 +1612,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
-  public void testAddArtifact() throws IOException {
+  public void testAddArtifact() throws Exception {
     ArtifactSpec spec = new ArtifactSpec()
         .setUrl("https://www.lockss.org/example");
 
