@@ -51,6 +51,7 @@ import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.log.L4JLogger;
 import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
+import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.*;
 import org.lockss.util.ListUtil;
@@ -72,6 +73,7 @@ import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.rest.repo.util.NamedInputStreamResource;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -111,7 +113,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static java.nio.file.StandardOpenOption.APPEND;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.*;
 
 /**
  * Tests an embedded LOCKSS Repository Service instance configured with an internal {@link LocalLockssRepository}.
@@ -212,6 +214,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   private String tempDirPath;
   private String dbPort;
+  @Autowired
+  private ArtifactIndex artifactIndex;
 
   @AfterClass
   public static void deleteTempDirs() throws Exception {
@@ -433,6 +437,27 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     assertFalse(ad.isHttpResponse());
     assertNull(ad.getHttpStatus());
+  }
+
+  /**
+   * Tests for {@link RestLockssRepository#startBulkStore(String, String)} and
+   * {@link RestLockssRepository#finishBulkStore(String, String)}. Verifies that making these REST API
+   * calls result in the Repository Service calling {@link ArtifactIndex#startBulkStore(String, String)}
+   * and {@link ArtifactIndex#finishBulkStore(String, String, int)}, respectively.
+   */
+  @Test
+  public void testHandleBulk() throws Exception {
+    String ns = "test";
+    String auid = "test";
+
+    doNothing().when(artifactIndex).startBulkStore(ns, auid);
+    doNothing().when(artifactIndex).finishBulkStore(eq(ns), eq(auid), ArgumentMatchers.anyInt());
+
+    repoClient.startBulkStore(ns, auid);
+    verify(artifactIndex).startBulkStore(ns, auid);
+
+    repoClient.finishBulkStore(ns, auid);
+    verify(artifactIndex).finishBulkStore(eq(ns), eq(auid), ArgumentMatchers.anyInt());
   }
 
   @Test

@@ -93,7 +93,7 @@ public class DefaultTestRepositoryApplicationConfiguration {
 
   @Bean
   public ArtifactIndex artifactIndex() throws DbException {
-    return new VolatileArtifactIndex();
+    return spy(new VolatileArtifactIndex());
   }
 
   @Bean
