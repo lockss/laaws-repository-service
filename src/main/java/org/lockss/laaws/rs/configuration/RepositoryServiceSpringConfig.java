@@ -1,6 +1,6 @@
 /*
 
-Copyright (c) 2000-2024, Board of Trustees of Leland Stanford Jr. University
+Copyright (c) 2000-2025, Board of Trustees of Leland Stanford Jr. University
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -32,25 +32,20 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.configuration;
 
-import jakarta.servlet.MultipartConfigElement;
 import org.apache.commons.io.FileUtils;
 import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.multipart.LockssMultipartResolver;
 import org.lockss.log.L4JLogger;
-import org.lockss.util.time.TimeBase;
+import org.lockss.util.rest.RestUtil;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
-import org.springframework.boot.web.error.ErrorAttributeOptions;
-import org.springframework.boot.web.servlet.error.DefaultErrorAttributes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
-import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 
 /**
  * Spring configuration beans for the Spring-implementation of the LOCKSS Repository Service.
@@ -72,6 +67,11 @@ public class RepositoryServiceSpringConfig {
     4 * (int)FileUtils.ONE_MB;
 
   LockssMultipartResolver multipartResolver;
+
+  @Bean
+  public RestTemplate restTemplate() {
+    return RestUtil.getRestTemplate();
+  }
 
   @Bean
   public LockssMultipartResolver multipartResolver(ObjectProvider<MultipartProperties> multipartPropsProvider) {
