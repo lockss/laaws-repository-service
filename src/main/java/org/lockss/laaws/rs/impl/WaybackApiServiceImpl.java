@@ -200,7 +200,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
         // Must match what OpenWayback expects to receive if there were no results
         String title = "Resource Not In Archive";
         String message = "Resource was not found in this LOCKSS archive";
-        return new ResponseEntity<String>(getCdxOwbError(title, message), HttpStatus.NOT_FOUND);
+        return new ResponseEntity<String>(getCdxOwbError(title, message), HttpStatus.OK);
       }
 
       // Convert the results to XML.
