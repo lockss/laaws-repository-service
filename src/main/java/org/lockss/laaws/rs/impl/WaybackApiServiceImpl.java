@@ -88,6 +88,8 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   protected RestTemplate restTemplate;
 
   private final HttpServletRequest request;
+  private String serviceUser;
+  private String servicePassword;
 
   @Autowired
   public WaybackApiServiceImpl(HttpServletRequest request) {
@@ -616,7 +618,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     List<String> normalizedUrls =
         new RestConfigClient(getServiceEndpoint(ServiceDescr.SVC_CONFIG))
             .setRestTemplate(restTemplate)
-            // TODO .addRequestHeaders(getAuthHeaders())
+            .addRequestHeaders(getAuthHeaders())
             .normalizeUrl(url);
 
     List<Iterable<Artifact>> artifactLists = new ArrayList<>();
@@ -645,6 +647,42 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Get the CDX records for the selected artifacts.
     getArtifactsCdxRecords(artIterator, repo, count, startPage, records);
+  }
+
+  /**
+   * Saves the authentication credentials, if any.
+   */
+  private void setAuthenticationCredentials() {
+    // Get the REST client credentials.
+    List<String> restClientCredentials = LockssDaemon.getLockssDaemon()
+        .getRestClientCredentials();
+    log.trace("restClientCredentials = " + restClientCredentials);
+
+    // Check whether there is a user name.
+    if (restClientCredentials != null && restClientCredentials.size() > 0) {
+      // Yes: Get the user name.
+      serviceUser = restClientCredentials.get(0);
+      log.trace("serviceUser = " + serviceUser);
+
+      // Check whether there is a user password.
+      if (restClientCredentials.size() > 1) {
+        // Yes: Get the user password.
+        servicePassword = restClientCredentials.get(1);
+      }
+    }
+  }
+
+  protected HttpHeaders getAuthHeaders() {
+    setAuthenticationCredentials();
+    HttpHeaders hdrs = new HttpHeaders();
+    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+    daemon.getRestClientCredentials();
+    hdrs.setBasicAuth(serviceUser, servicePassword);
+//    String reqIp = getRequestorIpAddress();
+//    if (!StringUtils.isEmpty(reqIp)) {
+//      hdrs.set("X-Forwarded-For", reqIp);
+//    }
+    return hdrs;
   }
 
   private String getServiceEndpoint(ServiceDescr sd) {
