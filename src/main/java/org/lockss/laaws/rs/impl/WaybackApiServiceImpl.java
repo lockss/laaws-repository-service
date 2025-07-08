@@ -53,6 +53,7 @@ import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactData;
 import org.lockss.util.rest.repo.model.ArtifactIdentifier;
 import org.lockss.util.rest.repo.model.ArtifactVersions;
+import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -605,7 +606,10 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     log.debug2("startPage = {}", startPage);
     log.debug2("closest = {}", closest);
 
+
+    long poi = TimeBase.nowMs();
     getCdxRecords0(restTemplate, namespace, url, repo, isPrefix, count, startPage, closest, records);
+    log.trace("getCdxRecords({}) took {}ms", url, TimeBase.msSince(poi));
   }
 
   void getCdxRecords0(RestTemplate restTemplate, String namespace, String url, LockssRepository repo,
@@ -739,13 +743,16 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     // Loop through all the artifacts that are potential results.
     int iteratorCounter = 0;
 
+    Map<String, Artifact> fetched = new HashMap<>();
+
     while (artIterator.hasNext()) {
       // Get the next artifact.
       Artifact artifact = artIterator.next();
       log.trace("artifact = {}", artifact);
 
       // Check whether this artifact needs to be included in the results.
-      if (iteratorCounter > lastArticleSkipped) {
+      if ((iteratorCounter > lastArticleSkipped)
+         && (!fetched.containsKey(artifact.getContentDigest()))) {
         // Yes: Get the artifact identifier.
         String artifactUuid = artifact.getUuid();
         log.trace("artifactUuid = {}", artifactUuid);
@@ -757,6 +764,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
         // Add this artifact to the results.
         records.addCdxRecord(record);
+        fetched.put(artifact.getContentDigest(), artifact);
         log.trace("recordsCount = {}", records.getCdxRecordCount());
       }
 
@@ -768,6 +776,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
         break;
       }
     }
+
   }
 
   /**
