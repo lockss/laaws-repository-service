@@ -757,7 +757,10 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
         String artifactUuid = artifact.getUuid();
         log.trace("artifactUuid = {}", artifactUuid);
 
-        // Create the result for this artifact.
+        // Create a CDX record for this artifact.
+        // NOTE: Reading an {@link ArtifactData} only for its Content-Type and HTTP
+        //  response status code is expensive; consider adding these fields to the
+        //  index if de-duplication isn't sufficient
         CdxRecord record = getCdxRecord(
             repo.getArtifactData(artifact, LockssRepository.IncludeContent.NEVER));
         log.trace("record = {}", record);
@@ -780,7 +783,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   }
 
   /**
-   * Provides the CDX record of an artifact.
+   * Generates a CDX record of an artifact from its {@link ArtifactData}.
    *
    * @param artifactData
    *          An ArtifactData with the artifact data.
