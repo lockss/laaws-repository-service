@@ -709,7 +709,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     // Loop through all the artifacts that are potential results.
     int iteratorCounter = 0;
 
-    Map<String, Artifact> fetched = new HashMap<>();
+    Set<String> fetched = new HashSet<>();
 
     while (artIterator.hasNext()) {
       // Get the next artifact.
@@ -718,7 +718,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
       // Check whether this artifact needs to be included in the results.
       if ((iteratorCounter > lastArticleSkipped)
-         && (!fetched.containsKey(artifact.getContentDigest()))) {
+         && (!fetched.contains(artifact.getContentDigest()))) {
         // Yes: Get the artifact identifier.
         String artifactUuid = artifact.getUuid();
         log.trace("artifactUuid = {}", artifactUuid);
@@ -733,7 +733,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
         // Add this artifact to the results.
         records.addCdxRecord(record);
-        fetched.put(artifact.getContentDigest(), artifact);
+        fetched.add(artifact.getContentDigest());
         log.trace("recordsCount = {}", records.getCdxRecordCount());
       }
 
