@@ -241,9 +241,6 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
         // Start the top element.
         writer.writeStartElement("wayback");
 
-        // Q: Does OpenWayback expect the parsed request parameters to be included in the XML error response?
-//        writeCdxRequestParameters(writer, openWayBackQuery);
-
         // Start the error element.
         writer.writeStartElement("error");
 
@@ -273,37 +270,6 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
           sw.close();
         } catch (Exception e) {}
       }
-  }
-
-  private void writeCdxRequestParameters(XMLStreamWriter writer, Map<String, String> openWayBackQuery)
-      throws XMLStreamException {
-
-    // Start the request element.
-    writer.writeStartElement("request");
-
-    // Add all the request sub-elements.
-    writeXmlElement(writer, "startdate", "19960101000000");
-
-    writeXmlElement(writer, "enddate",
-        DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
-            .format(LocalDateTime.now(ZoneOffset.UTC)));
-
-    writeXmlElement(writer, "type",
-        openWayBackQuery.getOrDefault("type", "urlquery").toLowerCase());
-
-    writeXmlElement(writer, "firstreturned",
-        Long.parseLong(openWayBackQuery.getOrDefault("offset", "0")));
-
-    writeXmlElement(writer, "url",
-        openWayBackQuery.get("canonicalUrl"));
-
-    writeXmlElement(writer, "resultsrequested",
-        Long.parseLong(openWayBackQuery.getOrDefault("limit", "10000")));
-
-    writeXmlElement(writer, "resultstype", "resultstypecapture");
-
-    // Finish the request element.
-    writer.writeEndElement();
   }
 
   /**
