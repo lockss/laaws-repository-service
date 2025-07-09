@@ -87,9 +87,7 @@ public class CdxRecords {
    *          A CdxRecord with the CDX record to be added.
    */
   public void addCdxRecord(CdxRecord cdxRecord) {
-    // FIXME: Using contains() here is expensive
-    if (!cdxRecords.contains(cdxRecord))
-      cdxRecords.add(cdxRecord);
+    cdxRecords.add(cdxRecord);
   }
 
   /**
