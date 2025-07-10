@@ -32,9 +32,14 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.impl;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.HttpHost;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.impl.WaybackApiServiceImpl.ClosestArtifact;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
@@ -45,18 +50,39 @@ import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactData;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
+import org.lockss.util.time.TimeBase;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.RequestEntity;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.client.response.MockRestResponseCreators;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.IOException;
+import java.io.StringReader;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 
@@ -436,6 +462,31 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(0, records.getCdxRecordCount());
   }
 
+  private class MyWaybackApiServiceImpl extends WaybackApiServiceImpl {
+    private String serviceUser;
+    private String servicePassword;
+
+    public MyWaybackApiServiceImpl(HttpServletRequest request) {
+      super(request);
+      this.setUsernameAndPassword("test.username", "test.password");
+    }
+
+    @Override
+    protected HttpHeaders getAuthHeaders() {
+      HttpHeaders hdrs = new HttpHeaders();
+      LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+      daemon.getRestClientCredentials();
+      hdrs.setBasicAuth(serviceUser, servicePassword);
+      return hdrs;
+    }
+
+    protected WaybackApiServiceImpl setUsernameAndPassword(String username, String password) {
+      serviceUser = username;
+      servicePassword = password;
+      return this;
+    }
+  }
+
   /**
    * Tests the creation of CDX records for URLs.
    *
@@ -470,7 +521,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     for (int i = 0; i < 4; i++) {
       String url = "www.url" + (i + 1) + ".example.com";
       mockServer.expect(
-              requestTo("http://" + MOCK_REST_CFGSVC + "/util/normalizeUrl?url=" + url))
+              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeUrl?url=" + url))
           .andRespond(
               MockRestResponseCreators.withSuccess(
                   "[\"" + url + "\"]",
@@ -483,7 +534,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
     CdxRecords records = new CdxRecords();
 
-    new WaybackApiServiceImpl(null)
+    new MyWaybackApiServiceImpl(null)
         .getCdxRecords0(restTemplate, collId, url, repository, false, null, null, null, records);
 
     // Validate count.
@@ -531,7 +582,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.url2.example.com";
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, null, records);
 
     // Validate count.
@@ -574,7 +626,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.url3.example.com";
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, null, records);
 
     // Validate count.
@@ -600,7 +653,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Setup mock for the next REST calls
     mockServer.reset();
     mockServer.expect(
-            requestTo("http://" + MOCK_REST_CFGSVC + "/util/normalizeUrl?url=www."))
+            requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeUrl?url=www."))
         .andRespond(
             MockRestResponseCreators.withSuccess(
                 "[\"www.\"]",
@@ -610,7 +663,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.";
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, true,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, true,
 	null, null, null, records);
 
     // Validate count.
@@ -645,7 +699,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     mockServer.reset();
     for (int i = 0; i < 7; i++) {
       mockServer.expect(
-              requestTo("http://" + MOCK_REST_CFGSVC + "/util/normalizeUrl?url=" + url))
+              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeUrl?url=" + url))
           .andRespond(
               MockRestResponseCreators.withSuccess(
                   "[\"" + url + "\"]",
@@ -653,7 +707,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     }
 
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000000", records);
 
     // Validate count.
@@ -684,7 +739,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the first chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000150", records);
 
     // Validate count.
@@ -696,7 +752,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the first chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000154", records);
 
     // Validate count.
@@ -708,7 +765,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the second chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000201", records);
 
     // Validate count.
@@ -722,7 +780,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the second chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000205", records);
 
     // Validate count.
@@ -736,7 +795,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the third chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000212", records);
 
     // Validate count.
@@ -750,7 +810,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the third chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords0(restTemplate, collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000216", records);
 
     // Validate count.
