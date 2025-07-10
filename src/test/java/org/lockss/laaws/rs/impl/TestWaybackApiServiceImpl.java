@@ -121,6 +121,75 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     return true;
   }
 
+  @Test
+  @Ignore
+  public void testRemoteRepository() throws Exception {
+    long startms = TimeBase.nowMs();
+
+    String tmpl = "http://dev2.lockss.org:24610/wayback/cdx/owb/{namespace}";
+
+    UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(tmpl);
+    Map<String, Object> uriParams = new HashMap<>();
+    uriParams.put("namespace", "lockss");
+    builder.uriVariables(uriParams);
+
+//    builder.queryParam("q", "url:https://muse.jhu.edu/js/pre.js");
+    builder.queryParam("q", "url:https://muse.jhu.edu/js/references.js");
+    builder.queryParam("count", 10000);
+    builder.queryParam("start_page", 1);
+
+    HttpComponentsClientHttpRequestFactory clientHttpRequestFactory = new HttpComponentsClientHttpRequestFactory(
+        HttpClientBuilder.create()
+            .setProxy(new HttpHost("localhost", 3128))
+            .build());
+
+    RestTemplate restTemplate = new RestTemplate(clientHttpRequestFactory);
+    URI url = builder.build().toUri();
+
+    HttpHeaders hdrs = new HttpHeaders();
+    hdrs.setBasicAuth("username", "password");
+
+    RequestEntity<Void> request = RequestEntity.get(url)
+        .headers(hdrs)
+        .build();
+
+    ResponseEntity<String> response =
+        restTemplate.exchange(request, String.class);
+
+    if (response.getStatusCode().isError()) {
+      log.error("response.status = {}", response.getStatusCode());
+    }
+
+    log.info("response.body =\n{}", prettyPrintXml(response.getBody()));
+    log.info("response.timeMs = {}", TimeBase.msSince(startms));
+  }
+
+  public static String prettyPrintXml(String xmlString) throws ParserConfigurationException, IOException, SAXException, TransformerException {
+    // 1. Parse the XML string into a Document object using DocumentBuilder
+    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    DocumentBuilder db = dbf.newDocumentBuilder();
+    Document doc = db.parse(new InputSource(new StringReader(xmlString)));
+
+    // 2. Create a TransformerFactory and configure it for pretty printing
+    TransformerFactory tf = TransformerFactory.newInstance();
+    // This attribute ensures proper indentation with a specified indent-number
+//    tf.setAttribute("indent-number", 2); // Set indentation to 2 spaces
+
+    // 3. Create a Transformer and set output properties for indentation
+    Transformer transformer = tf.newTransformer();
+    transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+    transformer.setOutputProperty(OutputKeys.INDENT, "yes"); // Enable indentation
+    transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8"); // Specify encoding
+    // Optional: Omit XML declaration if not needed
+    // transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+
+    // 4. Transform the Document to a StringWriter for output
+    StringWriter writer = new StringWriter();
+    transformer.transform(new DOMSource(doc), new StreamResult(writer));
+
+    return writer.toString();
+  }
+
   /**
    * Tests the repository readiness.
    */
