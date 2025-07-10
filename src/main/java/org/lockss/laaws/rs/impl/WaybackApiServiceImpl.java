@@ -39,6 +39,7 @@ import org.archive.wayback.surt.SURTTokenizer;
 import org.lockss.app.LockssDaemon;
 import org.lockss.app.ServiceBinding;
 import org.lockss.app.ServiceDescr;
+import org.lockss.daemon.RestServicesManager;
 import org.lockss.laaws.rs.api.WaybackApiDelegate;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
@@ -70,9 +71,6 @@ import javax.xml.stream.XMLStreamWriter;
 import java.io.*;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -92,9 +90,16 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   private String serviceUser;
   private String servicePassword;
 
+  private RestServicesManager svcsMgr;
+  private ServiceBinding cfgSvcBinding;
+
   @Autowired
   public WaybackApiServiceImpl(HttpServletRequest request) {
     this.request = request;
+
+    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+    svcsMgr = daemon.getManagerByType(RestServicesManager.class);
+    cfgSvcBinding = daemon.getServiceBinding(ServiceDescr.SVC_CONFIG);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +149,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     log.trace("Parsed request: {}", parsedRequest);
 
     // Validate the repository.
-    if (!repo.isReady()) {
+    if (!(repo.isReady() && isCfgSvcReady())) {
       try {
         String title = "Resource Index Not Available Exception";
         String message = "This LOCKSS Repository Service is not ready";
@@ -227,6 +232,10 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
       log.error(message, e);
       return getStringErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR, message, e);
     }
+  }
+
+  private boolean isCfgSvcReady() {
+    return !(cfgSvcBinding == null || !svcsMgr.isServiceReady(cfgSvcBinding));
   }
 
   private String getCdxOwbError(String title, String message) throws XMLStreamException {
@@ -581,8 +590,6 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   void getCdxRecords0(RestTemplate restTemplate, String namespace, String url, LockssRepository repo,
                       boolean isPrefix, Integer count, Integer startPage, String closest,
                       CdxRecords records) throws IOException {
-
-    // TODO: Use RestServicesManager to determine whether the Configuration Service is up before proceeding
 
     // Call "normalizeUrl" endpoint in the Configuration Service for a plugin normalized URL
     List<String> normalizedUrls =
