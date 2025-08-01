@@ -96,10 +96,6 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   @Autowired
   public WaybackApiServiceImpl(HttpServletRequest request) {
     this.request = request;
-
-    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
-    svcsMgr = daemon.getManagerByType(RestServicesManager.class);
-    cfgSvcBinding = daemon.getServiceBinding(ServiceDescr.SVC_CONFIG);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -235,6 +231,17 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   }
 
   private boolean isCfgSvcReady() {
+    if (!waitReady()) {
+      // Timed out waiting for daemon to become ready
+      return false;
+    }
+
+    if (svcsMgr == null || cfgSvcBinding == null) {
+       LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+       svcsMgr = daemon.getManagerByType(RestServicesManager.class);
+       cfgSvcBinding = daemon.getServiceBinding(ServiceDescr.SVC_CONFIG);
+    }
+
     return !(cfgSvcBinding == null || !svcsMgr.isServiceReady(cfgSvcBinding));
   }
 
@@ -360,7 +367,9 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     log.trace("Parsed request: {}", parsedRequest);
 
     // Validate the repository.
-    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    if (!(repo.isReady() && isCfgSvcReady())) {
+      return new ResponseEntity<String>(HttpStatus.SERVICE_UNAVAILABLE);
+    }
 
     try {
       // Initialize the results.
