@@ -275,6 +275,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
         return new ResponseEntity<>(artifact, HttpStatus.OK);
       } catch (LockssArtifactAlreadyExistsException e) {
+        log.error("Artifact already exists: {}", e.getArtifactId().toString());
         throw new LockssRestServiceException(
             LockssRestHttpException.ServerErrorType.DATA_ERROR,
             HttpStatus.CONFLICT,
