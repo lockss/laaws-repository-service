@@ -33,11 +33,12 @@ package org.lockss.laaws.rs.controller;
 
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 import jakarta.annotation.PreDestroy;
-import org.lockss.app.LockssDaemon;
+import org.lockss.app.LockssApp;
+import org.lockss.app.LockssAppException;
 import org.lockss.config.ConfigManager;
 import org.lockss.config.CurrentConfig;
+import org.lockss.daemon.LockssThread;
 import org.lockss.db.DbException;
-import org.lockss.db.DbManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.BaseLockssRepository;
@@ -50,7 +51,6 @@ import org.lockss.test.ConfigurationUtil;
 import org.lockss.test.LockssTestCase4;
 import org.lockss.test.MockLockssDaemon;
 import org.lockss.test.TcpTestUtil;
-import org.lockss.util.FileUtil;
 import org.lockss.util.StringUtil;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -72,6 +72,11 @@ import static org.mockito.Mockito.spy;
  * embedded PostgreSQL database. An important caveat is that embedded PostgreSQL
  * database is associated with the Spring Application Context and is not
  * reinitialized between unit tests.
+ *
+ * Currently, you must use the @ActiveProfiles("test") annotation wherever this
+ * @TestConfiguration class is used to set the repo.spec and repo.index.spec
+ * properties. It might be possible to use @TestPropertySource, but attempts to
+ * use it didn't work.
  */
 @TestConfiguration
 public class SQLTestRepositoryApplicationConfiguration {
@@ -97,18 +102,27 @@ public class SQLTestRepositoryApplicationConfiguration {
 
   @Bean
   public LockssRepository lockssRepository(
-      @Autowired MockLockssDaemon theDaemon,
       @Autowired ArtifactIndex index,
       @Autowired ArtifactDataStore ds
   ) throws IOException {
     File stateDir = getTempDir(tmpDirs);
 
-    LockssRepository repository =
+    LockssRepository repo =
         new BaseLockssRepository(stateDir, index, ds);
 
-    repository.initRepository();
+    // Initialize the repository in a separate thread
+    LockssThread.of("Init Repository", () -> {
+      try {
+        log.debug("Initializing LOCKSS repository from thread");
+        repo.initRepository();
+      } catch (IOException e) {
+        String errMsg = "Failed to initialize internal LOCKSS repository";
+        log.error(errMsg, e);
+        throw new IllegalStateException(errMsg);
+      }
+    }).start();
 
-    return spy(repository);
+    return spy(repo);
   }
 
   @Bean
@@ -118,21 +132,7 @@ public class SQLTestRepositoryApplicationConfiguration {
   }
 
   @Bean
-  public MockLockssDaemon mockLockssDaemon() throws Exception {
-    ConfigManager cfgMgr = ConfigManager.makeConfigManager();
-    theDaemon = new MockLockssDaemon();
-    cfgMgr.initService(theDaemon);
-
-    theDaemon.setAppRunning(true);
-    theDaemon.setDaemonInited(true);
-    theDaemon.setDaemonRunning(true);
-    LockssDaemon.setLockssDaemon(theDaemon);
-
-    return theDaemon;
-  }
-
-  @Bean
-  public ArtifactIndex artifactIndex(MockLockssDaemon theDaemon) throws DbException {
+  public ArtifactIndex artifactIndex() throws DbException {
     ConfigManager mgr = ConfigManager.makeConfigManager(appCtx);
     ConfigManager.setConfigManager(mgr, appCtx);
 
@@ -140,8 +140,10 @@ public class SQLTestRepositoryApplicationConfiguration {
     ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER, dbPort);
 
     try {
-      setUpDiskSpace();
-      initializePostgreSQL();
+      setupDiskSpace();
+      setupEmbeddedPg();
+      idxDbManager = new TestSQLArtifactIndexDbManager(embeddedPg);
+      System.getProperties().put(LockssApp.MANAGER_INSTANCE_PREFIX + SQLArtifactIndexDbManager.class.getName(), idxDbManager);
     } catch (Exception e) {
       throw new IllegalStateException("Failed to start embedded PostgreSQL", e);
     }
@@ -149,7 +151,7 @@ public class SQLTestRepositoryApplicationConfiguration {
     return new SQLArtifactIndex();
   }
 
-  private String setUpDiskSpace() throws IOException {
+  private String setupDiskSpace() throws IOException {
     String diskList =
         CurrentConfig.getParam(ConfigManager.PARAM_PLATFORM_DISK_SPACE_LIST);
     if (!StringUtil.isNullString(diskList)) {
@@ -161,34 +163,7 @@ public class SQLTestRepositoryApplicationConfiguration {
     return tmpdir;
   }
 
-  private void initializePostgreSQL() throws Exception {
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_USER, "postgres",
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgresx");
-
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.enabled", "true",
-        SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.initialSize", "2");
-
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.PARAM_MAX_RETRY_COUNT, "0",
-        SQLArtifactIndexDbManager.PARAM_RETRY_DELAY, "0");
-
-    ConfigurationUtil.addFromArgs(
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_CLASSNAME, PGSimpleDataSource.class.getCanonicalName(),
-        SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgres");
-
-    idxDbManager = new SQLArtifactIndexDbManager();
-    startEmbeddedPgDbManager(idxDbManager);
-    idxDbManager.initService(theDaemon);
-
-    idxDbManager.setTargetDatabaseVersion(4);
-    idxDbManager.startService();
-
-    theDaemon.setSQLArtifactIndexDbManager(idxDbManager);
-  }
-
-  private void startEmbeddedPgDbManager(DbManager mgr) throws DbException {
+  private void setupEmbeddedPg() throws DbException {
     try {
       if (embeddedPg == null) {
         EmbeddedPostgres.Builder builder = EmbeddedPostgres.builder();
@@ -198,11 +173,36 @@ public class SQLTestRepositoryApplicationConfiguration {
         }
         embeddedPg = builder.start();
       }
-      String dbName = mgr.getDatabaseNamePrefix()
-          + mgr.getClass().getSimpleName();
-      mgr.setTestingDataSource(embeddedPg.getDatabase("postgres", dbName));
     } catch (IOException e) {
       throw new DbException("Can't start embedded PostgreSQL", e);
+    }
+  }
+
+  static class TestSQLArtifactIndexDbManager extends SQLArtifactIndexDbManager {
+    public TestSQLArtifactIndexDbManager(EmbeddedPostgres embeddedPg) {
+      String dbName = getDatabaseNamePrefix() + this.getClass().getSimpleName();
+      setTestingDataSource(embeddedPg.getDatabase("postgres", dbName));
+    }
+
+    @Override
+    public void initService(LockssApp app) throws LockssAppException {
+      ConfigurationUtil.addFromArgs(
+          SQLArtifactIndexDbManager.PARAM_DATASOURCE_USER, "postgres",
+          SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgresx");
+
+      ConfigurationUtil.addFromArgs(
+          SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.enabled", "true",
+          SQLArtifactIndexDbManager.DATASOURCE_ROOT + ".dbcp.initialSize", "2");
+
+      ConfigurationUtil.addFromArgs(
+          SQLArtifactIndexDbManager.PARAM_MAX_RETRY_COUNT, "0",
+          SQLArtifactIndexDbManager.PARAM_RETRY_DELAY, "0");
+
+      ConfigurationUtil.addFromArgs(
+          SQLArtifactIndexDbManager.PARAM_DATASOURCE_CLASSNAME, PGSimpleDataSource.class.getCanonicalName(),
+          SQLArtifactIndexDbManager.PARAM_DATASOURCE_PASSWORD, "postgres");
+
+      super.initService(app);
     }
   }
 }

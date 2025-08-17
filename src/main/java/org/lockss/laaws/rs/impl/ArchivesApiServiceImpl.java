@@ -7,6 +7,8 @@ import org.apache.commons.io.FileUtils;
 import org.archive.format.warc.WARCConstants;
 import org.lockss.laaws.rs.api.ArchivesApiDelegate;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.StringUtil;
@@ -74,6 +76,9 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
         namespace, auId, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
+
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
 
     MimeType archiveType = MimeType.valueOf(archive.getContentType());
 

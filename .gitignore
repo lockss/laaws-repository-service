@@ -25,12 +25,6 @@
 ehthumbs.db
 Thumbs.db
 
-# WARC / ARC files
-*.warc
-*.arc
-*.warc.gz
-*.arc.gz
-
 # Old Versioning CVS/SVN file #
 ######################
 .svn/

@@ -3,6 +3,8 @@ package org.lockss.laaws.rs.impl;
 import org.apache.commons.collections4.IterableUtils;
 import org.lockss.laaws.rs.api.NamespacesApiDelegate;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.exception.LockssRestHttpException;
@@ -44,6 +46,8 @@ public class NamespacesApiServiceImpl extends BaseSpringApiServiceImpl implement
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       List<String> namespaces = IterableUtils.toList(repo.getNamespaces());

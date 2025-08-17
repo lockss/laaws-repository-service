@@ -9,8 +9,11 @@ import org.lockss.laaws.rs.model.CdxRecords;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactData;
@@ -96,6 +99,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     // Validate the pagination.
     ServiceImplUtil.validatePagination(count, startPage, parsedRequest);
@@ -199,6 +203,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       // Initialize the results.
@@ -306,6 +311,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       String namespace = ServiceImplUtil.getArchiveFilenameNamespace(
@@ -371,6 +377,11 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
           "Cannot get the archive for fileName = '" + fileName + "'";
       log.error(message, iae);
       return getResourceErrorResponseEntity(HttpStatus.BAD_REQUEST, message, iae);
+    } catch (LockssNoSuchArtifactIdException e) {
+      String message =
+          "Cannot get the artifact for fileName = '" + fileName + "'";
+      log.error(message, e);
+      return getResourceErrorResponseEntity(HttpStatus.NOT_FOUND, message, e);
     } catch (Exception e) {
       String message =
           "Cannot get the archive for fileName = '" + fileName + "'";

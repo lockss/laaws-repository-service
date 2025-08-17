@@ -13,6 +13,8 @@ import org.lockss.laaws.rs.multipart.LockssMultipartHttpServletRequest;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataUtil;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -209,6 +211,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
 
     try {
       boolean asHttpResponse = !StringUtil.isNullString(httpResponseHeader);
@@ -317,6 +320,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
 
     try {
       // Remove the artifact from the artifact store and index
@@ -369,6 +373,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       log.debug2("Retrieving artifact [namespace: {}, artifactId: {}]", namespace, artifactid);
@@ -434,6 +439,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       ArtifactData ad = repo.getArtifactData(namespace, artifactId);
@@ -525,6 +531,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       ArtifactData ad = repo.getArtifactData(namespace, artifactId);
@@ -605,6 +612,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     Integer requestLimit = limit;
     limit = validateLimit(requestLimit, defaultArtifactPageSize,
@@ -835,6 +843,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
 
     try {
       if (committed == false) {

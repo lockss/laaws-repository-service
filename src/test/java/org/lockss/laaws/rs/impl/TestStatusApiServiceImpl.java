@@ -35,12 +35,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.lockss.app.LockssDaemon;
+import org.lockss.app.LockssApp;
 import org.lockss.laaws.rs.controller.DefaultTestRepositoryApplicationConfiguration;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.AbstractArtifactIndex;
 import org.lockss.spring.test.SpringLockssTestCase4;
+import org.lockss.test.MockLockssDaemon;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.status.ApiStatus;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -76,9 +77,6 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
   @Autowired
   ApplicationContext appCtx;
 
-  @Autowired
-  LockssDaemon lockssDaemon;
-
   /**
    * Set up code to be run before each test.
    *
@@ -93,6 +91,7 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
 
     // Set up the UI port.
     setUpUiPort(UI_PORT_CONFIGURATION_TEMPLATE, UI_PORT_CONFIGURATION_FILE);
+    getMockLockssDaemon().setAppRunning(true);
 
     log.debug2("Done");
   }
@@ -187,8 +186,8 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
     // Get the expected result.
     ApiStatus expected = new ApiStatus("swagger/swagger.yaml");
     expected.setReady(true);
-    expected.setReadyTime(lockssDaemon.getReadyTime());
-    expected.setStartupStatus(lockssDaemon.getStartupStatus());
+    expected.setReadyTime(LockssApp.getLockssApp().getReadyTime());
+    expected.setStartupStatus(ApiStatus.StartupStatus.NONE);
 
     JSONAssert.assertEquals(expected.toJson(), successResponse.getBody(),
 	false);
