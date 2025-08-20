@@ -34,6 +34,8 @@ package org.lockss.laaws.rs.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.lockss.laaws.rs.api.ChecksumalgorithmsApiDelegate;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.StringUtil;
@@ -95,6 +97,7 @@ public class ChecksumalgorithmsApiServiceImpl extends BaseSpringApiServiceImpl
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CAUTIOUS);
 
     try {
       List<String> result = getSupportedMessageDigestAlgorithms();

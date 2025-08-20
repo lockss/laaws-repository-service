@@ -45,10 +45,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import static org.lockss.app.LockssApp.PARAM_START_PLUGINS;
 import static org.lockss.app.LockssApp.managerKey;
 import static org.lockss.app.ManagerDescs.*;
@@ -70,7 +66,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
           managerKey(RepositoryDbManager.class), RepositoryDbManager.class.getName()) {
         @Override
         public boolean shouldStart(LockssApp app) {
-          return repoProps.isSolrArtifactIndex();
+          return repoProps.isSolrArtifactIndex() || repoProps.isSqlArtifactIndex();
         }
       };
 
@@ -86,6 +82,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
   // Manager descriptors.  The order of this table determines the order in
   // which managers are initialized and started.
   private final ManagerDesc[] myManagerDescs = {
+      CONFIG_DB_MANAGER_DESC, // Started only in testing
       STATE_MANAGER_DESC,
       ACCOUNT_MANAGER_DESC,
       REPOSITORY_DB_MANAGER_DESC,
@@ -127,8 +124,7 @@ public class RepositoryApplication extends BaseSpringBootApplication
 	.addAppDefault(PluginManager.PARAM_START_ALL_AUS, "false")
 	.setSpringApplicatonContext(getApplicationContext())
 	.setAppManagers(myManagerDescs);
-
-      LockssApp.startStatic(LockssDaemon.class, spec);
+      startLockssApp(spec);
     } else {
       // No: Do nothing. This happens when a test is started and before the
       // test setup has got a chance to inject the appropriate command line

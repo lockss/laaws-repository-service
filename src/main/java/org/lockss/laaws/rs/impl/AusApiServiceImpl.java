@@ -7,6 +7,8 @@ import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.index.DispatchingArtifactIndex;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.base.LockssConfigurableService;
 import org.lockss.spring.error.LockssRestServiceException;
@@ -229,6 +231,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     Integer requestLimit = limit;
     limit = validateLimit(requestLimit, defaultArtifactPageSize,
@@ -607,6 +610,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
     try {
       // Validate request
       ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+      AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
       // Get and return AU size from internal LOCKSS repository
       AuSize result = repo.auSize(namespace, auid);
@@ -648,6 +652,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
     log.debug2("Parsed request: {}", parsedRequest);
 
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     Integer requestLimit = limit;
     limit = validateLimit(requestLimit, defaultAuidPageSize, maxAuidPageSize,
@@ -824,6 +829,9 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
         namespace, auid, op, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
+
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
 
     if (bulkIndexEnabled) {
       ArtifactIndex index = ((BaseLockssRepository)repo).getArtifactIndex();

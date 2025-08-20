@@ -31,9 +31,9 @@ POSSIBILITY OF SUCH DAMAGE.
 */
 package org.lockss.laaws.rs.controller;
 
-import org.lockss.app.LockssDaemon;
-import org.lockss.config.ConfigManager;
+import org.lockss.daemon.LockssThread;
 import org.lockss.db.DbException;
+import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.index.VolatileArtifactIndex;
@@ -56,6 +56,8 @@ import static org.mockito.Mockito.spy;
 
 @TestConfiguration
 public class DefaultTestRepositoryApplicationConfiguration {
+  private final static L4JLogger log = L4JLogger.getLogger();
+
   static List<File> tmpDirs = new ArrayList<>();
   private final ApplicationContext appCtx;
   private MockLockssDaemon theDaemon;
@@ -67,37 +69,31 @@ public class DefaultTestRepositoryApplicationConfiguration {
 
   @Bean
   public LockssRepository lockssRepository(
-      @Autowired MockLockssDaemon theDaemon,
       @Autowired ArtifactIndex index,
       @Autowired ArtifactDataStore ds
   ) throws IOException {
     File stateDir = LockssTestCase4.getTempDir(tmpDirs);
 
-    LockssRepository repository =
-        new BaseLockssRepository(stateDir, index, ds);
+    LockssRepository repo = new BaseLockssRepository(stateDir, index, ds);
 
-    repository.initRepository();
+    // Initialize the repository in a separate thread
+    LockssThread.of("Init Repository", () -> {
+      try {
+        log.debug("Initializing LOCKSS repository from thread");
+        repo.initRepository();
+      } catch (IOException e) {
+        String errMsg = "Failed to initialize internal LOCKSS repository";
+        log.error(errMsg, e);
+        throw new IllegalStateException(errMsg);
+      }
+    }).start();
 
-    return spy(repository);
-  }
-
-  @Bean
-  public MockLockssDaemon mockLockssDaemon() throws Exception {
-    ConfigManager cfgMgr = ConfigManager.makeConfigManager();
-    theDaemon = new MockLockssDaemon();
-    cfgMgr.initService(theDaemon);
-
-    theDaemon.setAppRunning(true);
-    theDaemon.setDaemonInited(true);
-    theDaemon.setDaemonRunning(true);
-    LockssDaemon.setLockssDaemon(theDaemon);
-
-    return theDaemon;
+    return spy(repo);
   }
 
   @Bean
   public ArtifactIndex artifactIndex() throws DbException {
-    return new VolatileArtifactIndex();
+    return spy(new VolatileArtifactIndex());
   }
 
   @Bean
