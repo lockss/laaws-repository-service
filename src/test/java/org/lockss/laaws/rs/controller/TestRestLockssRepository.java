@@ -71,9 +71,12 @@ import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.rest.repo.util.NamedInputStreamResource;
+import org.lockss.util.test.FileTestUtil;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
 import org.mockito.ArgumentMatchers;
+import org.mockserver.integration.ClientAndServer;
+import org.mockserver.model.Header;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -112,8 +115,12 @@ import java.util.stream.StreamSupport;
 import java.util.zip.GZIPOutputStream;
 
 import static java.nio.file.StandardOpenOption.APPEND;
+import static org.lockss.app.LockssApp.PARAM_SERVICE_BINDINGS;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
+import static org.mockserver.model.HttpRequest.request;
+import static org.mockserver.model.HttpResponse.response;
+import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 /**
  * Tests an embedded LOCKSS Repository Service instance configured with an internal {@link LocalLockssRepository}.
@@ -124,6 +131,9 @@ import static org.mockito.Mockito.*;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @ContextConfiguration(classes = { DefaultTestRepositoryApplicationConfiguration.class })
 public class TestRestLockssRepository extends SpringLockssTestCase4 {
+
+  private ClientAndServer mockServer;
+
   private final static L4JLogger log = L4JLogger.getLogger();
 
   protected static int MAX_RANDOM_FILE = 50000;
@@ -243,8 +253,25 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
         dbPort);
 
+    setupMockServerClient();
     setupLockssApp();
     setupRepositoryClient(USER_ADMIN);
+  }
+
+  public void setupMockServerClient() throws IOException {
+    int mockServerPort = TcpTestUtil.findUnboundTcpPort();
+    mockServer = startClientAndServer(mockServerPort);
+
+    String cfgSvcBinding = "cfg=localhost:" + mockServerPort + ":" + mockServerPort;
+//    ConfigurationUtil.addFromArgs(PARAM_SERVICE_BINDINGS, cfgSvcBinding);
+
+    try {
+      addParamToMiscConfig(PARAM_SERVICE_BINDINGS, cfgSvcBinding);
+      // addToMiscConfig("org.lockss.log.RestServicesManager", "DEBUG2");
+    } catch (IOException e) {
+      log.error("Could not add misc configuration parameters", e);
+      throw e;
+    }
   }
 
   @Override
@@ -268,6 +295,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     List<String> cmdLineArgs = getCommandLineArguments();
     cmdLineArgs.add("-p");
     cmdLineArgs.add("test/config/testAuthOn.txt");
+
+    // This is a one way to configure REST credentials so that this service can 
+    // make REST calls to other services. The "-s" mechanism was intended for
+    // Kubernetes secrets and the file will be deleted after being read.
+    File lockssAuth =
+        FileTestUtil.writeTempFile("lockss-auth", "lockss-u:lockss-p");
+    cmdLineArgs.add("-s");
+    cmdLineArgs.add("rest:" + lockssAuth);
 
     log.info("cmdLineArgs: " + cmdLineArgs);
 
@@ -294,6 +329,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     cmdLineArgs.add("test/config/lockss.txt");
     cmdLineArgs.add("-p");
     cmdLineArgs.add("test/config/lockss.opt");
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add(getMiscConfigPath());
 
     log.debug2("cmdLineArgs = {}", cmdLineArgs);
     return cmdLineArgs;
@@ -301,6 +338,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   @After
   public void tearDownArtifactDataStore() throws Exception {
+    mockServer.stop();
     this.repoClient = null;
   }
 
@@ -961,12 +999,58 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       return response;
     };
 
+    final String LOCKSS_VERSION = "2.0.90-beta2";
+    final String COMPONENT_VERSION = "2.10.0-SNAPSHOT";
+    final String API_VERSION = "2.0.0";
+    final long READY_TIME_EPOCH_MS = 1754706972643L;
+
+    final String CONFIG_SERVICE_READY_JSON = """
+        {
+          "componentName": "laaws-configuration-service",
+          "serviceName": "LOCKSS Configuration Service REST API",
+          "lockssVersion": "%s",
+          "componentVersion": "%s",
+          "apiVersion": "%s",
+          "ready": true,
+          "readyTime": %d,
+          "reason": null,
+          "startupStatus": "AUS_STARTED"
+        }
+        """.formatted(LOCKSS_VERSION, COMPONENT_VERSION, API_VERSION, READY_TIME_EPOCH_MS);
+
+    // Mock CfgSvc status endpoint
+    mockServer
+        .when(request()
+            .withMethod("GET")
+            .withPath("/status"))
+        .respond(response()
+            .withStatusCode(200)
+            .withHeaders(new Header("Content-Type", "application/json"))
+            .withBody(CONFIG_SERVICE_READY_JSON));
+
+    final String NORMALIZE_URL_JSON = """
+        [
+          "http://www.lockss.org/"
+        ]
+        """;;
+
+    // Mock CfgSvc normalizeUrl endpoint
+    mockServer
+        .when(request()
+            .withMethod("GET")
+            .withQueryStringParameter("url", "https://www.lockss.org/")
+            .withPath("/utils/normalizeUrl"))
+        .respond(response()
+            .withStatusCode(200)
+            .withHeaders(new Header("Content-Type", "application/json"))
+            .withBody(NORMALIZE_URL_JSON));
+
     assertResponseStatus(getCdxOwb, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
     assertResponseStatus(getCdxOwb, CONTENT_ACCESS, HttpStatus.OK);
     assertResponseStatus(getCdxOwb, AU_ADMIN, HttpStatus.OK);
     assertResponseStatus(getCdxOwb, USER_ADMIN, HttpStatus.OK);
 
-    RestEndpointCall getCdxPywb= (Credentials credentials) -> {
+    RestEndpointCall getCdxPywb = (Credentials credentials) -> {
       String namespace = "test";
       String auid = "test";
 

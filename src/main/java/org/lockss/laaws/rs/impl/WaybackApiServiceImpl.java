@@ -57,6 +57,7 @@ import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactData;
 import org.lockss.util.rest.repo.model.ArtifactIdentifier;
 import org.lockss.util.rest.repo.model.ArtifactVersions;
+import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -151,7 +152,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
     AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
-    if (!(repo.isReady() && isCfgSvcReady())) {
+    if (!(repo.isReady() && isWaitCfgSvcReady())) {
       try {
         String title = "Resource Index Not Available Exception";
         String message = "This LOCKSS Repository Service is not ready";
@@ -236,19 +237,22 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     }
   }
 
-  private boolean isCfgSvcReady() {
+  private boolean isWaitCfgSvcReady() {
     if (!waitReady()) {
-      // Timed out waiting for daemon to become ready
+      // Timed out waiting for LockssDaemon to become ready
       return false;
     }
 
-    if (svcsMgr == null || cfgSvcBinding == null) {
-       LockssDaemon daemon = LockssDaemon.getLockssDaemon();
-       svcsMgr = daemon.getManagerByType(RestServicesManager.class);
-       cfgSvcBinding = daemon.getServiceBinding(ServiceDescr.SVC_CONFIG);
-    }
+    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+    svcsMgr = daemon.getManagerByType(RestServicesManager.class);
+    cfgSvcBinding = daemon.getServiceBinding(ServiceDescr.SVC_CONFIG);
 
-    return !(cfgSvcBinding == null || !svcsMgr.isServiceReady(cfgSvcBinding));
+    if (svcsMgr == null || cfgSvcBinding == null) return false;
+
+    RestServicesManager.ServiceStatus cfgSvcStatus =
+        svcsMgr.waitServiceReady(ServiceDescr.SVC_CONFIG, cfgSvcBinding, Deadline.in(5000));
+
+    return cfgSvcStatus != null && cfgSvcStatus.isReady();
   }
 
   private String getCdxOwbError(String title, String message) throws XMLStreamException {
@@ -376,7 +380,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
     AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
-    if (!(repo.isReady() && isCfgSvcReady())) {
+    if (!(repo.isReady() && isWaitCfgSvcReady())) {
       return new ResponseEntity<String>(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
@@ -676,8 +680,6 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   protected HttpHeaders getAuthHeaders() {
     setAuthenticationCredentials();
     HttpHeaders hdrs = new HttpHeaders();
-    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
-    daemon.getRestClientCredentials();
     hdrs.setBasicAuth(serviceUser, servicePassword);
 //    String reqIp = getRequestorIpAddress();
 //    if (!StringUtils.isEmpty(reqIp)) {
