@@ -164,8 +164,6 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
       }
     }
 
-    // TODO: Check roles for content access; cause checkDocumentForExceptions to throw AccessControlException
-
     // Validate the pagination.
     ServiceImplUtil.validatePagination(count, startPage, parsedRequest);
 
