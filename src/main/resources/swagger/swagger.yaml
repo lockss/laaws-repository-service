@@ -1062,7 +1062,7 @@ components:
         - continuationToken
         - curLink
         - nextLink
-        - resultsPerPage
+        - itemsInPage
         - totalCount
       type: object
       properties:
@@ -1070,19 +1070,22 @@ components:
           description: The total number of results
           type: integer
           format: int32
-        resultsPerPage:
-          description: The number of results per page
+          nullable: true
+        itemsInPage:
+          description: The number of items in page
           type: integer
           format: int32
         continuationToken:
           description: The continuation token
           type: string
+          nullable: true
         curLink:
           description: The link of the current request
           type: string
         nextLink:
           description: The link of the next request
           type: string
+          nullable: true
     repositoryInfo:
       description: Information about the repository
       required:

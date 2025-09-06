@@ -736,7 +736,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       log.trace("artifacts.size() = {}", artifacts.size());
 
       PageInfo pageInfo = new PageInfo();
-      pageInfo.setResultsPerPage(artifacts.size());
+      pageInfo.setItemsInPage(artifacts.size());
 
       // Get the current link.
       StringBuffer curLinkBuffer = request.getRequestURL();
