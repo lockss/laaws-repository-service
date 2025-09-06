@@ -479,7 +479,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       log.trace("artifacts.size() = {}", artifacts.size());
 
       PageInfo pageInfo = new PageInfo();
-      pageInfo.setResultsPerPage(artifacts.size());
+      pageInfo.setItemsInPage(artifacts.size());
 
       // Get the current link.
       StringBuffer curLinkBuffer = request.getRequestURL();
@@ -741,7 +741,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       log.trace("auids.size() = {}", auids.size());
 
       PageInfo pageInfo = new PageInfo();
-      pageInfo.setResultsPerPage(auids.size());
+      pageInfo.setItemsInPage(auids.size());
 
       // Get the current link.
       StringBuffer curLinkBuffer = request.getRequestURL();
