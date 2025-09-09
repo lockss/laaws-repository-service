@@ -1001,6 +1001,7 @@ components:
     streamingResponseBody:
       type: object
     apiStatus:
+      title: Repository API Status
       description: The status information of the service
       required:
         - apiVersion
@@ -1008,31 +1009,40 @@ components:
       type: object
       properties:
         apiVersion:
+          title: API Version
           description: The version of the API
           type: string
         componentName:
+          title: Component Name
           description: The name of the component
           type: string
         componentVersion:
+          title: Component Version
           description: The version of the component software
           type: string
         lockssVersion:
+          title: LOCKSS Version
           description: The version of the LOCKSS system
           type: string
         ready:
+          title: Ready
           description: The indication of whether the service is available
           type: boolean
         serviceName:
+          title: Service Name
           description: The name of the service
           type: string
         readyTime:
+          title: Ready Time
           description: The time the service last became ready.
           type: integer
           format: int64
         reason:
+          title: Reason
           description: The reason the service isn't ready.
           type: string
         startupStatus:
+          title: Startup Status
           description: Enum indicating progress of plugin/AU processing at startup.
           type: string
           enum:
