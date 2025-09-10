@@ -76,6 +76,12 @@ public class ArtifactDataStoreConfig {
    */
   public final static boolean DEFAULT_REPO_USE_WARC_COMPRESSION = true;
 
+  public final static String PARAM_ARTIFACT_TO_STRING_SHORT_STYLE =
+    "org.lockss.repo.artifactToStringShortStyle";
+
+  public final static String DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE =
+    "uuid,uri,version";
+
   private RepositoryServiceProperties repoProps;
 
   ArtifactIndex index;
@@ -214,6 +220,8 @@ public class ArtifactDataStoreConfig {
       } else {
         log.warn("configurationChanged() called before ConfigManager started.  Okey while running unit tests, should not happen during real startup");
       }
+
+      wads.setArtifactToStringShortStyle(newConfig.get(PARAM_ARTIFACT_TO_STRING_SHORT_STYLE, DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE));
     }
   }
 }
