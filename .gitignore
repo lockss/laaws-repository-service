@@ -432,3 +432,6 @@ lib/run-props
 /*/pom.xml.bak
 /.surefire-*
 /TAGS
+
+# Patched version of the spec for swagger-codegen -l python
+/src/main/resources/swagger/swagger.yaml.python
