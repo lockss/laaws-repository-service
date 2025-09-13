@@ -1105,18 +1105,28 @@ components:
           type: string
           nullable: true
     repositoryInfo:
+      title: Repository Information
       description: Information about the repository
-      required:
-        - indexInfo
-        - storeInfo
       type: object
+      required:
+        - storeInfo
+        - indexInfo
       properties:
         storeInfo:
+          title: Storage Area Information
+          description: Information about the repository's storage areas
           $ref: '#/components/schemas/storageInfo'
+          nullable: false
         indexInfo:
+          title: Artifact Index Information
+          description: Information about the repository's artifact index
           $ref: '#/components/schemas/storageInfo'
+          nullable: false
         repositoryStatistics:
+          title: Repository Statistics
+          description: Miscellaneous statistics about the repository
           $ref: '#/components/schemas/repositoryStatistics'
+          nullable: true
     repositoryStatistics:
       description: "Various statistics about the repository's internal operation."
       type: object
