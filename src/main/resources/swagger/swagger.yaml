@@ -1067,32 +1067,40 @@ components:
         pageInfo:
           $ref: '#/components/schemas/pageInfo'
     pageInfo:
+      title: Page Information
       description: The information related to pagination of content
+      type: object
       required:
+        - totalCount
+        - itemsInPage
         - continuationToken
         - curLink
         - nextLink
-        - itemsInPage
-        - totalCount
-      type: object
       properties:
         totalCount:
-          description: The total number of results
+          title: Total Count 
+          description: The total number of items
           type: integer
           format: int32
           nullable: true
         itemsInPage:
-          description: The number of items in page
+          title: Items in Page
+          description: The number of items in the page
           type: integer
           format: int32
+          nullable: false
         continuationToken:
+          title: Continuation Token
           description: The continuation token
           type: string
           nullable: true
         curLink:
+          title: Current Request
           description: The link of the current request
           type: string
+          nullable: false
         nextLink:
+          title: Next Request
           description: The link of the next request
           type: string
           nullable: true
