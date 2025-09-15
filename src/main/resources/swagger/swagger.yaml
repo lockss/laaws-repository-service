@@ -1137,38 +1137,66 @@ components:
           format: int64
     storageInfo:
       required:
-        - avail
+        - type
         - name
+        - path
+        - components
+        - sizeKB
+        - usedKB
+        - availKB
         - percentUsed
         - percentUsedString
-        - size
-        - type
-        - used
       description: Information about a repository storage area
       type: object
       properties:
         type:
+          title: Type
           description: Type of the storage area
           type: string
+          nullable: false
         name:
+          title: Name
           description: Name of the storage area
           type: string
-        size:
-          description: Size in bytes of the storage area
-          type: integer
-          format: int64
-        used:
-          description: Used size in bytes of the storage area
-          type: integer
-          format: int64
-        avail:
-          description: Available size in bytes of the storage area
-          type: integer
-          format: int64
-        percentUsedString:
-          description: 'Percentage of size used, formatted as a string'
+          nullable: false
+        path:
+          title: Path
+          description: Path, if applicable
           type: string
+          nullable: true
+        components:
+          title: Components
+          description: Storage areas that comprise this one
+          type: array
+          items:
+            $ref: '#/components/schemas/storageInfo'
+          nullable: true
+        sizeKB:
+          title: Size (KB)
+          description: Size of the storage area (in KB)
+          type: integer
+          format: int64
+          nullable: true
+        usedKB:
+          title: Used (KB)
+          description: Size of the used storage area (in KB)
+          type: integer
+          format: int64
+          nullable: true
+        availKB:
+          title: Available (KB)
+          description: Size of the available storage area (in KB)
+          type: integer
+          format: int64
+          nullable: true
         percentUsed:
-          description: Percentage of size used
+          title: Percentage Used
+          description: Percentage of the storage area used
           type: number
           format: double
+          nullable: true
+        percentUsedString:
+          title: Used (%)
+          description: Percentage of the storage area used, formatted as a string
+          type: string
+          nullable: true
