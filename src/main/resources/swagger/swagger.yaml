@@ -1100,18 +1100,23 @@ components:
             - AUS_STARTING
             - AUS_STARTED
     auidPageInfo:
+      type: object
       required:
         - auids
         - pageInfo
-      type: object
       properties:
         auids:
-          description: The Archival Unit identifiers included in the page
+          title: AUIDs
+          description: The AUIDs included in the page
           type: array
           items:
             type: string
+          nullable: false
         pageInfo:
+          title: Page Information
+          description: Information about the page
           $ref: '#/components/schemas/pageInfo'
+          nullable: false
     pageInfo:
       title: Page Information
       description: The information related to pagination of content
