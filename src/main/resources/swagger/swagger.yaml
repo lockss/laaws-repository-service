@@ -979,30 +979,71 @@ components:
           type: string
     artifact:
       type: object
+      required:
+        - uuid
+        - namespace
+        - auid
+        - uri
+        - version
+        - committed
+        - storageUrl
+        - contentLength
+        - contentDigest
+        - collectionDate
       properties:
-        committed:
-          type: boolean
-        storageUrl:
-          type: string
-        namespace:
-          type: string
-          default: lockss
         uuid:
+          title: UUID
+          description: The artifact's UUID
           type: string
+          nullable: false
+        namespace:
+          title: Namespace
+          description: The artifact's namespace
+          type: string
+          nullable: false
+          default: lockss
         auid:
+          title: AUID
+          description: The artifact's AUID
           type: string
+          nullable: false
         uri:
+          title: URI
+          description: The artifact's URI
           type: string
+          nullable: false
         version:
+          title: Version
+          description: The artifact's version number
           type: integer
-        contentLength:
-          type: integer
-          format: int64
-        contentDigest:
+          nullable: false
+        committed:
+          title: Committed
+          description: The artifact's committed flag
+          type: boolean
+          nullable: false
+        storageUrl:
+          title: Storage URL
+          description: The artifact's storage URL
           type: string
-        collectionDate:
+          nullable: false
+        contentLength:
+          title: Content Length
+          description: The length of the artifact's content
           type: integer
           format: int64
+          nullable: false
+        contentDigest:
+          title: Content Digest
+          description: The digest of the artifact's content
+          type: string
+          nullable: false
+        collectionDate:
+          title: Collection Date
+          description: The artifact's collection date
+          type: integer
+          format: int64
+          nullable: false
     streamingResponseBody:
       type: object
     apiStatus:
