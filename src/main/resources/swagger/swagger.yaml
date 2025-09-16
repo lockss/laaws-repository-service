@@ -940,16 +940,29 @@ components:
           nullable: false
     auSize:
       type: object
+      required:
+        - totalLatestVersions
+        - totalAllVersions
+        - totalWarcSize
       properties:
         totalLatestVersions:
+          title: Latest Versions
+          description: Total content size of all latest versions
           type: integer
           format: int64
+          nullable: true
         totalAllVersions:
+          title: All Versions
+          description: Total content size of all versions
           type: integer
           format: int64
+          nullable: true
         totalWarcSize:
+          title: WARC Size
+          description: Total WARC file size
           type: integer
           format: int64
+          nullable: true
     artifactProperties:
       type: object
       properties:
