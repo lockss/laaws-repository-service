@@ -1199,6 +1199,7 @@ components:
           description: "Time spent reiterating a new artifact iterator during continuation."
           type: integer
           format: int64
+          nullable: true
     storageInfo:
       required:
         - type
