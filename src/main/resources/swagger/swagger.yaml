@@ -927,12 +927,17 @@ components:
       type: object
       properties:
         artifacts:
+          title: Artifacts
           description: The artifacts included in the page
           type: array
           items:
             $ref: '#/components/schemas/artifact'
+          nullable: false
         pageInfo:
+          title: Page Information
+          description: Information about the page
           $ref: '#/components/schemas/pageInfo'
+          nullable: false
     auSize:
       type: object
       properties:
