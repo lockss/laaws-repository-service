@@ -32,7 +32,7 @@
 
 function fixImport() {
 JAVA_SRC=$1
-sed -i.backup "s/import $2/import $3/" $JAVA_SRC && rm $JAVA_SRC.backup
+sed -i.backup "s/import $2;/import $3;/" $JAVA_SRC && rm $JAVA_SRC.backup
 }
 
 function fixResponseCode1234() {
