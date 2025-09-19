@@ -41,10 +41,16 @@ info:
 security:
 - basicAuth: []
 tags:
-  - name: Default
-    description: Default section
-  - name: repository
-    description: Tasks on the repository
+  - name: artifacts
+    description: Artifact operations
+  - name: aus
+    description: Archival unit (AU) operations
+  - name: repo
+    description: Repository operations
+  - name: status
+    description: Status operations
+  - name: wayback
+    description: Replay operations
 paths:
   /namespaces:
     get:
