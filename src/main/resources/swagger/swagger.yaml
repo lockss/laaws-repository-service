@@ -38,8 +38,8 @@ info:
     name: BSD-3-Clause
     url: 'https://opensource.org/licenses/BSD-3-Clause'
   version: 2.0.0
-servers:
-  - url: http://laaws.lockss.org:443/
+security:
+- basicAuth: []
 tags:
   - name: Default
     description: Default section
@@ -1264,3 +1264,9 @@ components:
           description: Percentage of the storage area used, formatted as a string
           type: string
           nullable: true
+  securitySchemes:
+    basicAuth:
+      type: http
+      description: HTTP Basic Authentication. Works over HTTP and HTTPS.
+      scheme: basic
+
