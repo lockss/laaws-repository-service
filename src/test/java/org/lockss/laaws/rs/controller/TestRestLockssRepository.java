@@ -1738,8 +1738,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     spec.assertArtifact(repoClient, a2);
     assertEquals(2, (long)a2.getVersion());
 
-    // Give the spec an existing version and assert that it throws LockssArtifactAlreadyExistsException
+    // Give the spec the version of an existing uncomitted artifact and demonstrate that
+    // it replaces the existing artifact:
     spec.setVersion(2);
+    Artifact committedArtifact = repoClient.addArtifact(spec.getArtifactData());
+    spec.assertArtifact(repoClient, committedArtifact);
+
+    // Commmit that artifact now and demonstrate that an attempt at replacing the artifact
+    // results in a LockssArtifactAlreadyExistsException:
+    repoClient.commitArtifact(committedArtifact);
     assertThrows(LockssArtifactAlreadyExistsException.class,
         () -> repoClient.addArtifact(spec.getArtifactData()));
 
