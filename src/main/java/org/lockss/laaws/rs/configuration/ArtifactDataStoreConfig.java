@@ -32,14 +32,13 @@ package org.lockss.laaws.rs.configuration;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.io.FileUtils;
 import org.lockss.config.ConfigManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
 import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
-import org.lockss.rs.io.storage.warc.TestingWarcArtifactDataStore;
+import org.lockss.rs.io.storage.warc.TestingLocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.PatternIntMap;
@@ -153,7 +152,7 @@ public class ArtifactDataStoreConfig {
 
           case "testing":
             log.info("Configuring testing artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
-            return new TestingWarcArtifactDataStore(repoProps.getLocalBaseDirs());
+            return new TestingLocalWarcArtifactDataStore(repoProps.getLocalBaseDirs());
 
           default:
             throw new RuntimeException("Shouldn't happen");
@@ -182,12 +181,12 @@ public class ArtifactDataStoreConfig {
   private static class ArtifactDataStoreConfigCallback
       implements org.lockss.config.Configuration.Callback {
 
-    TestingWarcArtifactDataStore twads;
+    TestingLocalWarcArtifactDataStore twads;
     WarcArtifactDataStore wads;
 
     ArtifactDataStoreConfigCallback(WarcArtifactDataStore ds) {
-      if (ds instanceof TestingWarcArtifactDataStore) {
-        twads = (TestingWarcArtifactDataStore) ds;
+      if (ds instanceof TestingLocalWarcArtifactDataStore) {
+        twads = (TestingLocalWarcArtifactDataStore) ds;
       }
 
       wads = ds;
