@@ -272,10 +272,6 @@ paths:
               schema:
                 type: string
                 format: binary
-            application/json:
-              schema:
-                type: string
-                format: binary
         default:
           description: The resulting error payload.
           content:
