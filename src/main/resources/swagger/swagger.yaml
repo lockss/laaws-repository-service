@@ -599,7 +599,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Returns an AuSize containing the sizes of all the artifacts,
             only the latest artifact version of all URLs, and the sum of the size
             of all the underlying WARC files, of an AU.
