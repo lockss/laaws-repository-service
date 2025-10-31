@@ -38,6 +38,22 @@ info:
     name: BSD-3-Clause
     url: 'https://opensource.org/licenses/BSD-3-Clause'
   version: 2.0.0
+servers:
+  - url: "{proto}://{hostname}:{port}/"
+    description: The LOCKSS Respository Service
+    variables:
+      proto:
+        description: "The protocol (default: http)."
+        enum:
+          - http
+          - https
+        default: https
+      hostname:
+        description: The service host name (or IP address).
+        default: localhost
+      port:
+        description: "The service port (default: 24610)."
+        default: 24610
 security:
 - basicAuth: []
 tags:
