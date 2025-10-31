@@ -47,7 +47,7 @@ servers:
         enum:
           - http
           - https
-        default: https
+        default: http
       hostname:
         description: The service host name (or IP address).
         default: localhost
