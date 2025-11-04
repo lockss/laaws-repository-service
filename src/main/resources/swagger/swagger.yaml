@@ -38,6 +38,22 @@ info:
     name: BSD-3-Clause
     url: 'https://opensource.org/licenses/BSD-3-Clause'
   version: 2.0.0
+servers:
+  - url: "{proto}://{hostname}:{port}/"
+    description: The LOCKSS Respository Service
+    variables:
+      proto:
+        description: "The protocol (default: http)."
+        enum:
+          - http
+          - https
+        default: http
+      hostname:
+        description: The service host name (or IP address).
+        default: localhost
+      port:
+        description: "The service port (default: 24610)."
+        default: 24610
 security:
 - basicAuth: []
 tags:
@@ -269,10 +285,6 @@ paths:
            See POST /artifacts for more information."
           content:
             multipart/form-data:
-              schema:
-                type: string
-                format: binary
-            application/json:
               schema:
                 type: string
                 format: binary
@@ -603,7 +615,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Returns an AuSize containing the sizes of all the artifacts,
             only the latest artifact version of all URLs, and the sum of the size
             of all the underlying WARC files, of an AU.
