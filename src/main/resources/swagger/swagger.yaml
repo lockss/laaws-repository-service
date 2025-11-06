@@ -900,113 +900,59 @@ paths:
                 type: object
 components:
   schemas:
-    errorResult:
-      type: object
+    apiStatus:
+      title: Repository API Status
+      description: The status information of the service
       required:
-        - message
-        - code
-      properties:
-        message:
-          type: string
-        code:
-          type: integer
-        rootCause:
-          type: string
-    importStatus:
+        - apiVersion
+        - ready
       type: object
       properties:
-        warcId:
+        apiVersion:
+          title: API Version
+          description: The version of the API
           type: string
-        offset:
+        componentName:
+          title: Component Name
+          description: The name of the component
+          type: string
+        componentVersion:
+          title: Component Version
+          description: The version of the component software
+          type: string
+        lockssVersion:
+          title: LOCKSS Version
+          description: The version of the LOCKSS system
+          type: string
+        ready:
+          title: Ready
+          description: The indication of whether the service is available
+          type: boolean
+        serviceName:
+          title: Service Name
+          description: The name of the service
+          type: string
+        readyTime:
+          title: Ready Time
+          description: The time the service last became ready.
           type: integer
           format: int64
-        url:
+        reason:
+          title: Reason
+          description: The reason the service isn't ready.
           type: string
-        artifactUuid:
-          type: string
-        digest:
-          type: string
-        version:
-          type: integer
-        status:
+        startupStatus:
+          title: Startup Status
+          description: Enum indicating progress of plugin/AU processing at startup.
           type: string
           enum:
-            - OK
-            - ERROR
-            - DUPLICATE
-            - EXCLUDED
-        statusMessage:
-          type: string
-    artifactPageInfo:
-      required:
-        - artifacts
-        - pageInfo
-      type: object
-      properties:
-        artifacts:
-          title: Artifacts
-          description: The artifacts included in the page
-          type: array
-          items:
-            $ref: '#/components/schemas/artifact'
-          nullable: false
-        pageInfo:
-          title: Page Information
-          description: Information about the page
-          $ref: '#/components/schemas/pageInfo'
-          nullable: false
-    auSize:
-      type: object
-      required:
-        - totalLatestVersions
-        - totalAllVersions
-        - totalWarcSize
-      properties:
-        totalLatestVersions:
-          title: Latest Versions
-          description: Total content size of all latest versions
-          type: integer
-          format: int64
-          nullable: true
-        totalAllVersions:
-          title: All Versions
-          description: Total content size of all versions
-          type: integer
-          format: int64
-          nullable: true
-        totalWarcSize:
-          title: WARC Size
-          description: Total WARC file size
-          type: integer
-          format: int64
-          nullable: true
-    artifactProperties:
-      type: object
-      properties:
-        namespace:
-          type: string
-          default: lockss
-        uuid:
-          type: string
-        auid:
-          type: string
-        uri:
-          type: string
-        version:
-          type: integer
-        contentLength:
-          type: integer
-          format: int64
-        contentDigest:
-          type: string
-        collectionDate:
-          type: integer
-          format: int64
-        storeDate:
-          type: integer
-          format: int64
-        state:
-          type: string
+            - NONE
+            - PLUGINS_CRAWLING
+            - PLUGINS_COLLECTED
+            - PLUGINS_LOADING
+            - PLUGINS_LOADED
+            - AUS_STARTING
+            - AUS_STARTED
     artifact:
       type: object
       required:
@@ -1074,61 +1020,76 @@ components:
           type: integer
           format: int64
           nullable: false
-    streamingResponseBody:
-      type: object
-    apiStatus:
-      title: Repository API Status
-      description: The status information of the service
+    artifactPageInfo:
       required:
-        - apiVersion
-        - ready
+        - artifacts
+        - pageInfo
       type: object
       properties:
-        apiVersion:
-          title: API Version
-          description: The version of the API
+        artifacts:
+          title: Artifacts
+          description: The artifacts included in the page
+          type: array
+          items:
+            $ref: '#/components/schemas/artifact'
+          nullable: false
+        pageInfo:
+          title: Page Information
+          description: Information about the page
+          $ref: '#/components/schemas/pageInfo'
+          nullable: false
+    artifactProperties:
+      type: object
+      properties:
+        namespace:
           type: string
-        componentName:
-          title: Component Name
-          description: The name of the component
+          default: lockss
+        uuid:
           type: string
-        componentVersion:
-          title: Component Version
-          description: The version of the component software
+        auid:
           type: string
-        lockssVersion:
-          title: LOCKSS Version
-          description: The version of the LOCKSS system
+        uri:
           type: string
-        ready:
-          title: Ready
-          description: The indication of whether the service is available
-          type: boolean
-        serviceName:
-          title: Service Name
-          description: The name of the service
-          type: string
-        readyTime:
-          title: Ready Time
-          description: The time the service last became ready.
+        version:
+          type: integer
+        contentLength:
           type: integer
           format: int64
-        reason:
-          title: Reason
-          description: The reason the service isn't ready.
+        contentDigest:
           type: string
-        startupStatus:
-          title: Startup Status
-          description: Enum indicating progress of plugin/AU processing at startup.
+        collectionDate:
+          type: integer
+          format: int64
+        storeDate:
+          type: integer
+          format: int64
+        state:
           type: string
-          enum:
-            - NONE
-            - PLUGINS_CRAWLING
-            - PLUGINS_COLLECTED
-            - PLUGINS_LOADING
-            - PLUGINS_LOADED
-            - AUS_STARTING
-            - AUS_STARTED
+    auSize:
+      type: object
+      required:
+        - totalLatestVersions
+        - totalAllVersions
+        - totalWarcSize
+      properties:
+        totalLatestVersions:
+          title: Latest Versions
+          description: Total content size of all latest versions
+          type: integer
+          format: int64
+          nullable: true
+        totalAllVersions:
+          title: All Versions
+          description: Total content size of all versions
+          type: integer
+          format: int64
+          nullable: true
+        totalWarcSize:
+          title: WARC Size
+          description: Total WARC file size
+          type: integer
+          format: int64
+          nullable: true
     auidPageInfo:
       type: object
       required:
@@ -1147,6 +1108,43 @@ components:
           description: Information about the page
           $ref: '#/components/schemas/pageInfo'
           nullable: false
+    errorResult:
+      type: object
+      required:
+        - message
+        - code
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+        rootCause:
+          type: string
+    importStatus:
+      type: object
+      properties:
+        warcId:
+          type: string
+        offset:
+          type: integer
+          format: int64
+        url:
+          type: string
+        artifactUuid:
+          type: string
+        digest:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+          enum:
+            - OK
+            - ERROR
+            - DUPLICATE
+            - EXCLUDED
+        statusMessage:
+          type: string
     pageInfo:
       title: Page Information
       description: The information related to pagination of content
@@ -1185,6 +1183,8 @@ components:
           description: The link of the next request
           type: string
           nullable: true
+    streamingResponseBody:
+      type: object
     repositoryInfo:
       title: Repository Information
       description: Information about the repository
@@ -1287,4 +1287,3 @@ components:
       type: http
       description: HTTP Basic Authentication. Works over HTTP and HTTPS.
       scheme: basic
-
