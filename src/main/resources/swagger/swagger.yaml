@@ -266,14 +266,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: "Multipart/form-data containing the following parts:
@@ -379,14 +374,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: Artifact's payload
@@ -423,15 +413,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart
-            response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: Artifact's payload
@@ -1135,6 +1119,15 @@ components:
             - EXCLUDED
         statusMessage:
           type: string
+    includeContentEnum:
+      title: Include Content
+      description: Whether to include the artifact content part in a multipart response
+      type: string
+      default: ALWAYS
+      enum:
+        - NEVER
+        - IF_SMALL
+        - ALWAYS
     pageInfo:
       title: Page Information
       description: The information related to pagination of content
