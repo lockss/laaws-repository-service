@@ -30,17 +30,17 @@ openapi: 3.0.3
 info:
   title: LOCKSS Repository Service REST API
   description: REST API of the LOCKSS Repository Service
+  version: 2.0.0
   contact:
     name: LOCKSS Support
-    url: 'https://www.lockss.org/'
+    url: https://www.lockss.org/
     email: lockss-support@lockss.org
   license:
     name: BSD-3-Clause
-    url: 'https://opensource.org/licenses/BSD-3-Clause'
-  version: 2.0.0
+    url: https://opensource.org/licenses/BSD-3-Clause
 servers:
   - url: "{proto}://{hostname}:{port}/"
-    description: The LOCKSS Respository Service
+    description: LOCKSS Respository Service
     variables:
       proto:
         description: "The protocol (default: http)."
