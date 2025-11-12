@@ -174,11 +174,7 @@ paths:
           in: query
           description: Versions of the artifacts to return
           schema:
-            type: string
-            default: all
-            enum:
-              - all
-              - latest
+            $ref: '#/components/schemas/versionsEnum'
         - name: limit
           in: query
           description: The requested maximum number of artifacts per response
@@ -1275,6 +1271,14 @@ components:
           description: Percentage of the storage area used, formatted as a string
           type: string
           nullable: true
+    versionsEnum:
+      title: Versions
+      description: Versions of the artifacts to return
+      type: string
+      default: latest
+      enum:
+        - all
+        - latest
   securitySchemes:
     basicAuth:
       type: http
