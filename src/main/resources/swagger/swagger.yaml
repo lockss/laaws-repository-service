@@ -493,12 +493,10 @@ paths:
             type: string
         - name: op
           in: query
+          description: Bulk AU operation
           required: true
           schema:
-            type: string
-            enum:
-            - start
-            - finish
+            $ref: '#/components/schemas/bulkAuOpEnum'
       responses:
         '200':
           description: Bulk operation succeeded
@@ -1088,6 +1086,13 @@ components:
           description: Information about the page
           $ref: '#/components/schemas/pageInfo'
           nullable: false
+    bulkAuOpEnum:
+      title: Bulk AU Operation
+      description: Versions of the artifacts to return
+      type: string
+      enum:
+        - start
+        - finish
     errorResult:
       type: object
       required:
