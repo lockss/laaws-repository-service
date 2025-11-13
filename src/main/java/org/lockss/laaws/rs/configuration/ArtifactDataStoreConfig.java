@@ -41,14 +41,17 @@ import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.TestingLocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
-import org.lockss.util.PatternIntMap;
+import org.lockss.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
 import java.io.*;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.lockss.rs.io.storage.warc.WarcArtifactDataStore.DATASTORE_VERSION_FILE;
 
@@ -62,13 +65,15 @@ public class ArtifactDataStoreConfig {
   private final static ObjectMapper mapper = new ObjectMapper()
       .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-  public final static String PARAM_FREE_SPACE_MAP = "org.lockss.repo.testing.freeSpaceMap";
+  public final static String PREFIX = "org.lockss.repo.";
+
+  public final static String PARAM_FREE_SPACE_MAP = PREFIX + "testing.freeSpaceMap";
 
   /**
    * Enables or disables the use of GZIP compression for WARC files in
    * WARC artifact data store implementations.
    */
-  public final static String PARAM_REPO_USE_WARC_COMPRESSION = "org.lockss.repo.warc.useCompression";
+  public final static String PARAM_REPO_USE_WARC_COMPRESSION = PREFIX + "warc.useCompression";
 
   /**
    * Default settings for use of GZIP compression for WARC files.
@@ -76,10 +81,28 @@ public class ArtifactDataStoreConfig {
   public final static boolean DEFAULT_REPO_USE_WARC_COMPRESSION = true;
 
   public final static String PARAM_ARTIFACT_TO_STRING_SHORT_STYLE =
-    "org.lockss.repo.artifactToStringShortStyle";
+    PREFIX + "artifactToStringShortStyle";
 
   public final static String DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE =
     "uuid,uri,version";
+
+  public final static String PARAM_INCLUDE_COMPRESSED_MIME_TYPES =
+      PREFIX + "includeCompressedContentTypes";
+
+  public final static List<String> DEFAULT_INCLUDE_COMPRESSED_MIME_TYPES =
+      Collections.EMPTY_LIST;
+
+  public final static String PARAM_EXCLUDE_COMPRESSED_MIME_TYPES =
+      PREFIX + "excludeCompressedContentTypes";
+
+  public final static List<String> DEFAULT_EXCLUDE_COMPRESSED_MIME_TYPES =
+      Collections.EMPTY_LIST;
+
+  public final static String PARAM_COMPRESSED_CONTENT_ENCODINGS =
+      PREFIX + "compressedContentEncodings";
+
+  public final static List<String> DEFAULT_COMPRESSED_CONTENT_ENCODINGS =
+      ListUtil.fromIterable(WarcArtifactDataStore.DEFAULT_COMPRESSED_CONTENT_ENCODINGS);
 
   private RepositoryServiceProperties repoProps;
 
@@ -216,11 +239,25 @@ public class ArtifactDataStoreConfig {
         boolean useWarcCompression =
           newConfig.getBoolean(PARAM_REPO_USE_WARC_COMPRESSION, DEFAULT_REPO_USE_WARC_COMPRESSION);
         wads.setDefaultUseWarcCompression(useWarcCompression);
+        wads.setArtifactToStringShortStyle(
+            newConfig.get(PARAM_ARTIFACT_TO_STRING_SHORT_STYLE, DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE));
+
+        wads.setCompressedContentEncodings(SetUtil.fromList(
+            newConfig.getList(PARAM_COMPRESSED_CONTENT_ENCODINGS, DEFAULT_COMPRESSED_CONTENT_ENCODINGS)));
+
+        List<String> includeContentTypes =
+            newConfig.getList(PARAM_INCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_INCLUDE_COMPRESSED_MIME_TYPES);
+        List<String> excludeContentTypes =
+            newConfig.getList(PARAM_EXCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_EXCLUDE_COMPRESSED_MIME_TYPES);
+
+        Set<String> compressedMimeTypes = new HashSet<>(WarcArtifactDataStore.DEFAULT_COMPRESSED_MIME_TYPES);
+        compressedMimeTypes.addAll(includeContentTypes);
+        excludeContentTypes.forEach(compressedMimeTypes::remove);
+
+        wads.setCompressedMimeTypes(compressedMimeTypes);
       } else {
         log.warn("configurationChanged() called before ConfigManager started.  Okey while running unit tests, should not happen during real startup");
       }
-
-      wads.setArtifactToStringShortStyle(newConfig.get(PARAM_ARTIFACT_TO_STRING_SHORT_STYLE, DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE));
     }
   }
 }
