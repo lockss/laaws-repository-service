@@ -591,7 +591,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     RestEndpointCall getArtifactsFromAllAus = (Credentials credentials) -> {
       String namespace = null;
       String prefix = "https://www.lockss.org/";
-      ArtifactVersions versions = ArtifactVersions.ALL;
+      VersionsEnum versions = VersionsEnum.ALL;
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("urlPrefix", prefix);
@@ -2831,24 +2831,24 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, VersionsEnum.ALL));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, VersionsEnum.ALL));
 
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, VersionsEnum.LATEST));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, VersionsEnum.LATEST));
 
     // Non-existent namespace or url
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.ALL));
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, ArtifactVersions.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, VersionsEnum.ALL));
 
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.LATEST));
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, ArtifactVersions.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, VersionsEnum.LATEST));
 
     // For each distinct URL in the specs, ask the repo for all artifacts
     // with that URL, check against the specs (sorted by (uri, auid,
@@ -2862,7 +2862,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
               .filter(spec -> spec.getUrl().equals(urlSpec.getUrl()))
               .filter(spec -> spec.getNamespace().equals(urlSpec.getNamespace())),
           repoClient.getArtifactsWithUrlFromAllAus(urlSpec.getNamespace(),
-              urlSpec.getUrl(), ArtifactVersions.ALL));
+              urlSpec.getUrl(), VersionsEnum.ALL));
 
       ArtifactSpec.assertArtList(repoClient,
           committedSpecStream()
@@ -2883,7 +2883,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                       .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
               ),
           repoClient.getArtifactsWithUrlFromAllAus(urlSpec.getNamespace(),
-              urlSpec.getUrl(), ArtifactVersions.LATEST));
+              urlSpec.getUrl(), VersionsEnum.LATEST));
     }
   }
 
@@ -2891,25 +2891,25 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, VersionsEnum.ALL));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, VersionsEnum.ALL));
 
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, VersionsEnum.LATEST));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, VersionsEnum.LATEST));
 
     // Non-existent namespace or url
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.ALL));
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, ArtifactVersions.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, VersionsEnum.ALL));
 
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.LATEST));
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, ArtifactVersions.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, VersionsEnum.LATEST));
 
     // Get all the Artifacts beginning with URL_PREFIX, check agains the specs
     // (sorted by (uri, auid, version), to match ...AllAus())
@@ -2918,7 +2918,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
             .filter(spec -> spec.getUrl().startsWith(URL_PREFIX))
             .filter(spec -> spec.getNamespace().equals(NS1)),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, ArtifactVersions.ALL));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, VersionsEnum.ALL));
 
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
@@ -2938,14 +2938,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                     .thenComparing(ArtifactSpec::getAuid)
                     .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
             ),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, ArtifactVersions.LATEST));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, VersionsEnum.LATEST));
 
     // Same with empty prefix
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
             .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
             .filter(spec -> spec.getNamespace().equals(NS1)),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", ArtifactVersions.ALL));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.ALL));
 
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
@@ -2964,7 +2964,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                     .thenComparing(ArtifactSpec::getAuid)
                     .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
             ),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", ArtifactVersions.LATEST));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.LATEST));
   }
 
   public void testGetAuIds() throws IOException {

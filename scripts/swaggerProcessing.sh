@@ -67,6 +67,7 @@ ARTIFACTS_API=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApi.java
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.IncludeContentEnum org.lockss.util.rest.repo.model.IncludeContentEnum
+fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.VersionsEnum org.lockss.util.rest.repo.model.VersionsEnum
 fixResponseCode1234 $ARTIFACTS_API
 
 # Edit ArtifactsApiController.java.
@@ -79,12 +80,14 @@ ARTIFACTS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApiDe
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.IncludeContentEnum org.lockss.util.rest.repo.model.IncludeContentEnum
+fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.VersionsEnum org.lockss.util.rest.repo.model.VersionsEnum
 
 # Edit AusApi.java.
 AUS_API=src/generated/java/org/lockss/laaws/rs/api/AusApi.java
 fixImport $AUS_API org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixImport $AUS_API org.lockss.laaws.rs.model.AuidPageInfo org.lockss.util.rest.repo.model.AuidPageInfo
 fixImport $AUS_API org.lockss.laaws.rs.model.AuSize org.lockss.util.rest.repo.model.AuSize
+fixImport $AUS_API org.lockss.laaws.rs.model.BulkAuOpEnum org.lockss.util.rest.repo.model.BulkAuOpEnum
 fixResponseCode1234 $AUS_API
 
 # Edit AusApiController.java.
@@ -98,6 +101,7 @@ AUS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/AusApiDelegate.java
 fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.AuidPageInfo org.lockss.util.rest.repo.model.AuidPageInfo
 fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.AuSize org.lockss.util.rest.repo.model.AuSize
+fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.BulkAuOpEnum org.lockss.util.rest.repo.model.BulkAuOpEnum
 
 # Edit RepoinfoApi.java.
 REPOINFO_API=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApi.java
@@ -125,6 +129,16 @@ fixResponseCode1234 $NAMESPACES_API
 
 # Edit WaybackApi.java
 WAYBACK_API=src/generated/java/org/lockss/laaws/rs/api/WaybackApi.java
+fixImport $WAYBACK_API org.lockss.laaws.rs.model.PywbMatchEnum org.lockss.util.rest.repo.model.PywbMatchEnum
+fixImport $WAYBACK_API org.lockss.laaws.rs.model.PywbOutputEnum org.lockss.util.rest.repo.model.PywbOutputEnum
+fixImport $WAYBACK_API org.lockss.laaws.rs.model.PywbSortEnum org.lockss.util.rest.repo.model.PywbSortEnum
 fixResponseCode1234 $WAYBACK_API
+
+# Edit WaybackApiDelegate.java
+WAYBACK_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/WaybackApiDelegate.java
+fixImport $WAYBACK_API_DELEGATE org.lockss.laaws.rs.model.PywbMatchEnum org.lockss.util.rest.repo.model.PywbMatchEnum
+fixImport $WAYBACK_API_DELEGATE org.lockss.laaws.rs.model.PywbOutputEnum org.lockss.util.rest.repo.model.PywbOutputEnum
+fixImport $WAYBACK_API_DELEGATE org.lockss.laaws.rs.model.PywbSortEnum org.lockss.util.rest.repo.model.PywbSortEnum
+fixResponseCode1234 $WAYBACK_API_DELEGATE
 
 rm src/generated/java/org/lockss/laaws/rs/config/SwaggerDocumentationConfig.java

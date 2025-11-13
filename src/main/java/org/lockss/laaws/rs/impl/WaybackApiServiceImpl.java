@@ -346,8 +346,8 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
    */
   @Override
   public ResponseEntity<String> getCdxPywb(String namespace, String url,
-                                           Integer limit, String matchType, String sort, String closest,
-                                           String output, String fl, String accept, String acceptEncoding) {
+                                           Integer limit, PywbMatchEnum matchType, PywbSortEnum sort, String closest,
+                                           PywbOutputEnum output, String fl, String accept, String acceptEncoding) {
     log.debug2("namespace = {}", namespace);
     log.debug2("url = {}", url);
     log.debug2("limit = {}", limit);
@@ -387,7 +387,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
       // Determine whether it is an exact query.
       boolean isExact =
-          matchType == null || matchType.toLowerCase().equals("exact");
+          matchType == null || matchType == PywbMatchEnum.EXACT;
       log.trace("isExact = {}", isExact);
 
       if (!isExact) {
@@ -396,7 +396,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
       // Determine whether it is a prefix query.
       boolean isPrefix =
-          matchType != null && matchType.toLowerCase().equals("prefix");
+          matchType == PywbMatchEnum.PREFIX;
       log.trace("isPrefix = {}", isPrefix);
 
       Integer startPage = null;
@@ -419,10 +419,9 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
       // Convert the results to the right format.
       String result = null;
 
-      if (output == null || output.trim().isEmpty()
-          || output.trim().toLowerCase().equals("cdx")) {
+      if (output == null || output == PywbOutputEnum.CDX) {
         result = records.toIaText();
-      } else if (output.trim().toLowerCase().equals("json")) {
+      } else if (output == PywbOutputEnum.JSON) {
         result = records.toJson();
       } else {
         String errorMessage = "Invalid output request parameter: " + output;
@@ -628,10 +627,10 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
       if (isPrefix) {
         // Yes: Get from the repository the artifacts for URLs with the passed prefix.
-        iterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, normalizedUrl, ArtifactVersions.ALL);
+        iterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, normalizedUrl, VersionsEnum.ALL);
       } else {
         // No: Get from the repository the artifacts for the passed URL.
-        iterable = repo.getArtifactsWithUrlFromAllAus(namespace, normalizedUrl, ArtifactVersions.ALL);
+        iterable = repo.getArtifactsWithUrlFromAllAus(namespace, normalizedUrl, VersionsEnum.ALL);
       }
 
       artifactLists.add(iterable);

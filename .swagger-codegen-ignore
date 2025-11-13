@@ -41,3 +41,9 @@ src/generated/java/org/lockss/laaws/*/model/RepositoryStatistics.java
 src/generated/java/org/lockss/laaws/*/model/StorageInfo.java
 src/generated/java/org/lockss/laaws/*/model/StreamingResponseBody.java
 src/generated/java/org/lockss/laaws/*/model/IncludeContentEnum.java
+src/generated/java/org/lockss/laaws/*/model/VersionsEnum.java
+src/generated/java/org/lockss/laaws/*/model/BulkAuOpEnum.java
+src/generated/java/org/lockss/laaws/*/model/PywbMatchEnum.java
+src/generated/java/org/lockss/laaws/*/model/PywbOutputEnum.java
+src/generated/java/org/lockss/laaws/*/model/PywbSortEnum.java
+

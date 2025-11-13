@@ -1,8 +1,10 @@
 package org.lockss.laaws.rs.impl;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.AusApiDelegate;
+import org.lockss.util.rest.repo.model.BulkAuOpEnum;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
@@ -25,7 +27,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -823,7 +824,7 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
    * @return TBD
    */
   @Override
-  public ResponseEntity<Void> handleBulkAuOp(String auid, String op, String namespace) {
+  public ResponseEntity<Void> handleBulkAuOp(String auid, BulkAuOpEnum op, String namespace) {
 
     String parsedRequest = String.format("namespace: %s, auid: %s, op: %s, requestUrl: %s",
         namespace, auid, op, ServiceImplUtil.getFullRequestUrl(request));
@@ -837,13 +838,13 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       ArtifactIndex index = ((BaseLockssRepository)repo).getArtifactIndex();
       try {
         switch (op) {
-          case "start":
+          case START:
             log.debug("startBulkStore({}, {})", namespace, auid);
             bulkAuids.add(auid);
             index.startBulkStore(namespace, auid);
             break;
 
-          case "finish":
+          case FINISH:
             log.debug("finishBulkStore({}, {})", namespace, auid);
             bulkAuids.remove(auid);
             index.finishBulkStore(namespace, auid, bulkIndexBatchSize);

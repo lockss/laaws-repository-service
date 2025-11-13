@@ -9,6 +9,7 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
+import org.lockss.util.rest.repo.model.VersionsEnum;
 import org.lockss.laaws.rs.multipart.LockssMultipartHttpServletRequest;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
@@ -26,7 +27,6 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.multipart.MultipartResponse;
 import org.lockss.util.rest.repo.LockssArtifactAlreadyExistsException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
-import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.*;
 import org.lockss.util.rest.repo.util.ArtifactCache;
@@ -595,7 +595,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   public ResponseEntity<ArtifactPageInfo> getArtifactsFromAllAus(String namespace,
                                                                  String url,
                                                                  String urlPrefix,
-                                                                 String versions,
+                                                                 VersionsEnum versions,
                                                                  Integer limit,
                                                                  String continuationToken) {
 
@@ -660,12 +660,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
       if (iterator == null) {
         Iterable<Artifact> artifactIterable = null;
-        ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions.toUpperCase());
 
         if (url != null) {
-          artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, artifactVersions);
+          artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, versions);
         } else if (urlPrefix != null) {
-          artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, artifactVersions);
+          artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, versions);
         }
 
         if (artifactIterable != null) {
