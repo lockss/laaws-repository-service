@@ -710,22 +710,14 @@ paths:
             type: integer
         - name: matchType
           in: query
+          description: Match type
           schema:
-            type: string
-            enum:
-              - exact
-              - prefix
-              - host
-              - domain
-              - range
+            $ref: '#/components/schemas/pywbMatchEnum'
         - name: sort
           in: query
+          description: Sorting behavior
           schema:
-            type: string
-            enum:
-              - default
-              - closest
-              - reverse
+            $ref: '#/components/schemas/pywbSortEnum'
         - name: closest
           in: query
           description: Timestamp for sort=closest mode
@@ -735,10 +727,7 @@ paths:
           in: query
           description: Output format
           schema:
-            type: string
-            enum:
-              - cdx
-              - json
+            $ref: '#/components/schemas/pywbOutputEnum'
         - name: fl
           in: query
           description: Comma-separated list of fields to include in output
@@ -1177,6 +1166,32 @@ components:
           description: The link of the next request
           type: string
           nullable: true
+    pywbMatchEnum:
+      title: Match Type
+      description: Match type in Pywb CDX queries
+      type: string
+      enum:
+        - exact
+        - prefix
+        - host
+        - domain
+        - range
+    pywbOutputEnum:
+      title: Output Format
+      description: Output format in Pywb CDX queries
+      type: string
+      default: cdx
+      enum:
+        - cdx
+        - json
+    pywbSortEnum:
+      title: Sort
+      description: Sorting behavior in Pywb CDX queries
+      type: string
+      enum:
+        - default
+        - closest
+        - reverse
     streamingResponseBody:
       type: object
     repositoryInfo:
