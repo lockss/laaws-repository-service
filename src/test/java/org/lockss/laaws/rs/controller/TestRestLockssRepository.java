@@ -595,7 +595,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("urlPrefix", prefix);
-      queryParams.put("versions", String.valueOf(versions));
+      queryParams.put("versions", String.valueOf(versions).toUpperCase());
 
       if (namespace != null) {
         queryParams.put("namespace", namespace);
@@ -857,7 +857,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     RestEndpointCall handleBulkAuOp = (Credentials credentials) -> {
       String namespace = "test";
       String auid = "test";
-      String op = "start";
+      BulkAuOpEnum op = BulkAuOpEnum.START;
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -866,7 +866,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("namespace", namespace);
-      queryParams.put("op", op);
+      queryParams.put("op", String.valueOf(op).toUpperCase());
 
       Map<String, String> uriParams = new HashMap<>();
       uriParams.put("auid", auid);
