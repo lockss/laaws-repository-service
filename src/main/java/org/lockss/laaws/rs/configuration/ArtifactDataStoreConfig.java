@@ -219,44 +219,46 @@ public class ArtifactDataStoreConfig {
                                      org.lockss.config.Configuration oldConfig,
                                      org.lockss.config.Configuration.Differences changedKeys) {
 
-      if (twads != null) {
-        PatternIntMap freeSpacePatternMap = PatternIntMap.EMPTY;
+      if (changedKeys.contains(PREFIX)) {
+        if (twads != null) {
+          PatternIntMap freeSpacePatternMap = PatternIntMap.EMPTY;
 
-        List lst = newConfig.getList(PARAM_FREE_SPACE_MAP, null);
+          List lst = newConfig.getList(PARAM_FREE_SPACE_MAP, null);
 
-        if (lst != null && !lst.isEmpty()) {
-          try {
-            freeSpacePatternMap = new PatternIntMap(lst);
-          } catch (IllegalArgumentException e) {
-            log.error("Illegal testing disk space map, ignoring", e);
+          if (lst != null && !lst.isEmpty()) {
+            try {
+              freeSpacePatternMap = new PatternIntMap(lst);
+            } catch (IllegalArgumentException e) {
+              log.error("Illegal testing disk space map, ignoring", e);
+            }
           }
+
+          twads.setTestingDiskSpaceMap(freeSpacePatternMap);
         }
 
-        twads.setTestingDiskSpaceMap(freeSpacePatternMap);
-      }
+        if (wads != null) {
+          boolean useWarcCompression =
+              newConfig.getBoolean(PARAM_REPO_USE_WARC_COMPRESSION, DEFAULT_REPO_USE_WARC_COMPRESSION);
+          wads.setDefaultUseWarcCompression(useWarcCompression);
+          wads.setArtifactToStringShortStyle(
+              newConfig.get(PARAM_ARTIFACT_TO_STRING_SHORT_STYLE, DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE));
 
-      if (wads != null) {
-        boolean useWarcCompression =
-          newConfig.getBoolean(PARAM_REPO_USE_WARC_COMPRESSION, DEFAULT_REPO_USE_WARC_COMPRESSION);
-        wads.setDefaultUseWarcCompression(useWarcCompression);
-        wads.setArtifactToStringShortStyle(
-            newConfig.get(PARAM_ARTIFACT_TO_STRING_SHORT_STYLE, DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE));
+          wads.setCompressedContentEncodings(SetUtil.fromList(
+              newConfig.getList(PARAM_COMPRESSED_CONTENT_ENCODINGS, DEFAULT_COMPRESSED_CONTENT_ENCODINGS)));
 
-        wads.setCompressedContentEncodings(SetUtil.fromList(
-            newConfig.getList(PARAM_COMPRESSED_CONTENT_ENCODINGS, DEFAULT_COMPRESSED_CONTENT_ENCODINGS)));
+          List<String> includeContentTypes =
+              newConfig.getList(PARAM_INCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_INCLUDE_COMPRESSED_MIME_TYPES);
+          List<String> excludeContentTypes =
+              newConfig.getList(PARAM_EXCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_EXCLUDE_COMPRESSED_MIME_TYPES);
 
-        List<String> includeContentTypes =
-            newConfig.getList(PARAM_INCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_INCLUDE_COMPRESSED_MIME_TYPES);
-        List<String> excludeContentTypes =
-            newConfig.getList(PARAM_EXCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_EXCLUDE_COMPRESSED_MIME_TYPES);
+          Set<String> compressedMimeTypes = new HashSet<>(WarcArtifactDataStore.DEFAULT_COMPRESSED_MIME_TYPES);
+          compressedMimeTypes.addAll(includeContentTypes);
+          excludeContentTypes.forEach(compressedMimeTypes::remove);
 
-        Set<String> compressedMimeTypes = new HashSet<>(WarcArtifactDataStore.DEFAULT_COMPRESSED_MIME_TYPES);
-        compressedMimeTypes.addAll(includeContentTypes);
-        excludeContentTypes.forEach(compressedMimeTypes::remove);
-
-        wads.setCompressedMimeTypes(compressedMimeTypes);
-      } else {
-        log.warn("configurationChanged() called before ConfigManager started.  Okey while running unit tests, should not happen during real startup");
+          wads.setCompressedMimeTypes(compressedMimeTypes);
+        } else {
+          log.warn("configurationChanged() called before ConfigManager started.  Okey while running unit tests, should not happen during real startup");
+        }
       }
     }
   }
