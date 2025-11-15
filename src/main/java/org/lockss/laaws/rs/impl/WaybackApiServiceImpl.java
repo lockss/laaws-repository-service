@@ -53,7 +53,10 @@ import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.rest.config.RestConfigClient;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
-import org.lockss.util.rest.repo.model.*;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.rest.repo.model.ArtifactData;
+import org.lockss.util.rest.repo.model.ArtifactIdentifier;
+import org.lockss.util.rest.repo.model.ArtifactVersions;
 import org.lockss.util.time.Deadline;
 import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -756,7 +759,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
         //  response status code is expensive; consider adding these fields to the
         //  index if de-duplication isn't sufficient
         CdxRecord record = getCdxRecord(
-            repo.getArtifactData(artifact, IncludeContentEnum.NEVER));
+            repo.getArtifactData(artifact, LockssRepository.IncludeContent.NEVER));
         log.trace("record = {}", record);
 
         // Add this artifact to the results.

@@ -25,7 +25,6 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
-import org.lockss.util.rest.repo.model.IncludeContentEnum;
 import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
 import org.lockss.util.time.TimeBase;
@@ -337,7 +336,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
     doThrow(e).when(internalRepo).getArtifactData(spec.getNamespace(), spec.getArtifactUuid());
 
     assertThrowsMatch(LockssNoSuchArtifactIdException.class, "Artifact not found",
-        () -> clientRepo.getArtifactData(spec.getArtifact(), IncludeContentEnum.ALWAYS));
+        () -> clientRepo.getArtifactData(spec.getArtifact(), LockssRepository.IncludeContent.ALWAYS));
 
     // Reset mock
     reset(internalRepo);
@@ -348,7 +347,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         .when(internalRepo).getArtifactData(spec.getNamespace(), spec.getArtifactUuid());
 
     assertLockssRestHttpException(
-        () -> clientRepo.getArtifactData(spec.getArtifact(), IncludeContentEnum.ALWAYS),
+        () -> clientRepo.getArtifactData(spec.getArtifact(), LockssRepository.IncludeContent.ALWAYS),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.UNSPECIFIED_ERROR);
 
@@ -361,7 +360,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         .when(internalRepo).getArtifactData(spec.getNamespace(), spec.getArtifactUuid());
 
     assertLockssRestHttpException(
-        () -> clientRepo.getArtifactData(spec.getArtifact(), IncludeContentEnum.ALWAYS),
+        () -> clientRepo.getArtifactData(spec.getArtifact(), LockssRepository.IncludeContent.ALWAYS),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
   }

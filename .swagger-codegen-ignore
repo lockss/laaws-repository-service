@@ -40,4 +40,3 @@ src/generated/java/org/lockss/laaws/*/model/RepositoryInfo.java
 src/generated/java/org/lockss/laaws/*/model/RepositoryStatistics.java
 src/generated/java/org/lockss/laaws/*/model/StorageInfo.java
 src/generated/java/org/lockss/laaws/*/model/StreamingResponseBody.java
-src/generated/java/org/lockss/laaws/*/model/IncludeContentEnum.java

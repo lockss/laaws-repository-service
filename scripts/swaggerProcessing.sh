@@ -66,7 +66,6 @@ fixImport $ARCHIVES_API_DELEGATE org.lockss.laaws.rs.model.StreamingResponseBody
 ARTIFACTS_API=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApi.java
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
-fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.IncludeContentEnum org.lockss.util.rest.repo.model.IncludeContentEnum
 fixResponseCode1234 $ARTIFACTS_API
 
 # Edit ArtifactsApiController.java.
@@ -78,7 +77,6 @@ fixImport $ARTIFACTS_API_CONTROLLER org.lockss.laaws.rs.model.ArtifactPageInfo o
 ARTIFACTS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApiDelegate.java
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
-fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.IncludeContentEnum org.lockss.util.rest.repo.model.IncludeContentEnum
 
 # Edit AusApi.java.
 AUS_API=src/generated/java/org/lockss/laaws/rs/api/AusApi.java
