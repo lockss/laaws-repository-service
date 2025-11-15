@@ -595,7 +595,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("urlPrefix", prefix);
-      queryParams.put("versions", String.valueOf(versions).toUpperCase());
+      queryParams.put("versions", versions.toString());
 
       if (namespace != null) {
         queryParams.put("namespace", namespace);
@@ -866,7 +866,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("namespace", namespace);
-      queryParams.put("op", String.valueOf(op).toUpperCase());
+      queryParams.put("op", op.toString());
 
       Map<String, String> uriParams = new HashMap<>();
       uriParams.put("auid", auid);
