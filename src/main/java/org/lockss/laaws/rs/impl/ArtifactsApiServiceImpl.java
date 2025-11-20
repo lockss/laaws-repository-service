@@ -364,9 +364,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifactDataByMultipart(String artifactid,
-                                                   String namespace,
-                                                   IncludeContentEnum includeContent) {
+  public ResponseEntity getArtifactDataByMultipart(String artifactid, String namespace, String includeContent) {
 
     String parsedRequest = String.format(
         "namespace: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
@@ -387,7 +385,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       MultiValueMap<String, Object> parts =
           ArtifactDataUtil.generateMultipartMapFromArtifactData(
               artifactData,
-              includeContent,
+              LockssRepository.IncludeContent.valueOf(includeContent),
               smallContentThreshold);
 
       //// Return multiparts response entity
@@ -429,11 +427,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    */
   @Override
   public ResponseEntity<Resource> getArtifactDataByPayload(String artifactId, String namespace,
-                                                           IncludeContentEnum includeContentParam) {
+                                                           String includeContentParam) {
+
+    LockssRepository.IncludeContent includeContent =
+        LockssRepository.IncludeContent.valueOf(includeContentParam);
 
     String parsedRequest = String.format(
         "namespace: %s, artifactId: %s, includeContent: %s, requestUrl: %s",
-        namespace, artifactId, includeContentParam, ServiceImplUtil.getFullRequestUrl(request));
+        namespace, artifactId, includeContent, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -462,8 +463,9 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           DateTimeFormatter.ISO_INSTANT
               .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
 
-      if (includeContentParam == IncludeContentEnum.ALWAYS ||
-         (includeContentParam == IncludeContentEnum.IF_SMALL && ad.getContentLength() <= smallContentThreshold)) {
+      if (includeContent == LockssRepository.IncludeContent.ALWAYS ||
+         (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
+             ad.getContentLength() <= smallContentThreshold)) {
 
         respHeaders.set(ArtifactConstants.INCLUDES_CONTENT, "true");
 
@@ -517,11 +519,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    */
   @Override
   public ResponseEntity<Resource> getArtifactDataByResponse(String artifactId, String namespace,
-                                                            IncludeContentEnum includeContentParam) {
+                                                            String includeContentParam) {
+
+    LockssRepository.IncludeContent includeContent =
+        LockssRepository.IncludeContent.valueOf(includeContentParam);
 
     String parsedRequest = String.format(
         "namespace: %s, artifactId: %s, includeContent: %s, requestUrl: %s",
-        namespace, artifactId, includeContentParam, ServiceImplUtil.getFullRequestUrl(request));
+        namespace, artifactId, includeContent, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -531,8 +536,9 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     try {
       ArtifactData ad = repo.getArtifactData(namespace, artifactId);
 
-      boolean onlyHeaders = (includeContentParam == IncludeContentEnum.NEVER) ||
-          (includeContentParam == IncludeContentEnum.IF_SMALL && ad.getContentLength() > smallContentThreshold);
+      boolean onlyHeaders = includeContent == LockssRepository.IncludeContent.NEVER ||
+          (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
+              ad.getContentLength() > smallContentThreshold);
 
       InputStream httpResponseStream = onlyHeaders ?
             new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :

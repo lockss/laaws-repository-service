@@ -42,7 +42,10 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
-import org.lockss.util.rest.repo.model.*;
+import org.lockss.util.rest.repo.model.Artifact;
+import org.lockss.util.rest.repo.model.ArtifactData;
+import org.lockss.util.rest.repo.model.ArtifactIdentifier;
+import org.lockss.util.rest.repo.model.AuSize;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
@@ -317,30 +320,30 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     }
 
     /**
-     * Test for {@link RestLockssRepository#getArtifactData(Artifact, IncludeContentEnum)}.
+     * Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}.
      *
      * @throws Exception
      */
     @Test
     public void testGetArtifactData() throws Exception {
       // Artifact data
-      runTestGetArtifactData(IncludeContentEnum.NEVER, false, true);
-      runTestGetArtifactData(IncludeContentEnum.NEVER, false, false);
-      runTestGetArtifactData(IncludeContentEnum.IF_SMALL, false, true);
-      runTestGetArtifactData(IncludeContentEnum.IF_SMALL, false, false);
-      runTestGetArtifactData(IncludeContentEnum.ALWAYS, false, true);
-      runTestGetArtifactData(IncludeContentEnum.ALWAYS, false, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, false, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, false, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, false, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, false, false);
 
       // Artifact data contains a web crawl
-      runTestGetArtifactData(IncludeContentEnum.NEVER, true, true);
-      runTestGetArtifactData(IncludeContentEnum.NEVER, true, false);
-      runTestGetArtifactData(IncludeContentEnum.IF_SMALL, true, true);
-      runTestGetArtifactData(IncludeContentEnum.IF_SMALL, true, false);
-      runTestGetArtifactData(IncludeContentEnum.ALWAYS, true, true);
-      runTestGetArtifactData(IncludeContentEnum.ALWAYS, true, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.NEVER, true, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.IF_SMALL, true, false);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, true, true);
+      runTestGetArtifactData(LockssRepository.IncludeContent.ALWAYS, true, false);
     }
 
-    public void runTestGetArtifactData(IncludeContentEnum includeContent,
+    public void runTestGetArtifactData(LockssRepository.IncludeContent includeContent,
                                        boolean isHttpResponse, boolean isSmall) throws Exception {
 
         ArtifactSpec spec = new ArtifactSpec()
@@ -366,8 +369,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         ResourceHttpMessageConverter converter = new ResourceHttpMessageConverter();
         MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
 
-        boolean onlyHeaders = includeContent == IncludeContentEnum.NEVER ||
-            (includeContent == IncludeContentEnum.IF_SMALL && !isSmall);
+        boolean onlyHeaders = includeContent == LockssRepository.IncludeContent.NEVER ||
+            (includeContent == LockssRepository.IncludeContent.IF_SMALL && !isSmall);
 
         InputStream httpResponseStream = onlyHeaders ?
             new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :
@@ -453,8 +456,8 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         }
 
         // Verify artifact content is present if expected
-        if ((includeContent == IncludeContentEnum.IF_SMALL && isSmall) ||
-            (includeContent == IncludeContentEnum.ALWAYS)) {
+        if ((includeContent == LockssRepository.IncludeContent.IF_SMALL && isSmall) ||
+            (includeContent == LockssRepository.IncludeContent.ALWAYS)) {
 
             // Assert artifact data has content and that its InputStream has the expected content
             assertTrue(result.hasContentInputStream());
