@@ -53,11 +53,11 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
   // that nothing seriously bad happen if they are.
 
   // The artifact iterators used in pagination.
-  private Map<Integer, Iterator<Artifact>> artifactIterators =
+  private Map<String, Iterator<Artifact>> artifactIterators =
       new ConcurrentHashMap<>();
 
   // The auid iterators used in pagination.
-  private Map<Integer, Iterator<String>> auidIterators =
+  private Map<String, Iterator<String>> auidIterators =
       new ConcurrentHashMap<>();
 
   @Autowired
@@ -344,15 +344,15 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       Iterator<Artifact> iterator = null;
       boolean missingIterator = false;
 
-      // Get the iterator hash code (if any) used to provide a previous page
+      // Get the iterator ID (if any) used to provide a previous page
       // of results.
-      Integer iteratorHashCode = requestAct.getIteratorHashCode();
+      String iteratorId = requestAct.getIteratorId();
 
       // Check whether this request is for a previous page of results.
-      if (iteratorHashCode != null) {
+      if (iteratorId != null) {
         // Yes: Get the iterator (if any) used to provide a previous page of
         // results.
-        iterator = artifactIterators.remove(iteratorHashCode);
+        iterator = artifactIterators.remove(iteratorId);
         missingIterator = iterator == null;
       }
 
@@ -464,15 +464,18 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
         // results.
         if (iterator.hasNext()) {
           // Yes: Store it locally.
-          iteratorHashCode = iterator.hashCode();
-          artifactIterators.put(iteratorHashCode, iterator);
+          // Only generate a new UUID if we don't already have one (new iterator)
+          if (iteratorId == null) {
+            iteratorId = UUID.randomUUID().toString();
+          }
+          artifactIterators.put(iteratorId, iterator);
 
           // Create the response continuation token.
           Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
           responseAct = new ArtifactContinuationToken(
               lastArtifact.getNamespace(), lastArtifact.getAuid(),
               lastArtifact.getUri(), lastArtifact.getVersion(),
-              iteratorHashCode);
+              iteratorId);
           log.trace("responseAct = {}", responseAct);
         }
       }
@@ -681,19 +684,19 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       AuidContinuationToken responseAct = null;
       Iterator<String> iterator = null;
 
-      // Get the iterator hash code (if any) used to provide a previous page
+      // Get the iterator ID (if any) used to provide a previous page
       // of results.
-      Integer iteratorHashCode = requestAct.getIteratorHashCode();
+      String iteratorId = requestAct.getIteratorId();
 
       // Check whether this request is for the first page.
-      if (iteratorHashCode == null) {
+      if (iteratorId == null) {
         // Yes: Get the iterator pointing to first page of results.
         iterator = repo.getAuIds(namespace).iterator();
 
       } else {
         // No: Get the iterator (if any) used to provide a previous page of
         // results.
-        iterator = auidIterators.remove(iteratorHashCode);
+        iterator = auidIterators.remove(iteratorId);
 
         // Check whether the iterator was not found.
         if (iterator == null) {
@@ -730,12 +733,15 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       // results.
       if (iterator.hasNext()) {
         // Yes: Store it locally.
-        iteratorHashCode = iterator.hashCode();
-        auidIterators.put(iteratorHashCode, iterator);
+        // Only generate a new UUID if we don't already have one (new iterator)
+        if (iteratorId == null) {
+          iteratorId = UUID.randomUUID().toString();
+        }
+        auidIterators.put(iteratorId, iterator);
 
         // Create the response continuation token.
         responseAct = new AuidContinuationToken(auids.get(auids.size() - 1),
-            iteratorHashCode);
+            iteratorId);
         log.trace("responseAct = {}", responseAct);
       }
 

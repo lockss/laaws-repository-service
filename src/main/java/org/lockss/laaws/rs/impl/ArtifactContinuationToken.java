@@ -31,11 +31,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package org.lockss.laaws.rs.impl;
 
+import java.util.List;
+import java.util.UUID;
 import org.lockss.log.L4JLogger;
 import org.lockss.util.StringUtil;
 import org.lockss.util.UrlUtil;
-
-import java.util.List;
 
 /**
  * The continuation token used to paginate through a list of artifacts.
@@ -50,7 +50,7 @@ public class ArtifactContinuationToken {
   private String auid = null;
   private String uri = null;
   private Integer version = null;
-  private Integer iteratorHashCode = null;
+  private String iteratorId = null;
 
   /**
    * Constructor from a web request continuation token.
@@ -90,8 +90,8 @@ public class ArtifactContinuationToken {
 	version = Integer.valueOf(tokenItems.get(3).trim());
 	log.trace("version = {}", version);
 
-	iteratorHashCode = Integer.valueOf(tokenItems.get(4).trim());
-	log.trace("iteratorHashCode = {}", iteratorHashCode);
+	iteratorId = tokenItems.get(4).trim();
+	log.trace("iteratorId = {}", iteratorId);
       } catch (Exception e) {
 	log.warn(message, e);
 	throw new IllegalArgumentException(message, e);
@@ -109,7 +109,7 @@ public class ArtifactContinuationToken {
 
   /**
    * Constructor from members.
-   * 
+   *
    * @param namespace     A String with the namespace of the last
    *                         artifact transferred.
    * @param auid             A String with the archival unit identifier of the
@@ -118,15 +118,15 @@ public class ArtifactContinuationToken {
    *                         transferred.
    * @param version          An Integer with the version of the last artifact
    *                         transferred.
-   * @param iteratorHashCode An Integer with the hash code of the iterator used.
+   * @param iteratorId A String with the UUID of the iterator used.
    */
   public ArtifactContinuationToken(String namespace, String auid, String uri,
-      Integer version, Integer iteratorHashCode) {
+      Integer version, String iteratorId) {
     this.namespace = namespace;
     this.auid = auid;
     this.uri = uri;
     this.version = version;
-    this.iteratorHashCode = iteratorHashCode;
+    this.iteratorId = iteratorId;
 
     validateMembers();
   }
@@ -170,12 +170,12 @@ public class ArtifactContinuationToken {
   }
 
   /**
-   * Provides the hash code of the iterator used.
-   * 
-   * @return an Integer with the hash code of the iterator used.
+   * Provides the UUID of the iterator used.
+   *
+   * @return a String with the UUID of the iterator used.
    */
-  public Integer getIteratorHashCode() {
-    return iteratorHashCode;
+  public String getIteratorId() {
+    return iteratorId;
   }
 
   /**
@@ -186,10 +186,10 @@ public class ArtifactContinuationToken {
    */
   public String toWebResponseContinuationToken() {
     if (namespace != null && auid != null && uri != null && version != null
-	&& iteratorHashCode != null) {
+	&& iteratorId != null) {
       String encodedToken = UrlUtil.encodeUrl(namespace) + separator
 	  + UrlUtil.encodeUrl(auid) + separator + UrlUtil.encodeUrl(uri)
-	  + separator + version + separator + iteratorHashCode;
+	  + separator + version + separator + iteratorId;
       log.trace("encodedToken = {}", encodedToken);
       return encodedToken;
     }
@@ -203,22 +203,22 @@ public class ArtifactContinuationToken {
   public String toString() {
     return "[ArtifactContinuationToken namespace=" + namespace
 	+ ", auid=" + auid + ", uri=" + uri + ", version=" + version
-	+ ", iteratorHashCode=" + iteratorHashCode + "]";
+	+ ", iteratorId=" + iteratorId + "]";
   }
 
   /**
    * Verifies the validity of the members of this class.
    */
   private void validateMembers() {
-    // Validate that all members are null or all non-null. 
+    // Validate that all members are null or all non-null.
     if ((namespace == null && auid == null && uri == null && version == null
-	 && iteratorHashCode != null)
+	 && iteratorId != null)
 	|| (namespace != null && auid != null && uri != null
-	    && version != null && iteratorHashCode == null)) {
+	    && version != null && iteratorId == null)) {
       String message = "Invalid member combination: namespace = '"
 	  + namespace + "', auid = '" + auid + "', uri = '" + uri
-	  + "', version = '" + version + "', iteratorHashCode = '"
-	  + iteratorHashCode + "'";
+	  + "', version = '" + version + "', iteratorId = '"
+	  + iteratorId + "'";
       log.warn(message);
       throw new IllegalArgumentException(message);
     }
@@ -251,12 +251,16 @@ public class ArtifactContinuationToken {
       throw new IllegalArgumentException(message);
     }
 
-    // Validate that the iterator hash code is positive.
-    if (iteratorHashCode != null && iteratorHashCode.intValue() <= 0) {
-      String message =
-	  "Invalid member: iteratorHashCode = '" + iteratorHashCode + "'";
-      log.warn(message);
-      throw new IllegalArgumentException(message);
+    // Validate that the iterator ID is a valid UUID format.
+    if (iteratorId != null) {
+      try {
+	UUID.fromString(iteratorId);
+      } catch (IllegalArgumentException e) {
+	String message = "Invalid member: iteratorId = '" + iteratorId
+	    + "' is not a valid UUID";
+	log.warn(message, e);
+	throw new IllegalArgumentException(message, e);
+      }
     }
   }
 }

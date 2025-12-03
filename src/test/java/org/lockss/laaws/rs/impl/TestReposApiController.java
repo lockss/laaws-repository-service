@@ -225,10 +225,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the iterator hash code.
-      Integer iteratorHashCode =
-	  new AuidContinuationToken(continuationToken).getIteratorHashCode();
-      assertNotNull(iteratorHashCode);
+      // Get the iterator ID.
+      String iteratorId =
+	  new AuidContinuationToken(continuationToken).getIteratorId();
+      assertNotNull(iteratorId);
 
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
@@ -253,16 +253,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the iterator hash code is the same.
-      assertEquals(iteratorHashCode,
-	  new AuidContinuationToken(continuationToken).getIteratorHashCode());
+      // Verify that the iterator ID is the same.
+      assertEquals(iteratorId,
+	  new AuidContinuationToken(continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
       // Remove the last digit of the continuation token, resulting in the
-      // specification of a different iterator hash code.
+      // specification of a different iterator ID.
       URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
           .replaceQueryParam("continuationToken",
               continuationToken.substring(0, continuationToken.length() - 1))
@@ -287,9 +287,9 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the iterator hash code is not the same.
-      assertNotEquals(iteratorHashCode,
-	  new AuidContinuationToken(continuationToken).getIteratorHashCode());
+      // Verify that the iterator ID is not the same.
+      assertNotEquals(iteratorId,
+	  new AuidContinuationToken(continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -487,10 +487,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the iterator hash code.
-      Integer iteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(iteratorHashCode);
+      // Get the iterator ID.
+      String iteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(iteratorId);
 
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
@@ -514,16 +514,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(iteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(iteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
       // Remove the last digit of the continuation token, resulting in the
-      // specification of a different iterator hash code.
+      // specification of a different iterator ID.
       URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
           .replaceQueryParam("continuationToken",
               UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
@@ -547,13 +547,13 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the new iterator hash code.
-      Integer newIteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(newIteratorHashCode);
+      // Get the new iterator ID.
+      String newIteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(newIteratorId);
 
-      // Verify that the new iterator hash code is not the same.
-      assertNotEquals(iteratorHashCode, newIteratorHashCode);
+      // Verify that the new iterator ID is not the same.
+      assertNotEquals(iteratorId, newIteratorId);
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -577,9 +577,9 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(newIteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(newIteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -647,10 +647,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the iterator hash code.
-      Integer iteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(iteratorHashCode);
+      // Get the iterator ID.
+      String iteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(iteratorId);
 
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
@@ -674,16 +674,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(iteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(iteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
       // Remove the last digit of the continuation token, resulting in the
-      // specification of a different iterator hash code.
+      // specification of a different iterator ID.
       URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
           .replaceQueryParam("continuationToken",
               UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
@@ -707,13 +707,13 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the new iterator hash code.
-      Integer newIteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(newIteratorHashCode);
+      // Get the new iterator ID.
+      String newIteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(newIteratorId);
 
-      // Verify that the new iterator hash code is not the same.
-      assertNotEquals(iteratorHashCode, newIteratorHashCode);
+      // Verify that the new iterator ID is not the same.
+      assertNotEquals(iteratorId, newIteratorId);
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -737,9 +737,9 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(newIteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(newIteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
