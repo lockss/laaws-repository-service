@@ -40,89 +40,94 @@ JAVA_SRC=$1
 sed -i.backup 's/responseCode = "1234"/responseCode = "default"/' $JAVA_SRC && rm $JAVA_SRC.backup
 }
 
+# Support both Maven (src/generated/java) and Gradle (build/generated/sources/openapi/src/main/java) paths
+GENERATED_DIR="${GENERATED_DIR:-src/generated/java}"
+API_DIR="${GENERATED_DIR}/org/lockss/laaws/rs/api"
+MODEL_DIR="${GENERATED_DIR}/org/lockss/laaws/rs/model"
+
 # Edit StatusApi.java.
-STATUS_API=src/generated/java/org/lockss/laaws/rs/api/StatusApi.java
+STATUS_API=${API_DIR}/StatusApi.java
 fixImport $STATUS_API org.lockss.laaws.rs.model.ApiStatus org.lockss.util.rest.status.ApiStatus
 fixResponseCode1234 $STATUS_API
 
 # Edit StatusApiController.java.
-STATUS_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/StatusApiController.java
+STATUS_API_CONTROLLER=${API_DIR}/StatusApiController.java
 fixImport $STATUS_API_CONTROLLER org.lockss.laaws.rs.model.ApiStatus org.lockss.util.rest.status.ApiStatus
 
 # Edit StatusApiDelegate.java.
-STATUS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/StatusApiDelegate.java
+STATUS_API_DELEGATE=${API_DIR}/StatusApiDelegate.java
 fixImport $STATUS_API_DELEGATE org.lockss.laaws.rs.model.ApiStatus org.lockss.util.rest.status.ApiStatus
 
 # Edit ArchivesApi.java.
-ARCHIVES_API=src/generated/java/org/lockss/laaws/rs/api/ArchivesApi.java
+ARCHIVES_API=${API_DIR}/ArchivesApi.java
 fixImport $ARCHIVES_API org.lockss.laaws.rs.model.StreamingResponseBody org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 fixResponseCode1234 $ARCHIVES_API
 
 # Edit ArchivesApiDelegate.java.
-ARCHIVES_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/ArchivesApiDelegate.java
+ARCHIVES_API_DELEGATE=${API_DIR}/ArchivesApiDelegate.java
 fixImport $ARCHIVES_API_DELEGATE org.lockss.laaws.rs.model.StreamingResponseBody org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 
 # Edit ArtifactsApi.java.
-ARTIFACTS_API=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApi.java
+ARTIFACTS_API=${API_DIR}/ArtifactsApi.java
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixResponseCode1234 $ARTIFACTS_API
 
 # Edit ArtifactsApiController.java.
-ARTIFACTS_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApiController.java
+ARTIFACTS_API_CONTROLLER=${API_DIR}/ArtifactsApiController.java
 fixImport $ARTIFACTS_API_CONTROLLER org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API_CONTROLLER org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 
 # Edit ArtifactsApiDelegate.java.
-ARTIFACTS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/ArtifactsApiDelegate.java
+ARTIFACTS_API_DELEGATE=${API_DIR}/ArtifactsApiDelegate.java
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.Artifact org.lockss.util.rest.repo.model.Artifact
 fixImport $ARTIFACTS_API_DELEGATE org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 
 # Edit AusApi.java.
-AUS_API=src/generated/java/org/lockss/laaws/rs/api/AusApi.java
+AUS_API=${API_DIR}/AusApi.java
 fixImport $AUS_API org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixImport $AUS_API org.lockss.laaws.rs.model.AuidPageInfo org.lockss.util.rest.repo.model.AuidPageInfo
 fixImport $AUS_API org.lockss.laaws.rs.model.AuSize org.lockss.util.rest.repo.model.AuSize
 fixResponseCode1234 $AUS_API
 
 # Edit AusApiController.java.
-AUS_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/AusApiController.java
+AUS_API_CONTROLLER=${API_DIR}/AusApiController.java
 fixImport $AUS_API_CONTROLLER org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixImport $AUS_API_CONTROLLER org.lockss.laaws.rs.model.AuidPageInfo org.lockss.util.rest.repo.model.AuidPageInfo
 fixImport $AUS_API_CONTROLLER org.lockss.laaws.rs.model.AuSize org.lockss.util.rest.repo.model.AuSize
 
 # Edit AusApiDelegate.java.
-AUS_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/AusApiDelegate.java
+AUS_API_DELEGATE=${API_DIR}/AusApiDelegate.java
 fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.ArtifactPageInfo org.lockss.util.rest.repo.model.ArtifactPageInfo
 fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.AuidPageInfo org.lockss.util.rest.repo.model.AuidPageInfo
 fixImport $AUS_API_DELEGATE org.lockss.laaws.rs.model.AuSize org.lockss.util.rest.repo.model.AuSize
 
 # Edit RepoinfoApi.java.
-REPOINFO_API=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApi.java
+REPOINFO_API=${API_DIR}/RepoinfoApi.java
 fixImport $REPOINFO_API org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
 fixImport $REPOINFO_API org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
 fixResponseCode1234 $REPOINFO_API
 
 # Edit RepoinfoApiController.java.
-REPOINFO_API_CONTROLLER=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApiController.java
+REPOINFO_API_CONTROLLER=${API_DIR}/RepoinfoApiController.java
 fixImport $REPOINFO_API_CONTROLLER org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
 fixImport $REPOINFO_API_CONTROLLER org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
 
 # Edit RepoinfoApiDelegate.java.
-REPOINFO_API_DELEGATE=src/generated/java/org/lockss/laaws/rs/api/RepoinfoApiDelegate.java
+REPOINFO_API_DELEGATE=${API_DIR}/RepoinfoApiDelegate.java
 fixImport $REPOINFO_API_DELEGATE org.lockss.laaws.rs.model.RepositoryInfo org.lockss.util.rest.repo.model.RepositoryInfo
 fixImport $REPOINFO_API_DELEGATE org.lockss.laaws.rs.model.StorageInfo org.lockss.util.storage.StorageInfo
 
 # Edit ChecksumalgorithmsApi.java
-CHECKSUMALGORITHMS_API=src/generated/java/org/lockss/laaws/rs/api/ChecksumalgorithmsApi.java
+CHECKSUMALGORITHMS_API=${API_DIR}/ChecksumalgorithmsApi.java
 fixResponseCode1234 $CHECKSUMALGORITHMS_API
 
 # Edit NamespacesApi.java
-NAMESPACES_API=src/generated/java/org/lockss/laaws/rs/api/NamespacesApi.java
+NAMESPACES_API=${API_DIR}/NamespacesApi.java
 fixResponseCode1234 $NAMESPACES_API
 
 # Edit WaybackApi.java
-WAYBACK_API=src/generated/java/org/lockss/laaws/rs/api/WaybackApi.java
+WAYBACK_API=${API_DIR}/WaybackApi.java
 fixResponseCode1234 $WAYBACK_API
 
-rm src/generated/java/org/lockss/laaws/rs/config/SwaggerDocumentationConfig.java
+rm -f ${GENERATED_DIR}/org/lockss/laaws/rs/config/SwaggerDocumentationConfig.java

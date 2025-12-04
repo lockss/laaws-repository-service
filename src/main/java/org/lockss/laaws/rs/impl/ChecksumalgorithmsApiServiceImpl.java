@@ -115,7 +115,8 @@ public class ChecksumalgorithmsApiServiceImpl extends BaseSpringApiServiceImpl
     }
   }
 
-  @Override
+  // Note: getObjectMapper() was removed from the generated ChecksumalgorithmsApiDelegate interface
+  // in OpenAPI Generator. Keeping as utility method without @Override.
   public Optional<ObjectMapper> getObjectMapper() {
     return Optional.ofNullable(objectMapper);
   }
