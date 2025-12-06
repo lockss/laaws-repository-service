@@ -48,6 +48,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -169,14 +170,20 @@ public class ArtifactDataStoreConfig {
       case "local":
       case "testing":
         switch (dsType) {
-          case "local":
-            log.info("Configuring local artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
-            return new LocalWarcArtifactDataStore(repoProps.getLocalBaseDirs());
-
+        case "local":
+          {
+            File[] baseDirs = repoProps.getLocalBaseDirs();
+            log.info("Configuring local artifact data store [baseDirs: {}]",
+                     Arrays.asList(baseDirs));
+            return new LocalWarcArtifactDataStore(baseDirs);
+          }
           case "testing":
-            log.info("Configuring testing artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
-            return new TestingLocalWarcArtifactDataStore(repoProps.getLocalBaseDirs());
-
+          {
+            File[] baseDirs = repoProps.getLocalBaseDirs();
+            log.info("Configuring testing artifact data store [baseDirs: {}]",
+                     Arrays.asList(baseDirs));
+            return new TestingLocalWarcArtifactDataStore(baseDirs);
+          }
           default:
             throw new RuntimeException("Shouldn't happen");
         }
