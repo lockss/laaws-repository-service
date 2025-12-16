@@ -1039,7 +1039,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         .when(request()
             .withMethod("GET")
             .withQueryStringParameter("url", "https://www.lockss.org/")
-            .withPath("/utils/normalizeUrl"))
+            .withPath("/utils/normalizeurl"))
         .respond(response()
             .withStatusCode(200)
             .withHeaders(new Header("Content-Type", "application/json"))
