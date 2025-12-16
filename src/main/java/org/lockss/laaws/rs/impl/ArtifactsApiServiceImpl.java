@@ -9,6 +9,7 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.lockss.config.Configuration;
 import org.lockss.laaws.rs.api.ArtifactsApiDelegate;
+import org.lockss.util.rest.repo.model.VersionsEnum;
 import org.lockss.laaws.rs.multipart.LockssMultipartHttpServletRequest;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
@@ -26,7 +27,6 @@ import org.lockss.util.rest.exception.LockssRestHttpException;
 import org.lockss.util.rest.multipart.MultipartResponse;
 import org.lockss.util.rest.repo.LockssArtifactAlreadyExistsException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
-import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.*;
 import org.lockss.util.rest.repo.util.ArtifactCache;
@@ -94,7 +94,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   // that nothing seriously bad happen if they are.
 
   // The artifact iterators used in pagination.
-  private Map<Integer, Iterator<Artifact>> artifactIterators = null;
+  private Map<String, Iterator<Artifact>> artifactIterators = null;
 
   @Autowired
   public ArtifactsApiServiceImpl(HttpServletRequest request) {
@@ -364,7 +364,9 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * @return a {@link ResponseEntity} containing a {@link MultipartResponse}.
    */
   @Override
-  public ResponseEntity getArtifactDataByMultipart(String artifactid, String namespace, String includeContent) {
+  public ResponseEntity getArtifactDataByMultipart(String artifactid,
+                                                   String namespace,
+                                                   IncludeContentEnum includeContent) {
 
     String parsedRequest = String.format(
         "namespace: %s, artifactid: %s, includeContent: %s, requestUrl: %s",
@@ -385,7 +387,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       MultiValueMap<String, Object> parts =
           ArtifactDataUtil.generateMultipartMapFromArtifactData(
               artifactData,
-              LockssRepository.IncludeContent.valueOf(includeContent),
+              includeContent,
               smallContentThreshold);
 
       //// Return multiparts response entity
@@ -427,14 +429,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    */
   @Override
   public ResponseEntity<Resource> getArtifactDataByPayload(String artifactId, String namespace,
-                                                           String includeContentParam) {
-
-    LockssRepository.IncludeContent includeContent =
-        LockssRepository.IncludeContent.valueOf(includeContentParam);
+                                                           IncludeContentEnum includeContentParam) {
 
     String parsedRequest = String.format(
         "namespace: %s, artifactId: %s, includeContent: %s, requestUrl: %s",
-        namespace, artifactId, includeContent, ServiceImplUtil.getFullRequestUrl(request));
+        namespace, artifactId, includeContentParam, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -463,9 +462,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           DateTimeFormatter.ISO_INSTANT
               .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
 
-      if (includeContent == LockssRepository.IncludeContent.ALWAYS ||
-         (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
-             ad.getContentLength() <= smallContentThreshold)) {
+      if (includeContentParam == IncludeContentEnum.ALWAYS ||
+         (includeContentParam == IncludeContentEnum.IF_SMALL && ad.getContentLength() <= smallContentThreshold)) {
 
         respHeaders.set(ArtifactConstants.INCLUDES_CONTENT, "true");
 
@@ -519,14 +517,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    */
   @Override
   public ResponseEntity<Resource> getArtifactDataByResponse(String artifactId, String namespace,
-                                                            String includeContentParam) {
-
-    LockssRepository.IncludeContent includeContent =
-        LockssRepository.IncludeContent.valueOf(includeContentParam);
+                                                            IncludeContentEnum includeContentParam) {
 
     String parsedRequest = String.format(
         "namespace: %s, artifactId: %s, includeContent: %s, requestUrl: %s",
-        namespace, artifactId, includeContent, ServiceImplUtil.getFullRequestUrl(request));
+        namespace, artifactId, includeContentParam, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -536,9 +531,8 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
     try {
       ArtifactData ad = repo.getArtifactData(namespace, artifactId);
 
-      boolean onlyHeaders = includeContent == LockssRepository.IncludeContent.NEVER ||
-          (includeContent == LockssRepository.IncludeContent.IF_SMALL &&
-              ad.getContentLength() > smallContentThreshold);
+      boolean onlyHeaders = (includeContentParam == IncludeContentEnum.NEVER) ||
+          (includeContentParam == IncludeContentEnum.IF_SMALL && ad.getContentLength() > smallContentThreshold);
 
       InputStream httpResponseStream = onlyHeaders ?
             new ByteArrayInputStream(ArtifactDataUtil.getHttpResponseHeader(ad)) :
@@ -601,7 +595,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   public ResponseEntity<ArtifactPageInfo> getArtifactsFromAllAus(String namespace,
                                                                  String url,
                                                                  String urlPrefix,
-                                                                 String versions,
+                                                                 VersionsEnum versions,
                                                                  Integer limit,
                                                                  String continuationToken) {
 
@@ -652,26 +646,25 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       boolean missingIterator = false;
       ArtifactContinuationToken responseAct = null;
 
-      // Get the iterator hash code (if any) used to provide a previous page
+      // Get the iterator ID (if any) used to provide a previous page
       // of results.
-      Integer iteratorHashCode = requestAct.getIteratorHashCode();
+      String iteratorId = requestAct.getIteratorId();
 
       // Check whether this request is for a previous page of results.
-      if (iteratorHashCode != null) {
+      if (iteratorId != null) {
         // Yes: Get the iterator (if any) used to provide a previous page of
         // results.
-        iterator = artifactIterators.remove(iteratorHashCode);
+        iterator = artifactIterators.remove(iteratorId);
         missingIterator = iterator == null;
       }
 
       if (iterator == null) {
         Iterable<Artifact> artifactIterable = null;
-        ArtifactVersions artifactVersions = ArtifactVersions.valueOf(versions.toUpperCase());
 
         if (url != null) {
-          artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, artifactVersions);
+          artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, versions);
         } else if (urlPrefix != null) {
-          artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, artifactVersions);
+          artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, versions);
         }
 
         if (artifactIterable != null) {
@@ -720,15 +713,18 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         // results.
         if (iterator.hasNext()) {
           // Yes: Store it locally.
-          iteratorHashCode = iterator.hashCode();
-          artifactIterators.put(iteratorHashCode, iterator);
+          // Only generate a new UUID if we don't already have one (new iterator)
+          if (iteratorId == null) {
+            iteratorId = UUID.randomUUID().toString();
+          }
+          artifactIterators.put(iteratorId, iterator);
 
           // Create the response continuation token.
           Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
           responseAct = new ArtifactContinuationToken(
               lastArtifact.getNamespace(), lastArtifact.getAuid(),
               lastArtifact.getUri(), lastArtifact.getVersion(),
-              iteratorHashCode);
+              iteratorId);
           log.trace("responseAct = {}", responseAct);
         }
       }

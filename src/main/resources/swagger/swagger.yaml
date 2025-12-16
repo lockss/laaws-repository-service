@@ -30,17 +30,17 @@ openapi: 3.0.3
 info:
   title: LOCKSS Repository Service REST API
   description: REST API of the LOCKSS Repository Service
+  version: 2.0.0
   contact:
     name: LOCKSS Support
-    url: 'https://www.lockss.org/'
+    url: https://www.lockss.org/
     email: lockss-support@lockss.org
   license:
     name: BSD-3-Clause
-    url: 'https://opensource.org/licenses/BSD-3-Clause'
-  version: 2.0.0
+    url: https://opensource.org/licenses/BSD-3-Clause
 servers:
   - url: "{proto}://{hostname}:{port}/"
-    description: The LOCKSS Respository Service
+    description: LOCKSS Respository Service
     variables:
       proto:
         description: "The protocol (default: http)."
@@ -174,11 +174,7 @@ paths:
           in: query
           description: Versions of the artifacts to return
           schema:
-            type: string
-            default: all
-            enum:
-              - all
-              - latest
+            $ref: '#/components/schemas/versionsEnum'
         - name: limit
           in: query
           description: The requested maximum number of artifacts per response
@@ -270,14 +266,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: "Multipart/form-data containing the following parts:
@@ -383,14 +374,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: Artifact's payload
@@ -427,15 +413,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart
-            response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: Artifact's payload
@@ -513,12 +493,10 @@ paths:
             type: string
         - name: op
           in: query
+          description: Bulk AU operation
           required: true
           schema:
-            type: string
-            enum:
-            - start
-            - finish
+            $ref: '#/components/schemas/bulkAuOpEnum'
       responses:
         '200':
           description: Bulk operation succeeded
@@ -732,22 +710,14 @@ paths:
             type: integer
         - name: matchType
           in: query
+          description: Match type
           schema:
-            type: string
-            enum:
-              - exact
-              - prefix
-              - host
-              - domain
-              - range
+            $ref: '#/components/schemas/pywbMatchEnum'
         - name: sort
           in: query
+          description: Sorting behavior
           schema:
-            type: string
-            enum:
-              - default
-              - closest
-              - reverse
+            $ref: '#/components/schemas/pywbSortEnum'
         - name: closest
           in: query
           description: Timestamp for sort=closest mode
@@ -757,10 +727,7 @@ paths:
           in: query
           description: Output format
           schema:
-            type: string
-            enum:
-              - cdx
-              - json
+            $ref: '#/components/schemas/pywbOutputEnum'
         - name: fl
           in: query
           description: Comma-separated list of fields to include in output
@@ -1108,6 +1075,13 @@ components:
           description: Information about the page
           $ref: '#/components/schemas/pageInfo'
           nullable: false
+    bulkAuOpEnum:
+      title: Bulk AU Operation
+      description: Versions of the artifacts to return
+      type: string
+      enum:
+        - start
+        - finish
     errorResult:
       type: object
       required:
@@ -1145,6 +1119,15 @@ components:
             - EXCLUDED
         statusMessage:
           type: string
+    includeContentEnum:
+      title: Include Content
+      description: Whether to include the artifact content part in a multipart response
+      type: string
+      default: ALWAYS
+      enum:
+        - NEVER
+        - IF_SMALL
+        - ALWAYS
     pageInfo:
       title: Page Information
       description: The information related to pagination of content
@@ -1183,6 +1166,32 @@ components:
           description: The link of the next request
           type: string
           nullable: true
+    pywbMatchEnum:
+      title: Match Type
+      description: Match type in Pywb CDX queries
+      type: string
+      enum:
+        - exact
+        - prefix
+        - host
+        - domain
+        - range
+    pywbOutputEnum:
+      title: Output Format
+      description: Output format in Pywb CDX queries
+      type: string
+      default: cdx
+      enum:
+        - cdx
+        - json
+    pywbSortEnum:
+      title: Sort
+      description: Sorting behavior in Pywb CDX queries
+      type: string
+      enum:
+        - default
+        - closest
+        - reverse
     streamingResponseBody:
       type: object
     repositoryInfo:
@@ -1282,6 +1291,14 @@ components:
           description: Percentage of the storage area used, formatted as a string
           type: string
           nullable: true
+    versionsEnum:
+      title: Versions
+      description: Versions of the artifacts to return
+      type: string
+      default: latest
+      enum:
+        - all
+        - latest
   securitySchemes:
     basicAuth:
       type: http

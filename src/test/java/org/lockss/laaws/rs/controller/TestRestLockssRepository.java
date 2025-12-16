@@ -591,11 +591,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     RestEndpointCall getArtifactsFromAllAus = (Credentials credentials) -> {
       String namespace = null;
       String prefix = "https://www.lockss.org/";
-      ArtifactVersions versions = ArtifactVersions.ALL;
+      VersionsEnum versions = VersionsEnum.ALL;
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("urlPrefix", prefix);
-      queryParams.put("versions", String.valueOf(versions));
+      queryParams.put("versions", versions.toString());
 
       if (namespace != null) {
         queryParams.put("namespace", namespace);
@@ -636,7 +636,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       // Transform ArtifactData into multiparts
       MultiValueMap<String, Object> parts =
-          ArtifactDataUtil.generateMultipartMapFromArtifactData(ad, LockssRepository.IncludeContent.ALWAYS, 0);
+          ArtifactDataUtil.generateMultipartMapFromArtifactData(ad, IncludeContentEnum.ALWAYS, 0);
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -668,7 +668,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     RestEndpointCall getArtifactDataByMultipart = (Credentials credentials) -> {
       String namespace = "test";
       String artifactUuid = "test";
-      LockssRepository.IncludeContent includeContent = LockssRepository.IncludeContent.ALWAYS;
+      IncludeContentEnum includeContent = IncludeContentEnum.ALWAYS;
 
       URI endpointUri = artifactByUuidEndpoint(namespace, artifactUuid, includeContent);
 
@@ -762,7 +762,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     RestEndpointCall getArtifactDataByPayload = (Credentials credentials) -> {
       String namespace = "test";
       String artifactUuid = "test";
-      LockssRepository.IncludeContent includeContent = LockssRepository.IncludeContent.ALWAYS;
+      IncludeContentEnum includeContent = IncludeContentEnum.ALWAYS;
 
       URI endpointUri =
           artifactDataEndpointUri(namespace, artifactUuid, "payload", includeContent);
@@ -793,7 +793,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     RestEndpointCall getArtifactDataByResponse = (Credentials credentials) -> {
       String namespace = "test";
       String artifactUuid = "test";
-      LockssRepository.IncludeContent includeContent = LockssRepository.IncludeContent.ALWAYS;
+      IncludeContentEnum includeContent = IncludeContentEnum.ALWAYS;
 
       URI endpointUri =
           artifactDataEndpointUri(namespace, artifactUuid, "response", includeContent);
@@ -857,7 +857,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     RestEndpointCall handleBulkAuOp = (Credentials credentials) -> {
       String namespace = "test";
       String auid = "test";
-      String op = "start";
+      BulkAuOpEnum op = BulkAuOpEnum.START;
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -866,7 +866,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("namespace", namespace);
-      queryParams.put("op", op);
+      queryParams.put("op", op.toString());
 
       Map<String, String> uriParams = new HashMap<>();
       uriParams.put("auid", auid);
@@ -1208,7 +1208,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   private URI artifactDataEndpointUri(String namespace, String artifactUuid, String responseDataType,
-                                      LockssRepository.IncludeContent includeContent) {
+                                      IncludeContentEnum includeContent) {
     Map<String, String> uriParams = new HashMap<>();
     Map<String, String> queryParams = new HashMap<>();
 
@@ -1230,7 +1230,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   private URI artifactByUuidEndpoint(String namespace,
-                                     String artifactUuid, LockssRepository.IncludeContent includeContent) {
+                                     String artifactUuid, IncludeContentEnum includeContent) {
     Map<String, String> uriParams = new HashMap<>();
     uriParams.put("uuid", artifactUuid);
 
@@ -1986,7 +1986,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertEquals(SIM_TIME, ad2.getStoreDate());
   }
 
-  /** Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}. */
+  /** Test for {@link RestLockssRepository#getArtifactData(Artifact, IncludeContentEnum)}. */
   @Test
   public void testConditionalContent() throws IOException {
     runTestConditionalContent(false);
@@ -2035,33 +2035,33 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     spec_large.setCommitted(true);
     spec_larger.setCommitted(true);
 
-    assertReceivesNoContent(art_small_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_small_c, IncludeContentEnum.NEVER);
+    assertReceivesContent(art_small_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_small_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_large_c, IncludeContentEnum.NEVER);
+    assertReceivesNoContent(art_large_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_large_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_larger_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.NEVER);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_larger_c, IncludeContentEnum.ALWAYS);
 
     // Set the threshold to something larger
     ConfigurationUtil.addFromArgs(ArtifactsApiServiceImpl.PARAM_SMALL_CONTENT_THRESHOLD,
         "" + (len_large + len_larger) / 2);
 
-    assertReceivesNoContent(art_small_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_small_c, IncludeContentEnum.NEVER);
+    assertReceivesContent(art_small_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_small_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_large_c, IncludeContentEnum.NEVER);
+    assertReceivesContent(art_large_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_large_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_larger_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.NEVER);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_larger_c, IncludeContentEnum.ALWAYS);
   }
 
   // Ensure artifact names can be arbitrary strings (not nec. URL).
@@ -2097,7 +2097,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   /**
    * Assert that the repo supplies content with the ArtifactData
    */
-  void assertReceivesContent(Artifact art, LockssRepository.IncludeContent ic)
+  void assertReceivesContent(Artifact art, IncludeContentEnum ic)
       throws IOException {
     ArtifactData ad = repoClient.getArtifactData(art, ic);
     assertTrue(ad.hasContentInputStream());
@@ -2106,7 +2106,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   /**
    * Assert that the repo does not supply content with the ArtifactData
    */
-  void assertReceivesNoContent(Artifact art, LockssRepository.IncludeContent ic)
+  void assertReceivesNoContent(Artifact art, IncludeContentEnum ic)
       throws IOException {
     ArtifactData ad = repoClient.getArtifactData(art, ic);
     assertFalse(ad.hasContentInputStream());
@@ -2180,7 +2180,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
-  /** Test for {@link RestLockssRepository#getArtifactDataByPayload(Artifact, LockssRepository.IncludeContent)}. */
+  /** Test for {@link RestLockssRepository#getArtifactDataByPayload(Artifact, IncludeContentEnum)}. */
   @Test
   public void testGetArtifactDataByPayload() throws Exception {
     // Resource backed artifact
@@ -2190,8 +2190,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(resourceSpec);
 
-    assertArtifactDataFromPayload(resourceSpec, LockssRepository.IncludeContent.NEVER);
-    assertArtifactDataFromPayload(resourceSpec, LockssRepository.IncludeContent.ALWAYS);
+    assertArtifactDataFromPayload(resourceSpec, IncludeContentEnum.NEVER);
+    assertArtifactDataFromPayload(resourceSpec, IncludeContentEnum.ALWAYS);
 
     // Test IF_SMALL behavior with resource artifacts
     ArtifactSpec resourceSpecUnderThreshold = new ArtifactSpec()
@@ -2208,8 +2208,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(resourceSpecOverThreshold);
 
-    assertArtifactDataFromPayload(resourceSpecUnderThreshold, LockssRepository.IncludeContent.IF_SMALL);
-    assertArtifactDataFromPayload(resourceSpecOverThreshold, LockssRepository.IncludeContent.IF_SMALL);
+    assertArtifactDataFromPayload(resourceSpecUnderThreshold, IncludeContentEnum.IF_SMALL);
+    assertArtifactDataFromPayload(resourceSpecOverThreshold, IncludeContentEnum.IF_SMALL);
 
     // Test response artifact
     ArtifactSpec responseSpec = new ArtifactSpec()
@@ -2218,8 +2218,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(responseSpec);
 
-    assertArtifactDataFromPayload(responseSpec, LockssRepository.IncludeContent.NEVER);
-    assertArtifactDataFromPayload(responseSpec, LockssRepository.IncludeContent.ALWAYS);
+    assertArtifactDataFromPayload(responseSpec, IncludeContentEnum.NEVER);
+    assertArtifactDataFromPayload(responseSpec, IncludeContentEnum.ALWAYS);
 
     // Test IF_SMALL behavior with response artifacts
     ArtifactSpec responseSpecUnderThreshold = new ArtifactSpec()
@@ -2236,12 +2236,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(responseSpecOverThreshold);
 
-    assertArtifactDataFromPayload(responseSpecUnderThreshold, LockssRepository.IncludeContent.IF_SMALL);
-    assertArtifactDataFromPayload(responseSpecOverThreshold, LockssRepository.IncludeContent.IF_SMALL);
+    assertArtifactDataFromPayload(responseSpecUnderThreshold, IncludeContentEnum.IF_SMALL);
+    assertArtifactDataFromPayload(responseSpecOverThreshold, IncludeContentEnum.IF_SMALL);
   }
 
   public void assertArtifactDataFromPayload(ArtifactSpec spec,
-                                            LockssRepository.IncludeContent includeContent) throws Exception {
+                                            IncludeContentEnum includeContent) throws Exception {
 
     ArtifactData ad = repoClient.getArtifactDataByPayload(
         spec.getArtifact(), includeContent);
@@ -2269,9 +2269,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       Assertions.assertEquals(spec.getStorageUrl(), ad.getStorageUrl());
     }
 
-    boolean expectContent = includeContent == LockssRepository.IncludeContent.ALWAYS ||
+    boolean expectContent = includeContent == IncludeContentEnum.ALWAYS ||
         (spec.getContentLength() <= ArtifactsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD &&
-            includeContent == LockssRepository.IncludeContent.IF_SMALL);
+            includeContent == IncludeContentEnum.IF_SMALL);
 
     if (expectContent) {
       new LockssTestCase5().assertSameBytes(
@@ -2831,24 +2831,24 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, VersionsEnum.ALL));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, VersionsEnum.ALL));
 
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, VersionsEnum.LATEST));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, VersionsEnum.LATEST));
 
     // Non-existent namespace or url
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.ALL));
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, ArtifactVersions.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, VersionsEnum.ALL));
 
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.LATEST));
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, ArtifactVersions.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, VersionsEnum.LATEST));
 
     // For each distinct URL in the specs, ask the repo for all artifacts
     // with that URL, check against the specs (sorted by (uri, auid,
@@ -2862,7 +2862,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
               .filter(spec -> spec.getUrl().equals(urlSpec.getUrl()))
               .filter(spec -> spec.getNamespace().equals(urlSpec.getNamespace())),
           repoClient.getArtifactsWithUrlFromAllAus(urlSpec.getNamespace(),
-              urlSpec.getUrl(), ArtifactVersions.ALL));
+              urlSpec.getUrl(), VersionsEnum.ALL));
 
       ArtifactSpec.assertArtList(repoClient,
           committedSpecStream()
@@ -2883,7 +2883,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                       .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
               ),
           repoClient.getArtifactsWithUrlFromAllAus(urlSpec.getNamespace(),
-              urlSpec.getUrl(), ArtifactVersions.LATEST));
+              urlSpec.getUrl(), VersionsEnum.LATEST));
     }
   }
 
@@ -2891,25 +2891,25 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, VersionsEnum.ALL));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, VersionsEnum.ALL));
 
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, VersionsEnum.LATEST));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, VersionsEnum.LATEST));
 
     // Non-existent namespace or url
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.ALL));
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, ArtifactVersions.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, VersionsEnum.ALL));
 
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.LATEST));
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, ArtifactVersions.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, VersionsEnum.LATEST));
 
     // Get all the Artifacts beginning with URL_PREFIX, check agains the specs
     // (sorted by (uri, auid, version), to match ...AllAus())
@@ -2918,7 +2918,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
             .filter(spec -> spec.getUrl().startsWith(URL_PREFIX))
             .filter(spec -> spec.getNamespace().equals(NS1)),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, ArtifactVersions.ALL));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, VersionsEnum.ALL));
 
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
@@ -2938,14 +2938,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                     .thenComparing(ArtifactSpec::getAuid)
                     .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
             ),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, ArtifactVersions.LATEST));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, VersionsEnum.LATEST));
 
     // Same with empty prefix
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
             .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
             .filter(spec -> spec.getNamespace().equals(NS1)),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", ArtifactVersions.ALL));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.ALL));
 
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
@@ -2964,7 +2964,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                     .thenComparing(ArtifactSpec::getAuid)
                     .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
             ),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", ArtifactVersions.LATEST));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.LATEST));
   }
 
   public void testGetAuIds() throws IOException {
