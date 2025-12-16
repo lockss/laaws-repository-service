@@ -590,7 +590,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     for (int i = 0; i < 4; i++) {
       String url = "www.url" + (i + 1) + ".example.com";
       mockServer.expect(
-              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeUrl?url=" + url))
+              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=" + url))
           .andRespond(
               MockRestResponseCreators.withSuccess(
                   "[\"" + url + "\"]",
@@ -722,7 +722,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Setup mock for the next REST calls
     mockServer.reset();
     mockServer.expect(
-            requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeUrl?url=www."))
+            requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=www."))
         .andRespond(
             MockRestResponseCreators.withSuccess(
                 "[\"www.\"]",
@@ -768,7 +768,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     mockServer.reset();
     for (int i = 0; i < 7; i++) {
       mockServer.expect(
-              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeUrl?url=" + url))
+              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=" + url))
           .andRespond(
               MockRestResponseCreators.withSuccess(
                   "[\"" + url + "\"]",
