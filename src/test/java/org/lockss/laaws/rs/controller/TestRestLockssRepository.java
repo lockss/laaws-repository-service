@@ -1933,6 +1933,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testAllNoSideEffect() throws Exception {
     testGetArtifact();
     testGetArtifactData();
@@ -2112,6 +2113,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertFalse(ad.hasContentInputStream());
   }
 
+  @Test
   public void testGetArtifact() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2140,6 +2142,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /** Test for {@link RestLockssRepository#getArtifactData(Artifact)}. */
+  @Test
   public void testGetArtifactData() throws Exception {
     runTestGetArtifactData(false);
     runTestGetArtifactData(true);
@@ -2281,6 +2284,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetArtifactVersion() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2367,6 +2371,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testAuSize() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2407,6 +2412,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testCommitArtifact() throws IOException {
     // Illegal args
     assertThrows(IllegalArgumentException.class,
@@ -2447,6 +2453,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testDeleteArtifact() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2570,6 +2577,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testDeleteAllArtifacts() throws IOException {
     // TK Delete committed & uncommitted arts & check results each time
     // delete twice
@@ -2612,6 +2620,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetAllArtifacts() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2688,6 +2697,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     log.debug("Iter returned {} artifacts", n);
   }
 
+  @Test
   public void testGetAllArtifactsWithPrefix() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2724,6 +2734,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetAllArtifactsAllVersions() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2762,6 +2773,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetAllArtifactsWithPrefixAllVersions() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2797,6 +2809,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetArtifactAllVersions() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2827,6 +2840,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetArtifactsWithUrlFromAllAus() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2887,6 +2901,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetArtifactsWithUrlPrefixFromAllAus() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -2967,6 +2982,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.LATEST));
   }
 
+  @Test
   public void testGetAuIds() throws IOException {
     // Non-existent namespace
     assertEmpty(repoClient.getAuIds(NO_NAMESPACE));
@@ -2989,6 +3005,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  @Test
   public void testGetNamespaces() throws IOException {
     Iterator<String> expColl =
         orderedAllCommitted()
