@@ -167,10 +167,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
-        Artifact result = repoClient.getArtifact("ns1", "auid1", "url1");
+	assertThrowsMatch(LockssRestHttpException.class,
+                          "400",
+                          () -> repoClient.getArtifact("ns1", "auid1", "url1"));
         mockServer.verify();
-
-        assertNull(result);
     }
 
     @Test
@@ -226,10 +226,10 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withServerError());
 
-        Artifact result = repoClient.getArtifact("ns1", "auid1", "url1");
+	assertThrowsMatch(LockssRestHttpException.class,
+		      "500",
+                          () -> repoClient.getArtifact("ns1", "auid1", "url1"));
         mockServer.verify();
-
-        assertNull(result);
     }
 
     @Test
