@@ -31,6 +31,7 @@
 package org.lockss.laaws.rs.configuration;
 
 import org.lockss.app.LockssDaemon;
+import org.lockss.config.ConfigManager;
 import org.lockss.daemon.LockssThread;
 import org.lockss.jms.JMSManager;
 import org.lockss.log.L4JLogger;
@@ -47,6 +48,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 
 import java.io.File;
 import java.io.IOException;
@@ -58,12 +60,19 @@ import java.io.IOException;
 public class LockssRepositoryConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
+  /**
+   * Rules for causing specified repository operation to return errors.
+   */
+  public final static String PARAM_ERROR_INJECTION_SPEC =
+    "org.lockss.repo.errorInjectionSpec";
+
   private static final String ARG_START_REINDEX = "--start-reindex";
 
   private final RepositoryServiceProperties repoProps;
   private final ArtifactIndexVersion lastRecordedIndexVersion;
   private final ArtifactDataStoreVersion lastRecordedDatastoreVersion;
   private final ApplicationArguments appArgs;
+  private BaseLockssRepository repo;
   private ArtifactDataStore store;
   private ArtifactIndex index;
 
@@ -91,7 +100,7 @@ public class LockssRepositoryConfig {
    */
   @Bean
   public BaseLockssRepository lockssRepository() throws IOException {
-    BaseLockssRepository repo = createLockssRepository();
+    repo = createLockssRepository();
 
     // Initialize the repository in a separate thread
     LockssThread.of("Init Repository", () -> {
@@ -242,5 +251,28 @@ public class LockssRepositoryConfig {
     }
 
     return null;
+  }
+
+  // Register config callback once ConfigManager has been created.
+  @EventListener
+  public void configMgrCreated(ConfigManager.ConfigManagerCreatedEvent event) {
+    log.debug2("ConfigManagerCreatedEvent triggered");
+    ConfigManager.getConfigManager()
+        .registerConfigurationCallback(new LockssRepositoryConfigCallback());
+  }
+
+  private class LockssRepositoryConfigCallback
+    implements org.lockss.config.Configuration.Callback {
+
+    public void configurationChanged(org.lockss.config.Configuration newConfig,
+                                     org.lockss.config.Configuration oldConfig,
+                                     org.lockss.config.Configuration.Differences changedKeys) {
+
+      if (changedKeys.contains(PARAM_ERROR_INJECTION_SPEC)) {
+        if (repo != null) {
+          repo.setErrorInjectionRulesFromSpecs(newConfig.get(PARAM_ERROR_INJECTION_SPEC, null));
+        }
+      }
+    }
   }
 }
