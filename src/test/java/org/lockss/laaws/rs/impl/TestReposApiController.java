@@ -352,7 +352,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //              .build().toUri();
 
       URI endpointUri =
-          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          new URI("/artifacts?auid=" + UrlUtil.encodeUrl(auId) + "&namespace="+UrlUtil.encodeUrl(namespace)+
               "&version" +
               "=all&limit=9");
 
@@ -467,7 +467,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //              .queryParam("limit", 2)
 //              .build().toUri();
 
-      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+      URI endpointUri = new URI("/artifacts?auid=" + UrlUtil.encodeUrl(auId) + "&namespace="+UrlUtil.encodeUrl(namespace)+
           "&version=all&limit=2");
 
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
@@ -625,7 +625,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //              .buildAndExpand(uriVars).toUri();
 
       URI endpointUri =
-          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          new URI("/artifacts?auid=" + UrlUtil.encodeUrl(auId) + "&namespace="+UrlUtil.encodeUrl(namespace)+
               "&version" +
               "=all&limit=2"
               + "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));

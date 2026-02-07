@@ -900,14 +900,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("namespace", namespace);
+      queryParams.put("auid", auid);
       queryParams.put("version", "latest");
-
-      Map<String, String> uriParams = new HashMap<>();
-      uriParams.put("auid", auid);
 
       // Build REST endpoint
       URI endpointUri =
-          RestUtil.getRestUri("http://localhost:" + port + "/aus/{auid}/artifacts", uriParams, queryParams);
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -937,13 +935,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("namespace", namespace);
-
-      Map<String, String> uriParams = new HashMap<>();
-      uriParams.put("auid", auid);
+      queryParams.put("auid", auid);
 
       // Build REST endpoint
       URI endpointUri =
-          RestUtil.getRestUri("http://localhost:" + port + "/aus/{auid}/artifacts", uriParams, queryParams);
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
 
       // Initialize the request to the REST service.
       RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);

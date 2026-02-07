@@ -150,8 +150,11 @@ paths:
     get:
       tags:
         - artifacts
-      summary: Returns all artifacts that match a given a URL or URL prefix and/or version.
-      operationId: getArtifactsFromAllAus
+      summary: Get artifacts in the repository
+      description: Get a list of all artifacts in a namespace, optionally filtered by
+        Archival Unit, URL, URL prefix, and/or version. Returns a pageful of results
+        defined by the continuation token and size.
+      operationId: getArtifacts
       # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
@@ -160,6 +163,11 @@ paths:
           schema:
             type: string
             default: lockss
+        - name: auid
+          in: query
+          description: Identifier of the Archival Unit containing the artifacts
+          schema:
+            type: string
         - name: url
           in: query
           description: The URL contained by the artifacts
@@ -170,11 +178,16 @@ paths:
           description: The prefix to be matched by the artifact URLs
           schema:
             type: string
-        - name: versions
+        - name: version
           in: query
-          description: Versions of the artifacts to return
+          description: The version of the artifacts to return ('all' for all versions, 'latest' for the latest version, or a specific positive integer version number)
           schema:
-            $ref: '#/components/schemas/versionsEnum'
+            type: string
+        - name: includeUncommitted
+          in: query
+          description: Indication of whether uncommitted artifacts should be returned
+          schema:
+            type: boolean
         - name: limit
           in: query
           description: The requested maximum number of artifacts per response
@@ -501,71 +514,6 @@ paths:
         '200':
           description: Bulk operation succeeded
           content: { }
-        default:
-          description: The resulting error payload.
-          content:
-            application/json:
-              schema:
-                type: object
-  /aus/{auid}/artifacts:
-    get:
-      tags:
-        - artifacts
-      summary: Get artifacts in an Archival Unit
-      description: Get a list of all artifacts in a namespace and Archival Unit or
-        a pageful of the list defined by the continuation token and size
-      operationId: getArtifacts
-      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
-      parameters:
-        - name: namespace
-          in: query
-          description: Namespace of the artifacts
-          schema:
-            type: string
-            default: lockss
-        - name: auid
-          in: path
-          description: Identifier of the Archival Unit containing the artifacts
-          required: true
-          schema:
-            type: string
-        - name: url
-          in: query
-          description: The URL contained by the artifacts
-          schema:
-            type: string
-        - name: urlPrefix
-          in: query
-          description: The prefix to be matched by the artifact URLs
-          schema:
-            type: string
-        - name: version
-          in: query
-          description: The version of the artifact
-          schema:
-            type: string
-        - name: includeUncommitted
-          in: query
-          description: Indication of whether uncommitted artifacts should be returned
-          schema:
-            type: boolean
-        - name: limit
-          in: query
-          description: The requested maximum number of artifacts per response
-          schema:
-            type: integer
-        - name: continuationToken
-          in: query
-          description: The continuation token of the next page of artifacts to be returned
-          schema:
-            type: string
-      responses:
-        '200':
-          description: The requested artifacts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/artifactPageInfo'
         default:
           description: The resulting error payload.
           content:

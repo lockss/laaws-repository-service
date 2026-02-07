@@ -161,7 +161,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifact_400() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -175,7 +175,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifact_404() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -189,7 +189,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifact_empty() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -203,7 +203,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifact_found() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -220,7 +220,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifact_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -625,7 +625,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifacts_400() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -639,7 +639,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifacts_404() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -654,7 +654,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifacts_empty() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -669,7 +669,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifacts_found() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -689,7 +689,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifacts_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=latest");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=latest");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -703,7 +703,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsAllVersions_400() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -717,7 +717,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsAllVersions_404() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -731,7 +731,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsAllVersions_empty() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -746,7 +746,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsAllVersions_found() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -766,7 +766,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsAllVersions_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -780,7 +780,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefix_400() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -794,7 +794,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefix_404() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -809,7 +809,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefix_empty() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -824,7 +824,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefix_found() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -844,7 +844,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefix_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -858,7 +858,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefixAllVersions_400() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -872,7 +872,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefixAllVersions_404() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -887,7 +887,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefixAllVersions_empty() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -902,7 +902,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefixAllVersions_found() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -922,7 +922,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetAllArtifactsWithPrefixAllVersions_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&version=all&urlPrefix=url1");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&version=all&urlPrefix=url1");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -936,7 +936,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactAllVersions_400() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -950,7 +950,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactAllVersions_404() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -965,7 +965,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactAllVersions_empty() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -979,7 +979,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactAllVersions_found() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -999,7 +999,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactAllVersions_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=all");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=all");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -1042,7 +1042,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactVersion_400() throws Exception {
-        URI uri = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=123");
+        URI uri = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=123");
 
         mockServer
             .expect(uriRequestTo(uri))
@@ -1060,7 +1060,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactVersion_404() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=123");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=123");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -1074,7 +1074,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactVersion_empty() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=123");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=123");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -1088,7 +1088,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactVersion_found() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=123");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=123");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))
@@ -1105,7 +1105,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
 
     @Test
     public void testGetArtifactVersion_failure() throws Exception {
-        URI endpoint = new URI(BASEURL + "/aus/auid1/artifacts?namespace=ns1&url=url1&version=123");
+        URI endpoint = new URI(BASEURL + "/artifacts?auid=auid1&namespace=ns1&url=url1&version=123");
 
         mockServer.expect(uriRequestTo(endpoint))
                 .andExpect(method(HttpMethod.GET))

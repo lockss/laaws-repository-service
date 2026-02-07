@@ -465,7 +465,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert invalid paging limit results in a 400
     URL endpoint1 =
-        new URL(String.format("http://localhost:%d/aus/auid/artifacts?limit=-1&namespace=namespace1", port));
+        new URL(String.format("http://localhost:%d/artifacts?auid=auid&limit=-1&namespace=namespace1", port));
 
     HttpUriRequest request1 = new HttpGet(endpoint1.toURI());
 
@@ -476,7 +476,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad Request if invalid continuation token
     URL endpoint2 =
-        new URL(String.format("http://localhost:%d/aus/auid/artifacts?continuationToken=test&namespace=namespace1",
+        new URL(String.format("http://localhost:%d/artifacts?auid=auid&continuationToken=test&namespace=namespace1",
             port));
 
     HttpUriRequest request2 = new HttpGet(endpoint2.toURI());
@@ -488,7 +488,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if urlPrefix and url provided (should be mutually exclusive)
     URL endpoint3 =
-        new URL(String.format("http://localhost:%d/aus/auid/artifacts?urlPrefix=a&url=b&namespace=namespace1", port));
+        new URL(String.format("http://localhost:%d/artifacts?auid=auid&urlPrefix=a&url=b&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request3 = new HttpGet(endpoint3.toURI());
@@ -501,7 +501,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if version specified without url or urlPrefix
     URL endpoint4 =
-        new URL(String.format("http://localhost:%d/aus/auid/artifacts?version=1&namespace=namespace1", port));
+        new URL(String.format("http://localhost:%d/artifacts?auid=auid&version=1&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request4 = new HttpGet(endpoint4.toURI());
@@ -514,7 +514,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if includeCommitted without url or urlPrefix
     URL endpoint5 = new URL(String.format(
-        "http://localhost:%d/aus/auid/artifacts?includeUncommitted=true&namespace=namespace1", port));
+        "http://localhost:%d/artifacts?auid=auid&includeUncommitted=true&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request5 = new HttpGet(endpoint5.toURI());
@@ -527,7 +527,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if negative version number
     URL endpoint6 = new URL(String.format(
-        "http://localhost:%d/aus/auid/artifacts?version=-1&url=test&namespace=namespace1", port));
+        "http://localhost:%d/artifacts?auid=auid&version=-1&url=test&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request6 = new HttpGet(endpoint6.toURI());
@@ -540,7 +540,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 400 Bad request if invalid version number
     URL endpoint7 = new URL(String.format(
-        "http://localhost:%d/aus/auid/artifacts?version=NaN&url=test&namespace=namespace1", port));
+        "http://localhost:%d/artifacts?auid=auid&version=NaN&url=test&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request7 = new HttpGet(endpoint7.toURI());
@@ -553,7 +553,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert invalid namespace
 //     URL endpoint8 = new URL(String.format(
-//         "http://localhost:%d/aus/auid/artifacts?namespace=namespace1", port));
+//         "http://localhost:%d/artifacts?auid=auid&namespace=namespace1", port));
 
 //     // Create a GET request
 //     HttpUriRequest request8 = new HttpGet(endpoint8.toURI());
@@ -593,7 +593,7 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
 
     //// Assert 500 Internal Server Error if IOException is thrown
     URL endpoint9 = new URL(String.format(
-        "http://localhost:%d/aus/auid/artifacts?version=all&namespace=namespace1", port));
+        "http://localhost:%d/artifacts?auid=auid&version=all&namespace=namespace1", port));
 
     // Create a GET request
     HttpUriRequest request9 = new HttpGet(endpoint9.toURI());

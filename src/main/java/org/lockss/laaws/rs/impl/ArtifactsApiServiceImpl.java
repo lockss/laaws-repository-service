@@ -577,13 +577,19 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
   }
 
   /**
-   * GET /artifacts: Returns the committed artifacts of all versions
-   * of a given URL, from a specified namespace.
+   * GET /artifacts:
+   * Get a list of all artifacts in a namespace, optionally filtered by Archival Unit,
+   * URL, URL prefix, and/or version.
    *
    * @param namespace          A String with the namespace of the artifact.
+   * @param auid               A String with the Archival Unit ID (AUID) of artifact.
    * @param url                A String with the URL contained by the artifacts.
    * @param urlPrefix          A String with the prefix to be matched by the
    *                           artifact URLs.
+   * @param version            A String with the version of the URL contained
+   *                           by the artifacts ('all', 'latest', or a specific number).
+   * @param includeUncommitted A Boolean with the indication of whether
+   *                           uncommitted artifacts should be returned.
    * @param limit              An Integer with the maximum number of artifacts
    *                           to be returned.
    * @param continuationToken  A String with the continuation token of the next
@@ -592,16 +598,20 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
    * artifacts.
    */
   @Override
-  public ResponseEntity<ArtifactPageInfo> getArtifactsFromAllAus(String namespace,
-                                                                 String url,
-                                                                 String urlPrefix,
-                                                                 VersionsEnum versions,
-                                                                 Integer limit,
-                                                                 String continuationToken) {
+  public ResponseEntity<ArtifactPageInfo> getArtifacts(String namespace,
+                                                       String auid,
+                                                       String url,
+                                                       String urlPrefix,
+                                                       String version,
+                                                       Boolean includeUncommitted,
+                                                       Integer limit,
+                                                       String continuationToken) {
 
     String parsedRequest = String.format(
-        "namespace: %s, url: %s, urlPrefix: %s, requestUrl: %s",
-        namespace, url, urlPrefix, ServiceImplUtil.getFullRequestUrl(request));
+        "namespace: %s, auid: %s, url: %s, urlPrefix: %s, version: %s, "
+            + "includeUncommitted: %s, limit: %s, continuationToken: %s, requestUrl: %s",
+        namespace, auid, url, urlPrefix, version, includeUncommitted, limit,
+        continuationToken, ServiceImplUtil.getFullRequestUrl(request));
 
     log.debug2("Parsed request: {}", parsedRequest);
 
@@ -641,183 +651,549 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             errorMessage, parsedRequest);
       }
 
-      List<Artifact> artifacts = new ArrayList<>();
-      Iterator<Artifact> iterator = null;
-      boolean missingIterator = false;
-      ArtifactContinuationToken responseAct = null;
-
-      // Get the iterator ID (if any) used to provide a previous page
-      // of results.
-      String iteratorId = requestAct.getIteratorId();
-
-      // Check whether this request is for a previous page of results.
-      if (iteratorId != null) {
-        // Yes: Get the iterator (if any) used to provide a previous page of
-        // results.
-        iterator = artifactIterators.remove(iteratorId);
-        missingIterator = iterator == null;
+      // Check if auid is provided - determines whether to search within an AU or across all AUs
+      if (auid != null) {
+        // Search within a specific AU - use the full version handling logic
+        return getArtifactsInAu(namespace, auid, url, urlPrefix, version,
+            includeUncommitted, limit, requestLimit, requestAct, parsedRequest);
+      } else {
+        // Search across all AUs - requires url or urlPrefix
+        return getArtifactsFromAllAus(namespace, url, urlPrefix, version,
+            limit, requestLimit, requestAct, parsedRequest);
       }
-
-      if (iterator == null) {
-        Iterable<Artifact> artifactIterable = null;
-
-        if (url != null) {
-          artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, versions);
-        } else if (urlPrefix != null) {
-          artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, versions);
-        }
-
-        if (artifactIterable != null) {
-          // Yes: Get the iterator pointing to the first page of results.
-          iterator = artifactIterable.iterator();
-
-          // Check whether the artifacts provided in a previous response need to
-          // be skipped.
-          if (missingIterator) {
-            // Yes: Initialize an artifact with properties from the last one
-            // already returned in the previous page of results.
-            Artifact lastArtifact = new Artifact();
-            lastArtifact.setNamespace(requestAct.getNamespace());
-            lastArtifact.setAuid(requestAct.getAuid());
-            lastArtifact.setUri(requestAct.getUri());
-            lastArtifact.setVersion(requestAct.getVersion());
-
-            // Loop through the artifacts skipping those already returned
-            // through a previous response.
-            long skipStarted = TimeBase.nowMs();
-            while (iterator.hasNext()) {
-              Artifact artifact = iterator.next();
-
-              // Check whether this artifact comes after the last one returned
-              // on the previous response for this operation.
-              if (ArtifactComparators.BY_URI_BY_DECREASING_VERSION
-                  .compare(artifact, lastArtifact) > 0) {
-                // Yes: Add this artifact to the results.
-                artifacts.add(artifact);
-
-                // Add the rest of the artifacts to the results for this
-                // response separately.
-                break;
-              }
-            }
-            repo.incTimeSpentReiterating(TimeBase.msSince(skipStarted));
-          }
-        }
-      }
-
-      if (iterator != null) {
-        // Populate the rest of the results for this response.
-        populateArtifacts(iterator, limit, artifacts);
-
-        // Check whether the iterator may be used in the future to provide more
-        // results.
-        if (iterator.hasNext()) {
-          // Yes: Store it locally.
-          // Only generate a new UUID if we don't already have one (new iterator)
-          if (iteratorId == null) {
-            iteratorId = UUID.randomUUID().toString();
-          }
-          artifactIterators.put(iteratorId, iterator);
-
-          // Create the response continuation token.
-          Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
-          responseAct = new ArtifactContinuationToken(
-              lastArtifact.getNamespace(), lastArtifact.getAuid(),
-              lastArtifact.getUri(), lastArtifact.getVersion(),
-              iteratorId);
-          log.trace("responseAct = {}", responseAct);
-        }
-      }
-
-      log.trace("artifacts.size() = {}", artifacts.size());
-
-      PageInfo pageInfo = new PageInfo();
-      pageInfo.setItemsInPage(artifacts.size());
-
-      // Get the current link.
-      StringBuffer curLinkBuffer = request.getRequestURL();
-
-      if (request.getQueryString() != null
-          && !request.getQueryString().trim().isEmpty()) {
-        curLinkBuffer.append("?").append(request.getQueryString());
-      }
-
-      String curLink = curLinkBuffer.toString();
-      log.trace("curLink = {}", curLink);
-
-      pageInfo.setCurLink(curLink);
-
-      // Check whether there is a response continuation token.
-      if (responseAct != null) {
-        // Yes.
-        continuationToken = responseAct.toWebResponseContinuationToken();
-        pageInfo.setContinuationToken(continuationToken);
-
-        // Start building the next link.
-        StringBuffer nextLinkBuffer = request.getRequestURL();
-        boolean hasQueryParameters = false;
-
-        if (curLink.indexOf("limit=") > 0) {
-          nextLinkBuffer.append("?limit=").append(requestLimit);
-          hasQueryParameters = true;
-        }
-
-        if (url != null) {
-          if (!hasQueryParameters) {
-            nextLinkBuffer.append("?");
-            hasQueryParameters = true;
-          } else {
-            nextLinkBuffer.append("&");
-          }
-
-          nextLinkBuffer.append("url=").append(UrlUtil.encodeUrl(url));
-        }
-
-        if (urlPrefix != null) {
-          if (!hasQueryParameters) {
-            nextLinkBuffer.append("?");
-            hasQueryParameters = true;
-          } else {
-            nextLinkBuffer.append("&");
-          }
-
-          nextLinkBuffer.append("urlPrefix=")
-              .append(UrlUtil.encodeUrl(urlPrefix));
-        }
-
-        continuationToken = pageInfo.getContinuationToken();
-
-        if (continuationToken != null) {
-          if (!hasQueryParameters) {
-            nextLinkBuffer.append("?");
-            hasQueryParameters = true;
-          } else {
-            nextLinkBuffer.append("&");
-          }
-
-          nextLinkBuffer.append("continuationToken=")
-              .append(UrlUtil.encodeUrl(continuationToken));
-        }
-
-        String nextLink = nextLinkBuffer.toString();
-        log.trace("nextLink = {}", nextLink);
-
-        pageInfo.setNextLink(nextLink);
-      }
-
-      ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
-      artifactPageInfo.setArtifacts(artifacts);
-      artifactPageInfo.setPageInfo(pageInfo);
-      log.trace("artifactPageInfo = {}", artifactPageInfo);
-
-      log.debug2("Returning OK.");
-      return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
 
     } catch (IOException e) {
       throw new LockssRestServiceException(
           LockssRestHttpException.ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
           "IOException", e, parsedRequest);
     }
+  }
+
+  /**
+   * Internal helper to get artifacts from a specific AU.
+   */
+  private ResponseEntity<ArtifactPageInfo> getArtifactsInAu(String namespace,
+                                                            String auid,
+                                                            String url,
+                                                            String urlPrefix,
+                                                            String version,
+                                                            Boolean includeUncommitted,
+                                                            Integer limit,
+                                                            Integer requestLimit,
+                                                            ArtifactContinuationToken requestAct,
+                                                            String parsedRequest) throws IOException {
+
+    boolean isLatestVersion =
+        version == null || version.equalsIgnoreCase("latest");
+    log.trace("isLatestVersion = {}", isLatestVersion);
+
+    boolean isAllVersions =
+        version != null && version.equalsIgnoreCase("all");
+    log.trace("isAllVersions = {}", isAllVersions);
+
+    boolean isSpecificVersion = !isAllVersions && !isLatestVersion;
+    log.trace("isSpecificVersion = {}", isSpecificVersion);
+    boolean isAllUrls = url == null && urlPrefix == null;
+    log.trace("isAllUrls = {}", isAllUrls);
+
+    if (isSpecificVersion && (isAllUrls || urlPrefix != null)) {
+      String errorMessage =
+          "A specific 'version' argument requires a 'url' argument";
+
+      log.warn(errorMessage);
+      log.warn("Parsed request: {}", parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          errorMessage, parsedRequest);
+    }
+
+    boolean includeUncommittedValue =
+        includeUncommitted != null && includeUncommitted;
+    log.trace("includeUncommittedValue = {}", includeUncommittedValue);
+
+    if (!isSpecificVersion && includeUncommittedValue) {
+      String errorMessage =
+          "Including an uncommitted artifact requires a specific 'version' argument";
+
+      log.warn(errorMessage);
+      log.warn("Parsed request: {}", parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          errorMessage, parsedRequest);
+    }
+
+    int numericVersion = 0;
+
+    if (isSpecificVersion) {
+      try {
+        numericVersion = Integer.parseInt(version);
+        log.trace("numericVersion = {}", numericVersion);
+
+        if (numericVersion <= 0) {
+          String errorMessage =
+              "The 'version' argument is not a positive integer";
+
+          log.warn(errorMessage);
+          log.warn("Parsed request: {}", parsedRequest);
+
+          throw new LockssRestServiceException(
+              LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+              errorMessage, parsedRequest);
+        }
+      } catch (NumberFormatException nfe) {
+        String errorMessage =
+            "The 'version' argument is invalid";
+
+        log.warn(errorMessage);
+        log.warn("Parsed request: {}", parsedRequest);
+
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+            errorMessage, parsedRequest);
+      }
+    }
+
+    Iterable<Artifact> artifactIterable = null;
+    List<Artifact> artifacts = new ArrayList<>();
+    Iterator<Artifact> iterator = null;
+    boolean missingIterator = false;
+
+    // Get the iterator ID (if any) used to provide a previous page
+    // of results.
+    String iteratorId = requestAct.getIteratorId();
+
+    // Check whether this request is for a previous page of results.
+    if (iteratorId != null) {
+      // Yes: Get the iterator (if any) used to provide a previous page of
+      // results.
+      iterator = artifactIterators.remove(iteratorId);
+      missingIterator = iterator == null;
+    }
+
+    if (isAllUrls && isAllVersions) {
+      log.trace("All versions of all URLs");
+      if (iterator == null) {
+        artifactIterable = repo.getArtifactsAllVersions(namespace, auid);
+      }
+    } else if (urlPrefix != null && isAllVersions) {
+      log.trace("All versions of all URLs matching a prefix");
+      if (iterator == null) {
+        artifactIterable = repo.getArtifactsWithPrefixAllVersions(
+            namespace, auid, urlPrefix);
+      }
+    } else if (url != null && isAllVersions) {
+      log.trace("All versions of a URL");
+      if (iterator == null) {
+        artifactIterable =
+            repo.getArtifactsAllVersions(namespace, auid, url);
+      }
+    } else if (isAllUrls && isLatestVersion) {
+      log.trace("Latest versions of all URLs");
+      if (iterator == null) {
+        artifactIterable = repo.getArtifacts(namespace, auid);
+      }
+    } else if (urlPrefix != null && isLatestVersion) {
+      log.trace("Latest versions of all URLs matching a prefix");
+      if (iterator == null) {
+        artifactIterable =
+            repo.getArtifactsWithPrefix(namespace, auid, urlPrefix);
+      }
+    } else if (url != null && isLatestVersion) {
+      log.trace("Latest version of a URL");
+      Artifact artifact = repo.getArtifact(namespace, auid, url);
+      log.trace("artifact = {}", artifact);
+
+      if (artifact != null) {
+        artifacts.add(artifact);
+      }
+    } else if (url != null && numericVersion > 0) {
+      log.trace("Given version of a URL");
+      log.trace("namespace = {}", namespace);
+      log.trace("auid = {}", auid);
+      log.trace("url = {}", url);
+      log.trace("numericVersion = {}", numericVersion);
+      log.trace("includeUncommittedValue = {}", includeUncommittedValue);
+      Artifact artifact = repo.getArtifactVersion(namespace, auid, url,
+          numericVersion, includeUncommittedValue);
+      log.trace("artifact = {}", artifact);
+
+      if (artifact != null) {
+        artifacts.add(artifact);
+      }
+    } else {
+      String errorMessage = "The request could not be understood";
+
+      log.warn(errorMessage);
+      log.warn("Parsed request: {}", parsedRequest);
+
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE, HttpStatus.BAD_REQUEST,
+          errorMessage, parsedRequest);
+    }
+
+    ArtifactContinuationToken responseAct = null;
+
+    // Check whether an iterator is involved in obtaining the response.
+    if (iterator != null || artifactIterable != null) {
+      // Yes: Check whether a new iterator is needed.
+      if (iterator == null) {
+        // Yes: Get the iterator pointing to the first page of results.
+        iterator = artifactIterable.iterator();
+
+        // Check whether the artifacts provided in a previous response need to
+        // be skipped.
+        if (missingIterator) {
+          // Yes: Initialize an artifact with properties from the last one
+          // already returned in the previous page of results.
+          Artifact lastArtifact = new Artifact();
+          lastArtifact.setNamespace(requestAct.getNamespace());
+          lastArtifact.setAuid(requestAct.getAuid());
+          lastArtifact.setUri(requestAct.getUri());
+          lastArtifact.setVersion(requestAct.getVersion());
+
+          // Loop through the artifacts skipping those already returned
+          // through a previous response.
+          while (iterator.hasNext()) {
+            Artifact artifact = iterator.next();
+
+            // Check whether this artifact comes after the last one returned
+            // on the previous response for this operation.
+            if (ArtifactComparators.BY_URI_BY_DECREASING_VERSION
+                .compare(artifact, lastArtifact) > 0) {
+              // Yes: Add this artifact to the results.
+              artifacts.add(artifact);
+
+              // Add the rest of the artifacts to the results for this
+              // response separately.
+              break;
+            }
+          }
+        }
+      }
+
+      // Populate the the rest of the results for this response.
+      populateArtifacts(iterator, limit, artifacts);
+
+      // Check whether the iterator may be used in the future to provide more
+      // results.
+      if (iterator.hasNext()) {
+        // Yes: Store it locally.
+        // Only generate a new UUID if we don't already have one (new iterator)
+        if (iteratorId == null) {
+          iteratorId = UUID.randomUUID().toString();
+        }
+        artifactIterators.put(iteratorId, iterator);
+
+        // Create the response continuation token.
+        Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
+        responseAct = new ArtifactContinuationToken(
+            lastArtifact.getNamespace(), lastArtifact.getAuid(),
+            lastArtifact.getUri(), lastArtifact.getVersion(),
+            iteratorId);
+        log.trace("responseAct = {}", responseAct);
+      }
+    }
+
+    log.trace("artifacts.size() = {}", artifacts.size());
+
+    PageInfo pageInfo = new PageInfo();
+    pageInfo.setItemsInPage(artifacts.size());
+
+    // Get the current link.
+    StringBuffer curLinkBuffer = request.getRequestURL();
+
+    if (request.getQueryString() != null
+        && !request.getQueryString().trim().isEmpty()) {
+      curLinkBuffer.append("?").append(request.getQueryString());
+    }
+
+    String curLink = curLinkBuffer.toString();
+    log.trace("curLink = {}", curLink);
+
+    pageInfo.setCurLink(curLink);
+
+    // Check whether there is a response continuation token.
+    if (responseAct != null) {
+      // Yes.
+      String continuationToken = responseAct.toWebResponseContinuationToken();
+      pageInfo.setContinuationToken(continuationToken);
+
+      // Start building the next link.
+      StringBuffer nextLinkBuffer = request.getRequestURL();
+      boolean hasQueryParameters = false;
+
+      if (curLink.indexOf("limit=") > 0) {
+        nextLinkBuffer.append("?limit=").append(requestLimit);
+        hasQueryParameters = true;
+      }
+
+      if (url != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("url=").append(UrlUtil.encodeUrl(url));
+      }
+
+      if (urlPrefix != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("urlPrefix=")
+            .append(UrlUtil.encodeUrl(urlPrefix));
+      }
+
+      if (version != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("version=").append(version);
+      }
+
+      if (includeUncommitted != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("includeUncommitted=")
+            .append(includeUncommitted);
+      }
+
+      continuationToken = pageInfo.getContinuationToken();
+
+      if (continuationToken != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("continuationToken=")
+            .append(UrlUtil.encodeUrl(continuationToken));
+      }
+
+      nextLinkBuffer.append("&namespace=").append(UrlUtil.encodeUrl(namespace));
+      nextLinkBuffer.append("&auid=").append(UrlUtil.encodeUrl(auid));
+
+      String nextLink = nextLinkBuffer.toString();
+      log.trace("nextLink = {}", nextLink);
+
+      pageInfo.setNextLink(nextLink);
+    }
+
+    ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
+    artifactPageInfo.setArtifacts(artifacts);
+    artifactPageInfo.setPageInfo(pageInfo);
+    log.trace("artifactPageInfo = {}", artifactPageInfo);
+
+    log.debug2("Returning OK.");
+    return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
+  }
+
+  /**
+   * Internal helper to get artifacts from all AUs (requires url or urlPrefix).
+   */
+  private ResponseEntity<ArtifactPageInfo> getArtifactsFromAllAus(String namespace,
+                                                                  String url,
+                                                                  String urlPrefix,
+                                                                  String version,
+                                                                  Integer limit,
+                                                                  Integer requestLimit,
+                                                                  ArtifactContinuationToken requestAct,
+                                                                  String parsedRequest) throws IOException {
+
+    // Determine version mode for cross-AU queries
+    boolean isAllVersions = version != null && version.equalsIgnoreCase("all");
+    VersionsEnum versions = isAllVersions ? VersionsEnum.ALL : VersionsEnum.LATEST;
+
+    List<Artifact> artifacts = new ArrayList<>();
+    Iterator<Artifact> iterator = null;
+    boolean missingIterator = false;
+    ArtifactContinuationToken responseAct = null;
+
+    // Get the iterator ID (if any) used to provide a previous page
+    // of results.
+    String iteratorId = requestAct.getIteratorId();
+
+    // Check whether this request is for a previous page of results.
+    if (iteratorId != null) {
+      // Yes: Get the iterator (if any) used to provide a previous page of
+      // results.
+      iterator = artifactIterators.remove(iteratorId);
+      missingIterator = iterator == null;
+    }
+
+    if (iterator == null) {
+      Iterable<Artifact> artifactIterable = null;
+
+      if (url != null) {
+        artifactIterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, versions);
+      } else if (urlPrefix != null) {
+        artifactIterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix, versions);
+      }
+
+      if (artifactIterable != null) {
+        // Yes: Get the iterator pointing to the first page of results.
+        iterator = artifactIterable.iterator();
+
+        // Check whether the artifacts provided in a previous response need to
+        // be skipped.
+        if (missingIterator) {
+          // Yes: Initialize an artifact with properties from the last one
+          // already returned in the previous page of results.
+          Artifact lastArtifact = new Artifact();
+          lastArtifact.setNamespace(requestAct.getNamespace());
+          lastArtifact.setAuid(requestAct.getAuid());
+          lastArtifact.setUri(requestAct.getUri());
+          lastArtifact.setVersion(requestAct.getVersion());
+
+          // Loop through the artifacts skipping those already returned
+          // through a previous response.
+          long skipStarted = TimeBase.nowMs();
+          while (iterator.hasNext()) {
+            Artifact artifact = iterator.next();
+
+            // Check whether this artifact comes after the last one returned
+            // on the previous response for this operation.
+            if (ArtifactComparators.BY_URI_BY_DECREASING_VERSION
+                .compare(artifact, lastArtifact) > 0) {
+              // Yes: Add this artifact to the results.
+              artifacts.add(artifact);
+
+              // Add the rest of the artifacts to the results for this
+              // response separately.
+              break;
+            }
+          }
+          repo.incTimeSpentReiterating(TimeBase.msSince(skipStarted));
+        }
+      }
+    }
+
+    if (iterator != null) {
+      // Populate the rest of the results for this response.
+      populateArtifacts(iterator, limit, artifacts);
+
+      // Check whether the iterator may be used in the future to provide more
+      // results.
+      if (iterator.hasNext()) {
+        // Yes: Store it locally.
+        // Only generate a new UUID if we don't already have one (new iterator)
+        if (iteratorId == null) {
+          iteratorId = UUID.randomUUID().toString();
+        }
+        artifactIterators.put(iteratorId, iterator);
+
+        // Create the response continuation token.
+        Artifact lastArtifact = artifacts.get(artifacts.size() - 1);
+        responseAct = new ArtifactContinuationToken(
+            lastArtifact.getNamespace(), lastArtifact.getAuid(),
+            lastArtifact.getUri(), lastArtifact.getVersion(),
+            iteratorId);
+        log.trace("responseAct = {}", responseAct);
+      }
+    }
+
+    log.trace("artifacts.size() = {}", artifacts.size());
+
+    PageInfo pageInfo = new PageInfo();
+    pageInfo.setItemsInPage(artifacts.size());
+
+    // Get the current link.
+    StringBuffer curLinkBuffer = request.getRequestURL();
+
+    if (request.getQueryString() != null
+        && !request.getQueryString().trim().isEmpty()) {
+      curLinkBuffer.append("?").append(request.getQueryString());
+    }
+
+    String curLink = curLinkBuffer.toString();
+    log.trace("curLink = {}", curLink);
+
+    pageInfo.setCurLink(curLink);
+
+    // Check whether there is a response continuation token.
+    if (responseAct != null) {
+      // Yes.
+      String continuationToken = responseAct.toWebResponseContinuationToken();
+      pageInfo.setContinuationToken(continuationToken);
+
+      // Start building the next link.
+      StringBuffer nextLinkBuffer = request.getRequestURL();
+      boolean hasQueryParameters = false;
+
+      if (curLink.indexOf("limit=") > 0) {
+        nextLinkBuffer.append("?limit=").append(requestLimit);
+        hasQueryParameters = true;
+      }
+
+      if (url != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("url=").append(UrlUtil.encodeUrl(url));
+      }
+
+      if (urlPrefix != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("urlPrefix=")
+            .append(UrlUtil.encodeUrl(urlPrefix));
+      }
+
+      continuationToken = pageInfo.getContinuationToken();
+
+      if (continuationToken != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("continuationToken=")
+            .append(UrlUtil.encodeUrl(continuationToken));
+      }
+
+      String nextLink = nextLinkBuffer.toString();
+      log.trace("nextLink = {}", nextLink);
+
+      pageInfo.setNextLink(nextLink);
+    }
+
+    ArtifactPageInfo artifactPageInfo = new ArtifactPageInfo();
+    artifactPageInfo.setArtifacts(artifacts);
+    artifactPageInfo.setPageInfo(pageInfo);
+    log.trace("artifactPageInfo = {}", artifactPageInfo);
+
+    log.debug2("Returning OK.");
+    return new ResponseEntity<>(artifactPageInfo, HttpStatus.OK);
   }
 
   /**
