@@ -1167,6 +1167,17 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             .append(UrlUtil.encodeUrl(urlPrefix));
       }
 
+      if (version != null) {
+        if (!hasQueryParameters) {
+          nextLinkBuffer.append("?");
+          hasQueryParameters = true;
+        } else {
+          nextLinkBuffer.append("&");
+        }
+
+        nextLinkBuffer.append("version=").append(version);
+      }
+
       continuationToken = pageInfo.getContinuationToken();
 
       if (continuationToken != null) {
@@ -1179,6 +1190,10 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
 
         nextLinkBuffer.append("continuationToken=")
             .append(UrlUtil.encodeUrl(continuationToken));
+      }
+
+      if (hasQueryParameters && !StringUtil.isNullString(namespace)) {
+        nextLinkBuffer.append("&namespace=").append(UrlUtil.encodeUrl(namespace));
       }
 
       String nextLink = nextLinkBuffer.toString();

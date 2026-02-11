@@ -35,28 +35,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.RepoinfoApiController;
-import org.lockss.laaws.rs.controller.DefaultTestRepositoryApplicationConfiguration;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.util.UrlUtil;
-import org.lockss.util.io.FileUtil;
 import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactPageInfo;
 import org.lockss.util.rest.repo.model.AuidPageInfo;
+import org.lockss.util.rest.repo.model.VersionsEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -834,6 +829,186 @@ public class TestReposApiController extends SpringLockssTestCase4 {
         */
 
     }
+
+  /**
+   * Tests the pagination of artifacts retrieved from all AUs (across-AUs query),
+   * verifying that the next link includes version, namespace, url, limit, and
+   * continuationToken parameters.
+   *
+   * @throws Exception if there are problems.
+   */
+  @Test
+  public void testAllAusPagination() throws Exception {
+    log.debug2("Invoked");
+
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    String namespace = "ns/Id:ABC";
+    String url = "http://test.com/page1";
+
+    // Set up the repository to be ready.
+    given(repo.isReady()).willReturn(true);
+
+    // Set up the namespace.
+    List<String> namespaces = new ArrayList<>();
+    namespaces.add(namespace);
+    given(repo.getNamespaces()).willReturn(namespaces);
+
+    // Create artifacts from multiple AUs.
+    List<Artifact> artifacts = new ArrayList<>();
+    artifacts.add(new Artifact("id01", namespace, "auid1", url, 1, true,
+        "surl", 1, null));
+    artifacts.add(new Artifact("id02", namespace, "auid2", url, 1, true,
+        "surl", 1, null));
+    artifacts.add(new Artifact("id03", namespace, "auid3", url, 1, true,
+        "surl", 1, null));
+
+    // Mock the all AUs repository method.
+    given(repo.getArtifactsWithUrlFromAllAus(namespace, url, VersionsEnum.ALL))
+        .willReturn(artifacts);
+
+    // Request with limit=2 to force pagination, version=all, namespace
+    URI endpointUri = new URI("/artifacts?url=" + UrlUtil.encodeUrl(url)
+        + "&namespace=" + UrlUtil.encodeUrl(namespace)
+        + "&version=all&limit=2");
+
+    String content = controller.perform(getAuthBuilder(get(endpointUri)))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    ArtifactPageInfo api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // First page should have 2 artifacts
+    assertEquals(2, api.getArtifacts().size());
+    assertEquals(artifacts.get(0), api.getArtifacts().get(0));
+    assertEquals(artifacts.get(1), api.getArtifacts().get(1));
+
+    // There should be more artifacts to return
+    assertNotNull(api.getPageInfo().getContinuationToken());
+
+    // Get and verify the next link
+    String nextLink = api.getPageInfo().getNextLink();
+    assertNotNull(nextLink);
+
+    // Verify that the next link contains the expected query parameters
+    assertTrue("Next link should contain version=all: " + nextLink,
+        nextLink.contains("version=all"));
+    assertTrue("Next link should contain namespace=: " + nextLink,
+        nextLink.contains("namespace="));
+    assertTrue("Next link should contain url=: " + nextLink,
+        nextLink.contains("url="));
+    assertTrue("Next link should contain limit=: " + nextLink,
+        nextLink.contains("limit="));
+    assertTrue("Next link should contain continuationToken=: " + nextLink,
+        nextLink.contains("continuationToken="));
+
+    // Follow the next link to get the remaining artifacts
+    content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // Second page should have the remaining artifact
+    assertEquals(1, api.getArtifacts().size());
+    assertEquals(artifacts.get(2), api.getArtifacts().get(0));
+
+    // Verify there are no more artifacts to return
+    assertNull(api.getPageInfo().getContinuationToken());
+    assertNull(api.getPageInfo().getNextLink());
+
+    log.debug2("Done");
+  }
+
+  /**
+   * Tests the pagination of artifacts across AUs with urlPrefix, verifying that
+   * the next link includes version, namespace, urlPrefix, limit, and
+   * continuationToken parameters.
+   *
+   * @throws Exception if there are problems.
+   */
+  @Test
+  public void testAllAusUrlPrefixPagination() throws Exception {
+    log.debug2("Invoked");
+
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    String namespace = "ns/Id:ABC";
+    String urlPrefix = "http://test.com/";
+
+    // Set up the repository to be ready.
+    given(repo.isReady()).willReturn(true);
+
+    // Set up the namespace.
+    List<String> namespaces = new ArrayList<>();
+    namespaces.add(namespace);
+    given(repo.getNamespaces()).willReturn(namespaces);
+
+    // Create artifacts from multiple AUs with URLs matching the prefix.
+    List<Artifact> artifacts = new ArrayList<>();
+    artifacts.add(new Artifact("id01", namespace, "auid1",
+        "http://test.com/page1", 1, true, "surl", 1, null));
+    artifacts.add(new Artifact("id02", namespace, "auid2",
+        "http://test.com/page2", 1, true, "surl", 1, null));
+    artifacts.add(new Artifact("id03", namespace, "auid3",
+        "http://test.com/page3", 1, true, "surl", 1, null));
+
+    // Mock the all AUs repository method with urlPrefix
+    given(repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix,
+        VersionsEnum.LATEST)).willReturn(artifacts);
+
+    // Request with limit=2, version=latest (default), namespace, urlPrefix
+    URI endpointUri = new URI("/artifacts?urlPrefix="
+        + UrlUtil.encodeUrl(urlPrefix)
+        + "&namespace=" + UrlUtil.encodeUrl(namespace)
+        + "&version=latest&limit=2");
+
+    String content = controller.perform(getAuthBuilder(get(endpointUri)))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    ArtifactPageInfo api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // First page should have two artifacts
+    assertEquals(2, api.getArtifacts().size());
+
+    // There should be more artifacts to return
+    assertNotNull(api.getPageInfo().getContinuationToken());
+
+    // Get and verify the next link
+    String nextLink = api.getPageInfo().getNextLink();
+    assertNotNull(nextLink);
+
+    // Verify that the next link contains the expected query parameters
+    assertTrue("Next link should contain version=latest: " + nextLink,
+        nextLink.contains("version=latest"));
+    assertTrue("Next link should contain namespace=: " + nextLink,
+        nextLink.contains("namespace="));
+    assertTrue("Next link should contain urlPrefix=: " + nextLink,
+        nextLink.contains("urlPrefix="));
+    assertTrue("Next link should contain limit=: " + nextLink,
+        nextLink.contains("limit="));
+    assertTrue("Next link should contain continuationToken=: " + nextLink,
+        nextLink.contains("continuationToken="));
+
+    // Follow the next link to get the remaining artifacts
+    content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // Second page should have the remaining artifact
+    assertEquals(1, api.getArtifacts().size());
+
+    // Verify there are no more artifacts to return
+    assertNull(api.getPageInfo().getContinuationToken());
+    assertNull(api.getPageInfo().getNextLink());
+
+    log.debug2("Done");
+  }
 
   /**
    * Tests the validation of request limits.
