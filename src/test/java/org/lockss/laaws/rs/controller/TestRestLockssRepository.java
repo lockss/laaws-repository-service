@@ -350,7 +350,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Setup page limit on server
     ConfigurationUtil.setFromArgs("org.lockss.repository.artifact.pagesize.default", "2");
 
-    List<Artifact> artifacts = new ArrayList<>();
+    List<Artifact> committed = new ArrayList<>();
 
     for (int i = 0; i < 10; i++) {
       ArtifactSpec spec = new ArtifactSpec()
@@ -363,9 +363,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       Artifact addedArtifact =
           repoClient.addArtifact(spec.getArtifactData());
 
-      Artifact committed = repoClient.commitArtifact(addedArtifact);
+      committed.add(repoClient.commitArtifact(addedArtifact));
+    }
 
-      artifacts.add(repoClient.getArtifact(committed.getNamespace(), committed.getAuid(), committed.getUri()));
+    // Re-fetch each artifact after all commits are done, so that storageUrls
+    // reflect the final committed state.
+    List<Artifact> artifacts = new ArrayList<>();
+    for (Artifact c : committed) {
+      artifacts.add(repoClient.getArtifact(c.getNamespace(), c.getAuid(), c.getUri()));
     }
 
     Iterable<Artifact> result = repoClient.getArtifacts(ns, auid);
