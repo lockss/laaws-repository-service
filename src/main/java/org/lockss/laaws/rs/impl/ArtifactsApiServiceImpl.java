@@ -296,6 +296,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             errorMessage, e, parsedRequest);
       }
     } catch (IOException e) {
+      log.error("Could not read artifact data from content part", e);
       // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
       // parsing HTTP request. Return a 400 Bad Request response.
       throw new HttpMessageNotReadableException("Could not read artifact data from content part", e);

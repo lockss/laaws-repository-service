@@ -428,6 +428,13 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
         if (msg.contains("exceed") && (msg.contains("size") || msg.contains("length"))) {
           throw new MaxUploadSizeExceededException(-1, ex);
         }
+        if (msg.contains("no space")) {
+          if (cause instanceof IOException iocause) {
+            throw new org.lockss.util.LockssUncheckedDiskFullException("No space left in temp dir while receiving multipart request", iocause);
+          } else {
+            throw new RuntimeException("No space left in temp dir while receiving multipart request", cause);
+          }
+        }
       }
       cause = cause.getCause();
     }
