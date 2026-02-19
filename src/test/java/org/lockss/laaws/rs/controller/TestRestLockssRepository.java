@@ -3000,6 +3000,28 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         IteratorUtils.toList(repoClient.getNamespaces().iterator()));
   }
 
+  @Test
+  public void testNamedAU() throws IOException {
+    String namedAuid = "org|lockss|plugin|NamedPlugin&handle~Migration+Reports";
+    ArtifactSpec spec = new ArtifactSpec()
+      .setNamespace(NS1)
+      .setAuid(namedAuid)
+      .setUrl("File1")
+      .setContent(CONTENT1)
+      .setCollectionDate(1234)
+      .toCommit(true);
+
+      ArtifactData ad = spec.getArtifactData();
+      Artifact newArt = repoClient.addArtifact(ad);
+      Artifact commArt = repoClient.commitArtifact(spec.getNamespace(),
+                                                   newArt.getUuid());
+      spec.setCommitted(true);
+      spec.assertArtifact(repoClient, repoClient.getArtifact(
+          spec.getNamespace(),
+          spec.getAuid(),
+          spec.getUrl()));
+    }
+
   // SCENARIOS
 
   protected enum StdVariants {
