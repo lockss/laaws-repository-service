@@ -3000,6 +3000,109 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         IteratorUtils.toList(repoClient.getNamespaces().iterator()));
   }
 
+  @Test
+  public void testNamedAU() throws IOException {
+    String namedAuid = "org|lockss|plugin|NamedPlugin&handle~Migration+Reports";
+    String url1 = "http://host1.com/path/file1";
+    String url2 = "http://host1.com/path/file2";
+    String urlPrefix = "http://host1.com/path/";
+
+    // First artifact (url1)
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace(NS1)
+        .setAuid(namedAuid)
+        .setUrl(url1)
+        .setContent(CONTENT1)
+        .setCollectionDate(1234)
+        .toCommit(true);
+
+    ArtifactData ad = spec.getArtifactData();
+    Artifact newArt = repoClient.addArtifact(ad);
+    repoClient.commitArtifact(spec.getNamespace(), newArt.getUuid());
+    spec.setCommitted(true);
+
+    // getArtifact (latest version of a single URL)
+    spec.assertArtifact(repoClient, repoClient.getArtifact(
+        spec.getNamespace(),
+        spec.getAuid(),
+        spec.getUrl()));
+
+    // Second artifact (url2, same AUID)
+    ArtifactSpec spec2 = new ArtifactSpec()
+        .setNamespace(NS1)
+        .setAuid(namedAuid)
+        .setUrl(url2)
+        .setContent("content string 2")
+        .setCollectionDate(1235)
+        .toCommit(true);
+
+    ArtifactData ad2 = spec2.getArtifactData();
+    Artifact newArt2 = repoClient.addArtifact(ad2);
+    repoClient.commitArtifact(spec2.getNamespace(), newArt2.getUuid());
+    spec2.setCommitted(true);
+
+    // Third artifact (second version of url1, same AUID)
+    ArtifactSpec spec1v2 = new ArtifactSpec()
+        .setNamespace(NS1)
+        .setAuid(namedAuid)
+        .setUrl(url1)
+        .setContent("content string 1 v2")
+        .setCollectionDate(1236)
+        .toCommit(true);
+
+    ArtifactData ad1v2 = spec1v2.getArtifactData();
+    Artifact newArt1v2 = repoClient.addArtifact(ad1v2);
+    repoClient.commitArtifact(spec1v2.getNamespace(), newArt1v2.getUuid());
+    spec1v2.setCommitted(true);
+
+    // getArtifacts(ns, auid) - latest version of all URLs
+    Iterable<Artifact> latestArts = repoClient.getArtifacts(NS1, namedAuid);
+    List<Artifact> latestList = IteratorUtils.toList(latestArts.iterator());
+    assertEquals("getArtifacts should return latest version of each URL",
+        2, latestList.size());
+
+    // getArtifactsAllVersions(ns, auid) - all versions of all URLs
+    Iterable<Artifact> allVerArts = repoClient.getArtifactsAllVersions(NS1, namedAuid);
+    List<Artifact> allVerList = IteratorUtils.toList(allVerArts.iterator());
+    assertEquals("getArtifactsAllVersions should return all 3 versions",
+        3, allVerList.size());
+
+    // getArtifactsWithPrefix(ns, auid, prefix) - latest versions matching prefix
+    Iterable<Artifact> prefixArts = repoClient.getArtifactsWithPrefix(NS1, namedAuid, urlPrefix);
+    List<Artifact> prefixList = IteratorUtils.toList(prefixArts.iterator());
+    assertEquals("getArtifactsWithPrefix should return 2 latest artifacts",
+        2, prefixList.size());
+
+    // getArtifactsWithPrefixAllVersions(ns, auid, prefix) - all versions matching prefix
+    Iterable<Artifact> prefixAllArts = repoClient.getArtifactsWithPrefixAllVersions(NS1, namedAuid, urlPrefix);
+    List<Artifact> prefixAllList = IteratorUtils.toList(prefixAllArts.iterator());
+    assertEquals("getArtifactsWithPrefixAllVersions should return all 3 versions",
+        3, prefixAllList.size());
+
+    // getArtifactsAllVersions(ns, auid, url) - all versions of a specific URL
+    Iterable<Artifact> urlAllVerArts = repoClient.getArtifactsAllVersions(NS1, namedAuid, url1);
+    List<Artifact> urlAllVerList = IteratorUtils.toList(urlAllVerArts.iterator());
+    assertEquals("getArtifactsAllVersions(url) should return 2 versions of url1",
+        2, urlAllVerList.size());
+
+    // getArtifactVersion(ns, auid, url, version) - specific version
+    Artifact artV1 = repoClient.getArtifactVersion(NS1, namedAuid, url1, 1);
+    assertNotNull("getArtifactVersion should find version 1", artV1);
+    assertEquals(1, artV1.getVersion().intValue());
+
+    Artifact artV2 = repoClient.getArtifactVersion(NS1, namedAuid, url1, 2);
+    assertNotNull("getArtifactVersion should find version 2", artV2);
+    assertEquals(2, artV2.getVersion().intValue());
+
+    // auSize(ns, auid)
+    AuSize size = repoClient.auSize(NS1, namedAuid);
+    assertNotNull("auSize should return a result", size);
+    assertTrue("auSize totalAllVersions should be > 0",
+        size.getTotalAllVersions() > 0);
+    assertTrue("auSize totalLatestVersions should be > 0",
+        size.getTotalLatestVersions() > 0);
+  }
+
   // SCENARIOS
 
   protected enum StdVariants {
