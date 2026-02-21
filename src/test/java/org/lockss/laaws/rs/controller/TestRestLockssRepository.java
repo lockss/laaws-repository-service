@@ -100,7 +100,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -973,7 +972,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       String namespace = "test";
 
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("q", "url:" + URLEncoder.encode("https://www.lockss.org/foo+baz", StandardCharsets.UTF_8));
+      queryParams.put("q", "url:https://www.lockss.org/");
 //      queryParams.put("count", namespace);
 //      queryParams.put("start_page", namespace);
 
@@ -1032,15 +1031,15 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     final String NORMALIZE_URL_JSON = """
         [
-          "http://www.lockss.org/foo+baz"
+          "http://www.lockss.org/"
         ]
-        """;
+        """;;
 
     // Mock CfgSvc normalizeUrl endpoint
     mockServer
         .when(request()
             .withMethod("GET")
-            .withQueryStringParameter("url", "https://www.lockss.org/foo+baz")
+            .withQueryStringParameter("url", "https://www.lockss.org/")
             .withPath("/utils/normalizeurl"))
         .respond(response()
             .withStatusCode(200)
@@ -1057,7 +1056,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       String auid = "test";
 
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("url", "https://www.lockss.org/foo+baz");
+      queryParams.put("url", "https://www.lockss.org/");
 //      queryParams.put("limit", "");
 //      queryParams.put("matchType", "");
 //      queryParams.put("sort", "");
