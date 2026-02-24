@@ -295,6 +295,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             HttpStatus.INTERNAL_SERVER_ERROR,
             errorMessage, e, parsedRequest);
       }
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (IOException e) {
       // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
       // parsing HTTP request. Return a 400 Bad Request response.
@@ -329,6 +337,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       sendCacheInvalidateArtifact(ArtifactCache.InvalidateOp.Delete, key);
       return new ResponseEntity<>(HttpStatus.OK);
 
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (LockssNoSuchArtifactIdException e) {
       // Translate to LockssRestServiceException and throw
       throw new LockssRestServiceException("Artifact not found", e)
@@ -393,6 +409,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       //// Return multiparts response entity
       return new ResponseEntity<MultiValueMap<String, Object>>(parts, HttpStatus.OK);
 
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (LockssNoSuchArtifactIdException e) {
       // Translate to LockssRestServiceException and throw
       throw new LockssRestServiceException("Artifact not found", e)
@@ -481,6 +505,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
         // Return a response with HTTP status line and headers only
         return new ResponseEntity<Resource>(respHeaders, HttpStatus.OK);
       }
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (LockssNoSuchArtifactIdException e) {
       // Translate to LockssRestServiceException and throw
       throw new LockssRestServiceException("Artifact not found", e)
@@ -552,6 +584,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
               .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
 
       return new ResponseEntity<>(resource, restResponseHeaders, HttpStatus.OK);
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (LockssNoSuchArtifactIdException e) {
       // Translate to LockssRestServiceException and throw
       throw new LockssRestServiceException("Artifact not found", e)
@@ -662,6 +702,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
             limit, requestLimit, requestAct, parsedRequest);
       }
 
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (IOException e) {
       throw new LockssRestServiceException(
           LockssRestHttpException.ServerErrorType.DATA_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
@@ -1258,6 +1306,14 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       // Return the updated Artifact
       return new ResponseEntity<>(updatedArtifact, HttpStatus.OK);
 
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (LockssNoSuchArtifactIdException e) {
       // Translate to LockssRestServiceException and throw
       throw new LockssRestServiceException("Artifact not found", e)
