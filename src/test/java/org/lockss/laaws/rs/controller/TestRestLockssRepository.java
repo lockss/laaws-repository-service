@@ -32,6 +32,7 @@ POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.controller;
 
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -2967,6 +2968,29 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                     .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
             ),
         repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.LATEST));
+  }
+
+  @Test
+  public void testGetAuIds_queryEncoding() throws Exception {
+    // Use a valid namespace (must match ^[a-zA-Z0-9][a-zA-Z0-9._-]*$)
+    // and put the '+' in the auid to exercise query parameter encoding
+    String ns = NS1;
+    String auid = "org|lockss|plugin+extra:test";
+
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace(ns)
+        .setAuid(auid)
+        .setUrl(URL1)
+        .setCollectionDate(1234);
+
+    spec.generateContent();
+
+    Artifact uncommitted = repoClient.addArtifact(spec.getArtifactData());
+    repoClient.commitArtifact(ns, uncommitted.getUuid());
+
+    Artifact artifact = repoClient.getArtifact(NS1, auid, URL1);
+    assertNotNull(artifact);
+    assertEquals(auid, artifact.getAuid());
   }
 
   public void testGetAuIds() throws IOException {
