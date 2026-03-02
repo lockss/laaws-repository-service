@@ -120,6 +120,14 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
             return new ResponseEntity<>(jsonResult, headers, HttpStatus.OK);
           }
         }
+      } catch (IllegalArgumentException iae) {
+        String message = iae.getMessage();
+        log.warn(message);
+        log.warn("Parsed request: {}", parsedRequest);
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE,
+            HttpStatus.BAD_REQUEST,
+            message, parsedRequest);
       } catch (IOException e) {
         String errorMessage = "Error adding artifacts from archive";
         throw new LockssRestServiceException(LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,

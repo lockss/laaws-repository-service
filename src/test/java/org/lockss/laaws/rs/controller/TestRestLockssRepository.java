@@ -119,9 +119,9 @@ import static java.nio.file.StandardOpenOption.APPEND;
 import static org.lockss.app.LockssApp.PARAM_SERVICE_BINDINGS;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
+import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
-import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 /**
  * Tests an embedded LOCKSS Repository Service instance configured with an internal {@link LocalLockssRepository}.
@@ -2969,6 +2969,29 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.LATEST));
   }
 
+  @Test
+  public void testGetAuIds_queryEncoding() throws Exception {
+    // Use a valid namespace (must match ^[a-zA-Z0-9][a-zA-Z0-9._-]*$)
+    // and put the '+' in the auid to exercise query parameter encoding
+    String ns = NS1;
+    String auid = "org|lockss|plugin+extra:test";
+
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace(ns)
+        .setAuid(auid)
+        .setUrl(URL1)
+        .setCollectionDate(1234);
+
+    spec.generateContent();
+
+    Artifact uncommitted = repoClient.addArtifact(spec.getArtifactData());
+    repoClient.commitArtifact(ns, uncommitted.getUuid());
+
+    Artifact artifact = repoClient.getArtifact(NS1, auid, URL1);
+    assertNotNull(artifact);
+    assertEquals(auid, artifact.getAuid());
+  }
+
   public void testGetAuIds() throws IOException {
     // Non-existent namespace
     assertEmpty(repoClient.getAuIds(NO_NAMESPACE));
@@ -3059,41 +3082,45 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // getArtifacts(ns, auid) - latest version of all URLs
     Iterable<Artifact> latestArts = repoClient.getArtifacts(NS1, namedAuid);
     List<Artifact> latestList = IteratorUtils.toList(latestArts.iterator());
-    assertEquals("getArtifacts should return latest version of each URL",
-        2, latestList.size());
+    assertPredicateOverCollection("getArtifacts AUID round-trip, latest version of each URL", latestList, 2,
+        (a) -> namedAuid.equals(a.getAuid()));
 
     // getArtifactsAllVersions(ns, auid) - all versions of all URLs
     Iterable<Artifact> allVerArts = repoClient.getArtifactsAllVersions(NS1, namedAuid);
     List<Artifact> allVerList = IteratorUtils.toList(allVerArts.iterator());
-    assertEquals("getArtifactsAllVersions should return all 3 versions",
-        3, allVerList.size());
+    assertPredicateOverCollection("getArtifactsAllVersions AUID round-trip, all versions", allVerList, 3,
+        (a) -> namedAuid.equals(a.getAuid()));
 
     // getArtifactsWithPrefix(ns, auid, prefix) - latest versions matching prefix
     Iterable<Artifact> prefixArts = repoClient.getArtifactsWithPrefix(NS1, namedAuid, urlPrefix);
     List<Artifact> prefixList = IteratorUtils.toList(prefixArts.iterator());
-    assertEquals("getArtifactsWithPrefix should return 2 latest artifacts",
-        2, prefixList.size());
+    assertPredicateOverCollection("getArtifactsWithPrefix AUID round-trip, latest with prefix", prefixList, 2,
+        (a) -> namedAuid.equals(a.getAuid()));
 
     // getArtifactsWithPrefixAllVersions(ns, auid, prefix) - all versions matching prefix
     Iterable<Artifact> prefixAllArts = repoClient.getArtifactsWithPrefixAllVersions(NS1, namedAuid, urlPrefix);
     List<Artifact> prefixAllList = IteratorUtils.toList(prefixAllArts.iterator());
-    assertEquals("getArtifactsWithPrefixAllVersions should return all 3 versions",
-        3, prefixAllList.size());
+    assertPredicateOverCollection("getArtifactsWithPrefixAllVersions AUID round-trip, all versions with prefix", prefixAllList, 3,
+        (a) -> namedAuid.equals(a.getAuid()));
 
     // getArtifactsAllVersions(ns, auid, url) - all versions of a specific URL
     Iterable<Artifact> urlAllVerArts = repoClient.getArtifactsAllVersions(NS1, namedAuid, url1);
     List<Artifact> urlAllVerList = IteratorUtils.toList(urlAllVerArts.iterator());
-    assertEquals("getArtifactsAllVersions(url) should return 2 versions of url1",
-        2, urlAllVerList.size());
+    assertPredicateOverCollection("getArtifactsAllVersions(url) AUID+URI round-trip, all versions of url1", urlAllVerList, 2,
+        (a) -> namedAuid.equals(a.getAuid()) && url1.equals(a.getUri()));
 
     // getArtifactVersion(ns, auid, url, version) - specific version
     Artifact artV1 = repoClient.getArtifactVersion(NS1, namedAuid, url1, 1);
     assertNotNull("getArtifactVersion should find version 1", artV1);
     assertEquals(1, artV1.getVersion().intValue());
+    assertEquals("getArtifactVersion v1 AUID round-trip", namedAuid, artV1.getAuid());
+    assertEquals("getArtifactVersion v1 URI round-trip", url1, artV1.getUri());
 
     Artifact artV2 = repoClient.getArtifactVersion(NS1, namedAuid, url1, 2);
     assertNotNull("getArtifactVersion should find version 2", artV2);
     assertEquals(2, artV2.getVersion().intValue());
+    assertEquals("getArtifactVersion v2 AUID round-trip", namedAuid, artV2.getAuid());
+    assertEquals("getArtifactVersion v2 URI round-trip", url1, artV2.getUri());
 
     // auSize(ns, auid)
     AuSize size = repoClient.auSize(NS1, namedAuid);
@@ -3102,6 +3129,18 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         size.getTotalAllVersions() > 0);
     assertTrue("auSize totalLatestVersions should be > 0",
         size.getTotalLatestVersions() > 0);
+  }
+
+  private <T> void assertPredicateOverCollection(String description,
+                                                 Collection<T> items,
+                                                 int expectedCount,
+                                                 Predicate<? super T> predicate) {
+    int actualCount = items.size();
+    assertEquals(description, expectedCount, actualCount);
+
+    for (T item : items) {
+      assertTrue(description + " (failed for item: " + item + ")", predicate.test(item));
+    }
   }
 
   // SCENARIOS

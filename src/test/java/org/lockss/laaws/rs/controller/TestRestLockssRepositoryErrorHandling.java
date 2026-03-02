@@ -316,6 +316,19 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         (Executable) () -> clientRepo.deleteArtifact("namespace", "artifact"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
+
+    // Reset mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 400 Bad Request if IllegalArgumentException is thrown (invalid input)
+    doThrow(new IllegalArgumentException("Invalid namespace: bad namespace"))
+        .when(internalRepo).deleteArtifact("namespace", "artifact");
+
+    assertLockssRestHttpException(
+        (Executable) () -> clientRepo.deleteArtifact("namespace", "artifact"),
+        "Invalid namespace: bad namespace", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
   }
 
   @Test
@@ -364,6 +377,19 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         () -> clientRepo.getArtifactData(spec.getArtifact(), IncludeContentEnum.ALWAYS),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
+
+    // Reset mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 400 Bad Request if IllegalArgumentException is thrown (invalid input)
+    doThrow(new IllegalArgumentException("Invalid namespace: bad namespace"))
+        .when(internalRepo).getArtifactData(spec.getNamespace(), spec.getArtifactUuid());
+
+    assertLockssRestHttpException(
+        () -> clientRepo.getArtifactData(spec.getArtifact(), IncludeContentEnum.ALWAYS),
+        "Invalid namespace: bad namespace", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
   }
 
   @Test
@@ -416,6 +442,19 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         (Executable) () -> clientRepo.commitArtifact("namespace", "artifact"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
+
+    // Reset mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 400 Bad Request if IllegalArgumentException is thrown (invalid input)
+    doThrow(new IllegalArgumentException("Invalid namespace: bad namespace"))
+        .when(internalRepo).commitArtifact("namespace", "artifact");
+
+    assertLockssRestHttpException(
+        (Executable) () -> clientRepo.commitArtifact("namespace", "artifact"),
+        "Invalid namespace: bad namespace", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
   }
 
   @Test
@@ -456,6 +495,25 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         (Executable) () -> clientRepo.addArtifact(spec2.getArtifactData()),
         "IOException from mock", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
+
+    // Reset mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 400 Bad Request if IllegalArgumentException is thrown (invalid input)
+    doThrow(new IllegalArgumentException("Invalid namespace: bad namespace"))
+        .when(internalRepo).addArtifact(ArgumentMatchers.any());
+
+    ArtifactSpec spec3 = new ArtifactSpec()
+        .setCollectionDate(1234)
+        .setUrl("http://example.com/")
+        .setContentLength(1234)
+        .generateContent();
+
+    assertLockssRestHttpException(
+        (Executable) () -> clientRepo.addArtifact(spec3.getArtifactData()),
+        "Invalid namespace: bad namespace", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
   }
 
   @Test
@@ -608,6 +666,25 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         (Executable) () -> processRequest(request9),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.DATA_ERROR);
+
+    // Reset mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 400 Bad Request if IllegalArgumentException is thrown (invalid input)
+    URL endpoint10 = new URL(String.format(
+        "http://localhost:%d/artifacts?auid=auid&version=all&namespace=namespace1", port));
+
+    HttpUriRequest request10 = new HttpGet(endpoint10.toURI());
+
+    doReturn(ListUtil.list("namespace1")).when(internalRepo).getNamespaces();
+    doThrow(new IllegalArgumentException("Invalid namespace: namespace1"))
+        .when(internalRepo).getArtifactsAllVersions("namespace1", "auid");
+
+    assertLockssRestHttpException(
+        (Executable) () -> processRequest(request10),
+        "Invalid namespace: namespace1", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
   }
 
   @Test
@@ -641,6 +718,20 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         (Executable) () -> clientRepo.auSize("namespace", "auid"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.APPLICATION_ERROR);
+
+    // Reset mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 400 Bad Request if IllegalArgumentException is thrown (invalid input)
+    doReturn(ListUtil.list("namespace")).when(internalRepo).getNamespaces();
+    doThrow(new IllegalArgumentException("Invalid namespace: namespace"))
+        .when(internalRepo).auSize("namespace", "auid");
+
+    assertLockssRestHttpException(
+        (Executable) () -> clientRepo.auSize("namespace", "auid"),
+        "Invalid namespace: namespace", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
   }
 
   @Test
@@ -684,5 +775,19 @@ public class TestRestLockssRepositoryErrorHandling extends SpringLockssTestCase4
         (Executable) () -> clientRepo.getAuIds("namespace1"),
         "Test error message", HttpStatus.INTERNAL_SERVER_ERROR,
         LockssRestHttpException.ServerErrorType.UNSPECIFIED_ERROR);
+
+    // Reset mock
+    reset(internalRepo);
+    initInternalLockssRepository();
+
+    //// Assert 400 Bad Request if IllegalArgumentException is thrown (invalid input)
+    doReturn(ListUtil.list("namespace1")).when(internalRepo).getNamespaces();
+    doThrow(new IllegalArgumentException("Invalid namespace: namespace1"))
+        .when(internalRepo).getAuIds("namespace1");
+
+    assertLockssRestHttpException(
+        (Executable) () -> clientRepo.getAuIds("namespace1"),
+        "Invalid namespace: namespace1", HttpStatus.BAD_REQUEST,
+        LockssRestHttpException.ServerErrorType.NONE);
   }
 }

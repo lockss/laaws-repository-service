@@ -180,6 +180,14 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       AuSize result = repo.auSize(namespace, auid);
       log.debug2("result = {}", result);
       return new ResponseEntity<AuSize>(result, HttpStatus.OK);
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get artifacts size";
@@ -366,6 +374,14 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       log.debug2("Returning OK.");
       return new ResponseEntity<>(auidPageInfo, HttpStatus.OK);
 
+    } catch (IllegalArgumentException iae) {
+      String message = iae.getMessage();
+      log.warn(message);
+      log.warn("Parsed request: {}", parsedRequest);
+      throw new LockssRestServiceException(
+          LockssRestHttpException.ServerErrorType.NONE,
+          HttpStatus.BAD_REQUEST,
+          message, parsedRequest);
     } catch (IOException e) {
       String errorMessage =
           "Unexpected exception caught while attempting to get AU ids";
