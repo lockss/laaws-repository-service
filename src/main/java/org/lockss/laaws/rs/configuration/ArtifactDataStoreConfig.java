@@ -41,18 +41,16 @@ import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.TestingLocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
-import org.lockss.util.*;
+import org.lockss.util.ListUtil;
+import org.lockss.util.PatternIntMap;
+import org.lockss.util.SetUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
 import java.io.*;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.lockss.rs.io.storage.warc.WarcArtifactDataStore.DATASTORE_VERSION_FILE;
 
@@ -120,6 +118,7 @@ public class ArtifactDataStoreConfig {
   public ArtifactDataStore artifactDataStore() throws Exception {
     // Create WARC artifact data store and set use WARC compression
     ds = createWarcArtifactDataStore(parseDataStoreSpecs());
+    ds.setStorageUrlPathPolicy(repoProps.getStorageUrlPathPolicy());
     return ds;
   }
 

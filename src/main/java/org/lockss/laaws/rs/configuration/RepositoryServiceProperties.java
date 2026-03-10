@@ -2,7 +2,6 @@ package org.lockss.laaws.rs.configuration;
 
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
-import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,7 +9,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
-import java.nio.file.Path;
 import java.util.Arrays;
 
 /**
@@ -36,6 +34,7 @@ public class RepositoryServiceProperties {
 
   @Value("${repo.datastore.hdfs.server:#{null}}") String hdfsEndpoint;
   @Value("${repo.datastore.hdfs.basedir:#{null}}") String hdfsBaseDir;
+  @Value("${repo.storageUrl.pathPolicy:warn}") String storageUrlPathPolicy;
 
   // Artifact index properties
   @Value("${repo.index.spec:#{null}}") String indexSpec;
@@ -174,6 +173,10 @@ public class RepositoryServiceProperties {
 
   public String getHdfsBaseDir() {
     return hdfsBaseDir;
+  }
+
+  public String getStorageUrlPathPolicy() {
+    return storageUrlPathPolicy;
   }
 
   public File getRepositoryStateDir() {
