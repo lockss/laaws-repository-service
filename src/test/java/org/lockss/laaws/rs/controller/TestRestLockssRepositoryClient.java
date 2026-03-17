@@ -81,7 +81,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @ContextConfiguration(classes = { DefaultTestRepositoryApplicationConfiguration.class })
 public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
-    private final static String BASEURL = "http://localhost:24610";
+    private final static String BASEURL = "http://localhost:24611";
     private final static ObjectMapper mapper = new ObjectMapper();
     protected RestLockssRepository repoClient;
     protected MockRestServiceServer mockServer;

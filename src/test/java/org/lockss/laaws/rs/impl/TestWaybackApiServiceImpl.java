@@ -126,7 +126,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
   public void testRemoteRepository() throws Exception {
     long startms = TimeBase.nowMs();
 
-    String tmpl = "http://dev2.lockss.org:24610/wayback/cdx/owb/{namespace}";
+    String tmpl = "http://dev2.lockss.org:24611/wayback/cdx/owb/{namespace}";
 
     UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(tmpl);
     Map<String, Object> uriParams = new HashMap<>();
