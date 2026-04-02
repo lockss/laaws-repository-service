@@ -79,6 +79,8 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -966,5 +968,61 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
     // Commit artifact
     return repository.commitArtifact("coll1", art.getUuid());
+  }
+
+  /**
+   * Regression test: when normalizeUrl returns multiple URL variants (e.g.
+   * http:// and https://), getCdxRecords0 must return results sorted globally
+   * by collection date ascending, not two concatenated ascending groups.
+   */
+  @Test
+  public void testGetCdxRecords0_multipleNormalizedUrls_sortedByTimestamp()
+      throws Exception {
+    // Create artifacts under two different URLs with interleaved timestamps.
+    // URL A artifacts: timestamps 10000, 30000, 50000 (ascending within URL)
+    // URL B artifacts: timestamps 20000, 40000        (ascending within URL)
+    //
+    // Without the fix, concatenation would yield: 10000, 30000, 50000, 20000, 40000
+    // With the fix, globally ascending:           10000, 20000, 30000, 40000, 50000
+
+    String httpUrl = "http://www.example.com/page";
+    String httpsUrl = "https://www.example.com/page";
+
+    makeArtifact("coll1", "auid1", httpsUrl, null, MediaType.TEXT_HTML, 10000);
+    makeArtifact("coll1", "auid1", httpsUrl, null, MediaType.TEXT_HTML, 30000);
+    makeArtifact("coll1", "auid1", httpsUrl, null, MediaType.TEXT_HTML, 50000);
+
+    makeArtifact("coll1", "auid1", httpUrl, null, MediaType.TEXT_HTML, 20000);
+    makeArtifact("coll1", "auid1", httpUrl, null, MediaType.TEXT_HTML, 40000);
+
+    // Mock normalizeUrl to return both URL variants.
+    RestTemplate restTemplate = new RestTemplate();
+    MockRestServiceServer mockServer =
+        MockRestServiceServer.createServer(restTemplate);
+
+    String encodedHttpUrl = URLEncoder.encode(httpUrl, StandardCharsets.UTF_8);
+    mockServer
+        .expect(requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=" + encodedHttpUrl))
+        .andRespond(
+            MockRestResponseCreators.withSuccess("[\"" + httpsUrl + "\",\"" + httpUrl + "\"]", MediaType.APPLICATION_JSON));
+
+    // Call getCdxRecords0 with closest=null (the calendar/timemap case).
+    CdxRecords records = new CdxRecords();
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, "coll1", httpUrl, repository, false, null, null, null, records);
+
+    // All 5 artifacts should be present.
+    assertEquals(5, records.getCdxRecordCount());
+
+    // Verify globally ascending order by timestamp.
+    long previousTimestamp = -1;
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      long ts = records.getCdxRecords().get(i).getTimestamp();
+      assertTrue("CDX records must be sorted by timestamp ascending: "
+              + "record " + i + " timestamp " + ts
+              + " should be > previous " + previousTimestamp,
+          ts > previousTimestamp);
+      previousTimestamp = ts;
+    }
   }
 }

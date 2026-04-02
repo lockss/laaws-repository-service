@@ -642,6 +642,13 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     if (closest != null && !closest.trim().isEmpty()) {
       // Yes: Return all the artifacts found sorted by temporal proximity to the target timestamp.
       artIterator = getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
+    } else if (normalizedUrls.size() > 1) {
+      // Multiple URL variants were concatenated; sort by collection date ascending
+      // to match the single-URL order produced by the repository.
+      List<Artifact> allArtifacts = new ArrayList<>();
+      artIterator.forEachRemaining(allArtifacts::add);
+      allArtifacts.sort(Comparator.comparingLong(Artifact::getCollectionDate));
+      artIterator = allArtifacts.iterator();
     }
 
     // Get the CDX records for the selected artifacts.
