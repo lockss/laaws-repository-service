@@ -1,5 +1,69 @@
 # `laaws-repository-service` Release Notes
 
+## 2.16.0 (LOCKSS 2.0.91-beta2)
+
+### Features
+
+* Introduced configurable storage URL path policy with options `off`, `warn`, and `strict` to control access paths for artifacts
+* Added role-based access control (RBAC) checks across APIs
+* Added repository error injection framework
+* Made the set of compressed Content-Encodings and MIME types configurable
+* Allow replacement of existing uncommitted artifacts
+* Added full disk reporting (WIP)
+* Added `o.l.repo.artifactToStringShortStyle` to control "added Artifact" logging
+* First foray into a Python client
+* Support for adding specified versions of artifacts
+* Merged MDQ and MDX services into a single MD service
+* Introduced `RepositoryStatistics` in OpenAPI spec and implementation
+* ArtifactIndex versioning and reindex support
+* WarcArtifactDataStore versioning and upgrade support
+* Long URL support
+
+### API Changes
+
+* Consolidated the `/aus/{auid}/artifacts` endpoint into `/artifacts`; moved AUID to a query parameter
+* Relabeled REST endpoint paths: `normalizeUrl` to `normalizeurl`, `mimeType` to `mediatypes`
+* Refactored enums out of API query parameters: `includeContent`, `versions`, `bulkAuOp`, `pywbMatch`, `pywbSort`, `pywbOutput`
+* Updated `PageInfo` spec: some properties now nullable; renamed `resultsPerPage` to `itemsInPage`
+* Clean up and update OpenAPI specifications for `Artifact`, `ArtifactPageInfo`, `AuidPageInfo`, `AuSize`, `RepositoryInfo`, `RepositoryStatistics`
+* Declared specification as OpenAPI 3.0.3
+* Added parameterized `servers` stanza with default service port
+* Updated `nextLink` generation logic for artifact pagination across all AUs with namespace and version query parameters
+
+### Bug Fixes
+
+* Fixed `getArtifact()` to throw on non-404 error responses
+* Fixed `IllegalArgumentException` handling across API service methods to return 400 BAD_REQUEST
+* Used `waitReady()` to guard access to `getLockssDaemon()` call
+* Use `RestServicesManager` to check whether Configuration Service is ready during CDX record lookup
+* Prevented bug when a class name is a prefix of a longer class name
+* Replaced iterator hash codes with UUIDs to avoid hash code collisions
+* Fixed encoding in test for OpenWayback URL normalize call
+* Fixed iterator refetch logic for continuation
+* Bug fix: Do not block LockssApp startup by waiting for it
+
+### CDX / Wayback
+
+* Sort CDX records globally by timestamp when multiple normalized URLs are present; added regression test
+* Avoid generating redundant CDX records
+* Match expected behavior by OpenWayback's `RemoteResourceIndex`
+* Added authentication headers to `normalizeUrl` request
+* Improvements to CDX record endpoints
+
+### Refactorings
+
+* Refactored URI construction to use `encode().build().expand()` with template variables across methods
+* Pipelined artifact iterator
+* Refactored artifact fetching in pagination tests to ensure accurate committed state retrieval
+* Used MockServer to mock Config Service behavior for tests; introduced related infrastructure changes
+* Refactored `MockLockssDaemon` construction and configuration
+* Log all repository content base directories
+* Refactored data store upgrade logic into `BaseLockssRepository`
+* Refactored `WarcArtifactData` utility methods into `WarcArtifactDataUtil`
+* Refactored component startup order and update
+* 2.0-beta2 port conventions
+
+
 ## 2.15.0
 ## changes since 2.12.0
 * Remove travis CI support
