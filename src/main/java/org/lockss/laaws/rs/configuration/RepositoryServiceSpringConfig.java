@@ -67,8 +67,8 @@ public class RepositoryServiceSpringConfig {
 
   @Autowired public ArtifactDataStore ds;
   public static final String CONTENT_MULTIPARTS_DIR = "tmp/multiparts";
-  public static boolean DEFAULT_MULTIPART_USE_CONTENT_FS = false;
-  public static String PARAM_MULTIPART_USE_CONTENT_FS =
+  public static final boolean DEFAULT_MULTIPART_USE_CONTENT_FS = false;
+  public static final String PARAM_MULTIPART_USE_CONTENT_FS =
             org.lockss.config.Configuration.PREFIX + "spring.multipart.useContentFS";
 
   public static final int DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE =
@@ -111,7 +111,7 @@ public class RepositoryServiceSpringConfig {
             newConfig.getBoolean(PARAM_MULTIPART_USE_CONTENT_FS, DEFAULT_MULTIPART_USE_CONTENT_FS);
 
         File tmpDir = useContentFilesystem && (ds != null && ds instanceof WarcArtifactDataStore wads) ?
-            new File(wads.getTmpWarcBasePaths()[0].toFile(), CONTENT_MULTIPARTS_DIR) :
+            new File(wads.getBasePaths()[0].toFile(), CONTENT_MULTIPARTS_DIR) :
             new File(ConfigManager.getConfigManager().getTmpDir(), uploadDir);
 
         log.debug("Setting multipart upload directory to {}", tmpDir);
