@@ -67,7 +67,7 @@ public class RepositoryServiceSpringConfig {
 
   @Autowired public ArtifactDataStore ds;
   public static final String CONTENT_MULTIPARTS_DIR = "tmp/multiparts";
-  public static final boolean DEFAULT_MULTIPART_USE_CONTENT_FS = false;
+  public static final boolean DEFAULT_MULTIPART_USE_CONTENT_FS = true;
   public static final String PARAM_MULTIPART_USE_CONTENT_FS =
             org.lockss.config.Configuration.PREFIX + "spring.multipart.useContentFS";
 
