@@ -36,8 +36,11 @@ import org.apache.commons.io.FileUtils;
 import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.multipart.LockssMultipartResolver;
 import org.lockss.log.L4JLogger;
+import org.lockss.rs.io.storage.ArtifactDataStore;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.util.rest.RestUtil;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -45,7 +48,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
-import java.io.IOException;
 
 /**
  * Spring configuration beans for the Spring-implementation of the LOCKSS Repository Service.
@@ -62,6 +64,12 @@ public class RepositoryServiceSpringConfig {
 
   public static String PARAM_MULTIPART_UPLOAD_DIR =
       org.lockss.config.Configuration.PREFIX + "spring.multipart.uploadDir";
+
+  @Autowired public ArtifactDataStore ds;
+  public static final String CONTENT_MULTIPARTS_DIR = "tmp/multiparts";
+  public static final boolean DEFAULT_MULTIPART_USE_CONTENT_FS = true;
+  public static final String PARAM_MULTIPART_USE_CONTENT_FS =
+            org.lockss.config.Configuration.PREFIX + "spring.multipart.useContentFS";
 
   public static final int DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE =
     4 * (int)FileUtils.ONE_MB;
@@ -94,19 +102,20 @@ public class RepositoryServiceSpringConfig {
 				     org.lockss.config.Configuration.Differences changedKeys) {
 
       if (changedKeys.contains(ConfigManager.PARAM_TMPDIR) ||
-          changedKeys.contains(PARAM_MULTIPART_UPLOAD_DIR)) {
+          changedKeys.contains(PARAM_MULTIPART_UPLOAD_DIR) ||
+          changedKeys.contains(PARAM_MULTIPART_USE_CONTENT_FS)) {
 
-        String uploadDir = newConfig.get(PARAM_MULTIPART_UPLOAD_DIR, DEFAULT_MULTIPART_UPLOAD_DIR);
-        File tmpdir = new File(ConfigManager.getConfigManager().getTmpDir(), uploadDir);
+        String uploadDir =
+            newConfig.get(PARAM_MULTIPART_UPLOAD_DIR, DEFAULT_MULTIPART_UPLOAD_DIR);
+        boolean useContentFilesystem =
+            newConfig.getBoolean(PARAM_MULTIPART_USE_CONTENT_FS, DEFAULT_MULTIPART_USE_CONTENT_FS);
 
-	try {
-	  log.debug("Setting LockssMultipartResolver tmpdir to {}", tmpdir);
-	  multipartResolver.setUploadTempDir(tmpdir);
-          if (false) throw new IOException();
-	} catch (IOException e) {
-	  log.warn("Couldn't set LockssMultipartResolver tmpdir to {}",
-		   tmpdir);
-	}
+        File tmpDir = useContentFilesystem && (ds != null && ds instanceof WarcArtifactDataStore wads) ?
+            new File(wads.getBasePaths()[0].toFile(), CONTENT_MULTIPARTS_DIR) :
+            new File(ConfigManager.getConfigManager().getTmpDir(), uploadDir);
+
+        log.debug("Setting multipart upload directory to {}", tmpDir);
+        multipartResolver.setUploadTempDir(tmpDir);
       }
 
       if (changedKeys.contains(PARAM_MULTIPART_MAX_IN_MEMORY_SIZE)) {
