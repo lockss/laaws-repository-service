@@ -382,7 +382,7 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         outputHeaders.set(ArtifactConstants.INCLUDES_CONTENT, String.valueOf(!onlyHeaders));
 
         // Build expected endpoint
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(BASEURL);
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(BASEURL);
         builder.path(String.format("/artifacts/%s/response", refId.getUuid()));
         builder.queryParam("namespace", refId.getNamespace());
         builder.queryParam("includeContent", includeContent);
@@ -423,19 +423,19 @@ public class TestRestLockssRepositoryClient extends SpringLockssTestCase4 {
         if (isHttpResponse) {
             // Verify artifact header equality (only HTTP response artifacts)
             HttpHeaders referenceHeaders = reference.getHttpHeaders();
-            assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
-                && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
-//            assertTrue(referenceHeaders.entrySet().containsAll(result.getHttpHeaders().entrySet())
-//                && result.getHttpHeaders().entrySet().containsAll(referenceHeaders.entrySet()));
+            assertTrue(referenceHeaders.headerSet().containsAll(result.getHttpHeaders().headerSet())
+                && result.getHttpHeaders().headerSet().containsAll(referenceHeaders.headerSet()));
+//            assertTrue(referenceHeaders.headerSet().containsAll(result.getHttpHeaders().headerSet())
+//                && result.getHttpHeaders().headerSet().containsAll(referenceHeaders.headerSet()));
 
             HttpHeaders actualHeaders = result.getHttpHeaders();
 
-            log.info("ref.keys = {}", referenceHeaders.keySet());
-            log.info("act.keys = {}", actualHeaders.keySet());
+            log.info("ref.keys = {}", referenceHeaders.headerNames());
+            log.info("act.keys = {}", actualHeaders.headerNames());
             actualHeaders.remove("Content-Type");
-            assertIterableEquals(referenceHeaders.keySet(), actualHeaders.keySet());
+            assertIterableEquals(referenceHeaders.headerNames(), actualHeaders.headerNames());
 
-            for (String key : referenceHeaders.keySet()) {
+            for (String key : referenceHeaders.headerNames()) {
                 log.info("key = {}", key);
                 log.info("ref = {}", referenceHeaders.get(key));
                 log.info("act = {}", actualHeaders.get(key));

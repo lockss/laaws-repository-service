@@ -44,9 +44,9 @@ import org.lockss.util.rest.repo.model.ArtifactPageInfo;
 import org.lockss.util.rest.repo.model.AuidPageInfo;
 import org.lockss.util.rest.repo.model.VersionsEnum;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -64,7 +64,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @RunWith(SpringRunner.class)
 @WebMvcTest(RepoinfoApiController.class)
 @AutoConfigureMockMvc()
-// We can't use a @ContextConfiguration here because the tests rely on a @MockBean to mock the
+// We can't use a @ContextConfiguration here because the tests rely on a @MockitoBean to mock the
 // internal BaseLockssRepository behavior.
 public class TestReposApiController extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
@@ -72,7 +72,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
     @Autowired
     private MockMvc controller;
 
-    @MockBean
+    @MockitoBean
     private BaseLockssRepository repo;
 
     // The value of the Authorization header to be used when calling the REST
@@ -258,7 +258,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
       // Remove the last digit of the continuation token, resulting in the
       // specification of a different iterator ID.
-      URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
+      URI nextLinkUri = UriComponentsBuilder.fromUriString(nextLink)
           .replaceQueryParam("continuationToken",
               continuationToken.substring(0, continuationToken.length() - 1))
           .build(true).toUri();
@@ -519,7 +519,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
       // Remove the last digit of the continuation token, resulting in the
       // specification of a different iterator ID.
-      URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
+      URI nextLinkUri = UriComponentsBuilder.fromUriString(nextLink)
           .replaceQueryParam("continuationToken",
               UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
           .build(true).toUri();
@@ -679,7 +679,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 
       // Remove the last digit of the continuation token, resulting in the
       // specification of a different iterator ID.
-      URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
+      URI nextLinkUri = UriComponentsBuilder.fromUriString(nextLink)
           .replaceQueryParam("continuationToken",
               UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
           .build(true).toUri();

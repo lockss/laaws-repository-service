@@ -130,7 +130,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
     String tmpl = "http://dev2.lockss.org:24611/wayback/cdx/owb/{namespace}";
 
-    UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(tmpl);
+    UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(tmpl);
     Map<String, Object> uriParams = new HashMap<>();
     uriParams.put("namespace", "lockss");
     builder.uriVariables(uriParams);

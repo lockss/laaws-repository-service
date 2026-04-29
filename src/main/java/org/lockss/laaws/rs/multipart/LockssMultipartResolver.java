@@ -37,14 +37,16 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.apache.catalina.connector.Connector;
 import org.lockss.laaws.rs.configuration.RepositoryServiceSpringConfig;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
-import org.springframework.boot.web.embedded.tomcat.TomcatWebServer;
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties;
+import org.springframework.boot.tomcat.TomcatWebServer;
 import org.springframework.boot.web.server.WebServer;
-import org.springframework.boot.web.servlet.MultipartConfigFactory;
-import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
+import org.springframework.boot.servlet.MultipartConfigFactory;
+import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext;
+import org.springframework.util.StringUtils;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
+import org.springframework.web.multipart.support.AbstractMultipartHttpServletRequest;
 import org.springframework.web.multipart.support.StandardServletMultipartResolver;
 
 import java.io.File;
@@ -65,6 +67,12 @@ import java.io.IOException;
 public class LockssMultipartResolver extends StandardServletMultipartResolver {
   private final MultipartConfigFactory multipartConfigFactory;
 
+  // Spring 7: resolveLazily controls whether multipart parsing is deferred
+  private boolean resolveLazily = false;
+
+  // Spring 7: strictServletCompliance controls multipart content-type matching
+  private boolean strictServletCompliance = false;
+
 //  @Autowired
 //  ServletWebServerApplicationContext context;
 
@@ -79,9 +87,47 @@ public class LockssMultipartResolver extends StandardServletMultipartResolver {
     }
   }
 
+  /**
+   * Spring 7: set whether to resolve the multipart request lazily at the time of
+   * file or parameter access.
+   */
+  public void setResolveLazily(boolean resolveLazily) {
+    this.resolveLazily = resolveLazily;
+  }
+
+  public boolean isResolveLazily() {
+    return resolveLazily;
+  }
+
+  /**
+   * Spring 7: set whether to comply strictly with the Servlet spec, requiring
+   * {@code multipart/form-data} content type. When {@code false} (the default),
+   * any {@code multipart/} content type is accepted.
+   */
+  public void setStrictServletCompliance(boolean strictServletCompliance) {
+    this.strictServletCompliance = strictServletCompliance;
+  }
+
+  public boolean isStrictServletCompliance() {
+    return strictServletCompliance;
+  }
+
+  /**
+   * Spring 7: check content type with strictServletCompliance support.
+   * When strict, only {@code multipart/form-data} is accepted; otherwise
+   * any {@code multipart/*} is accepted.
+   */
+  @Override
+  public boolean isMultipart(HttpServletRequest request) {
+    return StringUtils.startsWithIgnoreCase(request.getContentType(),
+        this.strictServletCompliance ? "multipart/form-data" : "multipart/");
+  }
+
   @Override
   public MultipartHttpServletRequest resolveMultipart(HttpServletRequest request) throws MultipartException {
     MultipartConfigElement mce = getMultipartConfigElement();
+    // Note: always construct lazily first, then set MCE, then trigger parsing if
+    // resolveLazily is false. The MCE must be set before parsing can proceed.
     LockssMultipartHttpServletRequest lockssMultipartRequest =
         new LockssMultipartHttpServletRequest(request, true)
             .setMultipartConfigElement(mce);
@@ -97,6 +143,26 @@ public class LockssMultipartResolver extends StandardServletMultipartResolver {
 //    }
 
     return lockssMultipartRequest;
+  }
+
+  /**
+   * Spring 7: cleanup multipart resources. Iterates over parts and deletes them.
+   */
+  @Override
+  public void cleanupMultipart(MultipartHttpServletRequest request) {
+    if (request instanceof AbstractMultipartHttpServletRequest abstractRequest) {
+      if (!abstractRequest.isResolved()) {
+        return;
+      }
+    }
+    try {
+      for (var part : request.getParts()) {
+        part.delete();
+      }
+    } catch (Throwable ex) {
+      org.apache.commons.logging.LogFactory.getLog(getClass())
+          .warn("Failed to perform cleanup of multipart items", ex);
+    }
   }
 
   public MultipartConfigElement getMultipartConfigElement() {

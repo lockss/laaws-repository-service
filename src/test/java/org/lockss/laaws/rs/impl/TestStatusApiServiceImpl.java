@@ -41,6 +41,8 @@ import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.AbstractArtifactIndex;
 import org.lockss.spring.test.SpringLockssTestCase4;
+import org.lockss.util.rest.RestUtil;
+import org.springframework.web.client.RestTemplate;
 import org.lockss.test.MockLockssDaemon;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.status.ApiStatus;
@@ -48,7 +50,6 @@ import org.skyscreamer.jsonassert.JSONAssert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpMethod;
@@ -176,7 +177,7 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
   private void getStatusTest() throws JsonProcessingException {
     log.debug2("Invoked");
 
-    ResponseEntity<String> successResponse = new TestRestTemplate().exchange(
+    ResponseEntity<String> successResponse = RestUtil.buildRestTemplate(0, 0).exchange(
 	getTestUrlTemplate("/status"), HttpMethod.GET, null, String.class);
 
     HttpStatusCode statusCode = successResponse.getStatusCode();
@@ -198,7 +199,7 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
     AbstractArtifactIndex index =
         (AbstractArtifactIndex) ((BaseLockssRepository)repo).getArtifactIndex();
     index.setState(AbstractArtifactIndex.ArtifactIndexState.STOPPED);
-    ResponseEntity<String> resp2 = new TestRestTemplate().exchange(
+    ResponseEntity<String> resp2 = RestUtil.buildRestTemplate(0, 0).exchange(
 	getTestUrlTemplate("/status"), HttpMethod.GET, null, String.class);
     assertEquals(HttpStatus.OK, resp2.getStatusCode());
 

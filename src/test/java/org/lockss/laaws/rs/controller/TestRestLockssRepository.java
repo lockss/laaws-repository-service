@@ -80,9 +80,8 @@ import org.mockserver.model.Header;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
@@ -517,11 +516,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       URI endpointUri =
           RestUtil.getRestUri("http://localhost:" + port + "/namespaces", null, null);
 
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -580,11 +579,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       URI endpointUri = RestUtil.getRestUri(endpoint, null, queryParams);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<Resource> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<Resource> response = restTemplate
           .exchange(endpointUri, HttpMethod.POST, requestEntity, Resource.class);
 
       return response;
@@ -611,7 +610,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
       HttpHeaders requestHeaders = new HttpHeaders();
 
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -620,8 +619,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -656,11 +655,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, null);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<MultipartMessage> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<MultipartMessage> response = restTemplate
           .exchange(endpointUri, HttpMethod.POST, requestEntity, MultipartMessage.class);
 
       return response;
@@ -686,13 +685,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           ListUtil.list(MediaType.MULTIPART_FORM_DATA, MediaType.APPLICATION_JSON));
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<MultipartMessage> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<MultipartMessage> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, MultipartMessage.class);
 
       return response;
@@ -718,14 +717,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       requestHeaders.setContentType(MediaType.valueOf("multipart/form-data"));
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       MultiValueMap<String, Object> EMPTY_MULTIPART_MAP = new LinkedMultiValueMap<>();
       HttpEntity requestEntity = new HttpEntity<>(EMPTY_MULTIPART_MAP, requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.PUT, requestEntity, String.class);
 
       return response;
@@ -748,13 +747,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       requestHeaders.setContentType(MediaType.APPLICATION_JSON);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<Void> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<Void> response = restTemplate
           .exchange(endpointUri, HttpMethod.DELETE, requestEntity, Void.class);
 
       return response;
@@ -779,13 +778,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       requestHeaders.setAccept(ListUtil.list(MediaType.ALL, MediaType.APPLICATION_JSON));
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<Resource> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<Resource> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, Resource.class);
 
       return response;
@@ -811,13 +810,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       requestHeaders.setAccept(ListUtil.list(APPLICATION_HTTP_RESPONSE, MediaType.APPLICATION_JSON));
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<Void> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<Void> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, Void.class);
 
       return response;
@@ -845,11 +844,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       URI endpointUri = RestUtil.getRestUri("http://localhost:" + port + "/aus", null, queryParams);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -882,11 +881,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/aus/{auid}/bulk", uriParams, queryParams);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.POST, requestEntity, String.class);
 
       return response;
@@ -920,11 +919,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -948,7 +947,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -957,8 +956,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -985,7 +984,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/wayback/cdx/owb/{namespace}", uriParams, queryParams);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -994,8 +993,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -1073,7 +1072,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           uriParams, queryParams);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -1082,8 +1081,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -1103,7 +1102,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/wayback/warcs/{fileName}", uriParams, null);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       HttpHeaders requestHeaders = new HttpHeaders();
       requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
@@ -1112,8 +1111,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<Resource> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<Resource> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, Resource.class);
 
       return response;
@@ -1137,11 +1136,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/checksumalgorithms", null, null);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -1165,11 +1164,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/repoinfo", null, null);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;
@@ -1193,11 +1192,11 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
           RestUtil.getRestUri("http://localhost:" + port + "/repoinfo/storage", null, null);
 
       // Initialize the request to the REST service.
-      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      RestTemplate restTemplate = RestUtil.buildRestTemplate(0, 0);
 
       // Make the request and get the response.
-      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
-      ResponseEntity<String> response = testTemplate
+      // restTemplate already assigned above
+      ResponseEntity<String> response = restTemplate
           .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
 
       return response;

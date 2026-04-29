@@ -257,7 +257,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           // Set HTTP headers
           ad.setHttpHeaders(ArtifactDataUtil.transformHeaderArrayToHttpHeaders(httpResponse.getAllHeaders()));
         } catch (HttpException e) {
-          throw new HttpMessageNotReadableException("Error parsing HTTP response header part", e);
+          throw new HttpMessageNotReadableException("Error parsing HTTP response header part", e, null);
         }
       } else {
         // Set artifact's Content-Type to the Content-Type of the part
@@ -307,7 +307,7 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       log.error("Could not read artifact data from content part", e);
       // This one would be thrown by ArtifactDataFactory.fromHttpResponseStream(InputStream) while
       // parsing HTTP request. Return a 400 Bad Request response.
-      throw new HttpMessageNotReadableException("Could not read artifact data from content part", e);
+      throw new HttpMessageNotReadableException("Could not read artifact data from content part", e, null);
     }
   }
 
@@ -472,11 +472,11 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
       HttpHeaders respHeaders = new HttpHeaders();
 
       // Selectively copy artifact headers into REST response
-      if (httpHeaders.containsKey(HttpHeaders.CONTENT_TYPE)) {
+      if (httpHeaders.containsHeader(HttpHeaders.CONTENT_TYPE)) {
         respHeaders.setContentType(httpHeaders.getContentType());
       }
 
-      if (httpHeaders.containsKey(HttpHeaders.LAST_MODIFIED)) {
+      if (httpHeaders.containsHeader(HttpHeaders.LAST_MODIFIED)) {
         respHeaders.setLastModified(httpHeaders.getLastModified());
       }
 

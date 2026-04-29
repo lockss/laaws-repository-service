@@ -516,7 +516,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
       // Get an input stream to the WARC record to be returned.
       try (DeferredFileOutputStream dfos =
-               new DeferredFileOutputStream((int) FileUtils.ONE_MB, warcRecordFile)) {
+               DeferredFileOutputStream.builder().setThreshold((int) FileUtils.ONE_MB).setOutputFile(warcRecordFile).get()) {
         // Get the WARC record.
         WarcArtifactDataStore.writeArtifactData(artifactData, dfos);
         dfos.close();

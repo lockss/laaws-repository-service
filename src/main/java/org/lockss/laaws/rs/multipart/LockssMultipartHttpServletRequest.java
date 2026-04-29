@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 */
 
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,9 +49,11 @@ POSSIBILITY OF SUCH DAMAGE.
 package org.lockss.laaws.rs.multipart;
 
 import jakarta.servlet.MultipartConfigElement;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequestWrapper;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.core.ApplicationPart;
@@ -59,12 +61,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.tomcat.util.buf.B2CConverter;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.buf.UDecoder;
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.apache.tomcat.util.http.Parameters;
-import org.apache.tomcat.util.http.Parameters.FailReason;
 import org.apache.tomcat.util.http.fileupload.FileItem;
 import org.apache.tomcat.util.http.fileupload.FileUpload;
 import org.apache.tomcat.util.http.fileupload.MultipartStream.MalformedStreamException;
 import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
+import org.apache.tomcat.util.http.fileupload.impl.FileCountLimitExceededException;
 import org.apache.tomcat.util.http.fileupload.impl.InvalidContentTypeException;
 import org.apache.tomcat.util.http.fileupload.impl.SizeException;
 import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
@@ -72,7 +75,8 @@ import org.lockss.log.L4JLogger;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -89,6 +93,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.Locale;
 
 /**
  * Portions of this class were copied from Spring's {@link StandardMultipartHttpServletRequest} and
@@ -136,6 +141,10 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   private final Parameters parameters = new Parameters();
   private int maxParameterCount = -1;
   private int maxPostSize = -1;
+  // Tomcat 11: maxPartCount limits the total number of parts in a multipart request
+  private int maxPartCount = -1;
+  // Tomcat 11: maxPartHeaderSize limits the size of individual part headers
+  private int maxPartHeaderSize = -1;
   private boolean createUploadTargets = true;
   private Charset charset;
 
@@ -179,6 +188,24 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
 
   public int getMaxPostSize() {
     return maxPostSize;
+  }
+
+  // Tomcat 11: maxPartCount getter/setter
+  public void setMaxPartCount(int maxPartCount) {
+    this.maxPartCount = maxPartCount;
+  }
+
+  public int getMaxPartCount() {
+    return maxPartCount;
+  }
+
+  // Tomcat 11: maxPartHeaderSize getter/setter
+  public void setMaxPartHeaderSize(int maxPartHeaderSize) {
+    this.maxPartHeaderSize = maxPartHeaderSize;
+  }
+
+  public int getMaxPartHeaderSize() {
+    return maxPartHeaderSize;
   }
 
   private Parameters getParameters() {
@@ -245,7 +272,20 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   }
 
   /**
-   * Adapted from Tomcat's {@link Request#parseParts(boolean)}.
+   * Adapted from Tomcat 11's {@link Request#parseParts(boolean)}.
+   *
+   * <p>Tomcat 11 improvements over the previous version:
+   * <ul>
+   *   <li>maxPartHeaderSize / maxPartCount validation</li>
+   *   <li>Location resolution for relative paths via servlet context tempdir</li>
+   *   <li>Math.addExact() for overflow-safe size calculations</li>
+   *   <li>FileItem cleanup on parse exceptions (finally block)</li>
+   *   <li>checkSwallowInput() equivalents on SizeException / IllegalStateException</li>
+   * </ul>
+   *
+   * <p>LOCKSS-specific: Uses {@link DigestFileItemFactory} instead of
+   * {@link DiskFileItemFactory} so that part digests are computed during upload.
+   * Also wraps items as {@link LockssApplicationPart} to expose the digest.
    */
   private void parseParts(boolean explicit) throws IOException, ServletException {
 
@@ -260,115 +300,167 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
     Parameters parameters = getParameters();
     parameters.setLimit(maxParameterCount);
 
+    // Tomcat 11: resolve location, handling relative paths via servlet context tempdir
+    String locationStr = mce.getLocation();
+    File location;
+    if (locationStr == null || locationStr.isEmpty()) {
+      // Use the servlet context temporary directory
+      location = (File) getServletContext().getAttribute("jakarta.servlet.context.tempdir");
+    } else {
+      location = new File(locationStr);
+      if (!location.isAbsolute()) {
+        // Tomcat 11: resolve relative paths against servlet context tempdir
+        File tempDir = (File) getServletContext().getAttribute("jakarta.servlet.context.tempdir");
+        location = new File(tempDir, locationStr).getAbsoluteFile();
+      }
+    }
+
+    if (!location.exists() && getCreateUploadTargets()) {
+      log.warn("Temporary directory for parts is missing; will attempt to create it: {}", location);
+      if (!location.mkdirs()) {
+        log.warn("Failed to create temporary directory for parts: {}", location);
+      }
+    }
+
+    if (!location.isDirectory()) {
+      partsParseException = new IOException("Upload location invalid: " + location);
+      return;
+    }
+
+    // LOCKSS-specific: Use DigestFileItemFactory instead of DiskFileItemFactory
+    // so that part digests are computed during upload
+    DigestFileItemFactory factory = new DigestFileItemFactory();
+    try {
+      factory.setRepository(location.getCanonicalFile());
+    } catch (IOException ioe) {
+      partsParseException = ioe;
+      return;
+    }
+    factory.setSizeThreshold(mce.getFileSizeThreshold());
+
+    FileUpload upload = new FileUpload();
+    upload.setFileItemFactory(factory);
+    upload.setFileSizeMax(mce.getMaxFileSize());
+    upload.setSizeMax(mce.getMaxRequestSize());
+
+    // Tomcat 11: set part header size limit
+    upload.setPartHeaderSizeMax(maxPartHeaderSize);
+
+    int fileCountMax = maxParameterCount;
+    if (fileCountMax > -1) {
+      // There is a limit. The limit for parts needs to be reduced by
+      // the number of parameters we have already parsed.
+      // Must be under the limit else parsing parameters would have
+      // triggered an exception.
+      fileCountMax = fileCountMax - parameters.size();
+    }
+
+    // Tomcat 11: apply maxPartCount if set, taking the minimum of the two limits
+    int maxPartCount = getMaxPartCount();
+    if (maxPartCount > -1) {
+      if (fileCountMax < 0 || fileCountMax > maxPartCount) {
+        fileCountMax = maxPartCount;
+      }
+    }
+
+    upload.setFileCountMax(fileCountMax);
+
+    parts = new ArrayList<>();
+    List<FileItem> items = null;
     boolean success = false;
     try {
-      File location = new File(mce.getLocation());
-
-      if (!location.exists() && getCreateUploadTargets()) {
-        log.warn("Temporary directory for parts is missing; will attempt to create it: {}", location);
-        if (!location.mkdirs()) {
-          log.error("Failed to create temporary directory for parts");
+      items = upload.parseRequest(new ServletRequestContext(getRequest()));
+      int maxPostSize = getMaxPostSize();
+      long postSize = 0;
+      Charset charset = getCharset();
+      for (FileItem item : items) {
+        // LOCKSS-specific: wrap as LockssApplicationPart to expose digest
+        ApplicationPart part = new LockssApplicationPart((DigestFileItem) item, location);
+        if (part.getSubmittedFileName() == null) {
+          String name = part.getName();
+          if (maxPostSize >= 0) {
+            // Have to calculate equivalent size. Not completely
+            // accurate but close enough.
+            // Tomcat 11: use Math.addExact() to prevent integer overflow
+            postSize = Math.addExact(postSize, (long) name.getBytes(charset).length);
+            // Equals sign
+            postSize = Math.addExact(postSize, 1L);
+            // Value length
+            postSize = Math.addExact(postSize, part.getSize());
+            // Value separator
+            postSize = Math.addExact(postSize, 1L);
+            if (postSize > maxPostSize) {
+              throw new IllegalStateException("maxPostSize exceeded");
+            }
+          }
+          String value = null;
+          try {
+            value = part.getString(charset.name());
+          } catch (UnsupportedEncodingException uee) {
+            // Not possible
+          }
+          parameters.addParameter(name, value);
+        } else {
+          // Adjust the limit to account for a file part which is not added to the parameter map.
+          maxParameterCount--;
         }
+        parts.add(part);
       }
 
-      if (!location.isDirectory()) {
-        parameters.setParseFailedReason(FailReason.MULTIPART_CONFIG_INVALID);
-        throw new IOException("Upload location invalid: " + location);
-      }
+      success = true;
+    } catch (InvalidContentTypeException e) {
+      partsParseException = new ServletException(e);
+    } catch (SizeException | FileCountLimitExceededException e) {
+      // Tomcat 11: drain remaining input on size/count errors
+      drainInputStream();
+      partsParseException = new InvalidParameterException(e, HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+    } catch (IOException e) {
+      partsParseException = e;
+      Throwable ppeCause = partsParseException.getCause();
 
-      // Create a new file upload handler
-      DigestFileItemFactory factory = new DigestFileItemFactory();
-      try {
-        factory.setRepository(location.getCanonicalFile());
-      } catch (IOException ioe) {
-        parameters.setParseFailedReason(FailReason.IO_ERROR);
-        throw ioe;
-      }
-      factory.setSizeThreshold(mce.getFileSizeThreshold());
+      if (ppeCause instanceof MalformedStreamException) {
+        String clientStr = "[client: " + getRemoteHost() + ", clientIP: " + getRemoteAddr() +"]";
+        String errMsg = "Error processing malformed multipart request from client "
+            + clientStr + ": " + ppeCause.getMessage();
 
-      FileUpload upload = new FileUpload();
-      upload.setFileItemFactory(factory);
-      upload.setFileSizeMax(mce.getMaxFileSize());
-      upload.setSizeMax(mce.getMaxRequestSize());
-      if (maxParameterCount > -1) {
-        // There is a limit. The limit for parts needs to be reduced by
-        // the number of parameters we have already parsed.
-        // Must be under the limit else parsing parameters would have
-        // triggered an exception.
-        upload.setFileCountMax(maxParameterCount - parameters.size());
-      }
+        log.error(errMsg);
 
-      parts = new ArrayList<>();
-      try {
-        List<FileItem> items = upload.parseRequest(new ServletRequestContext(getRequest()));
-        int maxPostSize = getMaxPostSize();
-        int postSize = 0;
-        Charset charset = getCharset();
-        for (FileItem item : items) {
-          ApplicationPart part = new LockssApplicationPart((DigestFileItem) item, location);
-          parts.add(part);
-          if (part.getSubmittedFileName() == null) {
-            String name = part.getName();
-            if (maxPostSize >= 0) {
-              // Have to calculate equivalent size. Not completely
-              // accurate but close enough.
-              postSize += name.getBytes(charset).length;
-              // Equals sign
-              postSize++;
-              // Value length
-              postSize += part.getSize();
-              // Value separator
-              postSize++;
-              if (postSize > maxPostSize) {
-                parameters.setParseFailedReason(FailReason.POST_TOO_LARGE);
-                throw new IllegalStateException("maxPostSized exceeded");
-              }
-            }
-            String value = null;
+        partsParseException = getQuietMultipartStreamException((MalformedStreamException) ppeCause);
+      }
+    } catch (IllegalStateException e) {
+      // Tomcat 11: drain remaining input on illegal state
+      drainInputStream();
+      partsParseException = e;
+    } finally {
+      // Tomcat 11: clean up parsed FileItems on failure
+      if (!success) {
+        parts.clear();
+        if (items != null) {
+          for (FileItem item : items) {
             try {
-              value = part.getString(charset.name());
-            } catch (UnsupportedEncodingException uee) {
-              // Not possible
+              item.delete();
+            } catch (Throwable t) {
+              log.warn("Failed to perform cleanup of multipart items", t);
             }
-            parameters.addParameter(name, value);
           }
         }
-
-        success = true;
-      } catch (InvalidContentTypeException e) {
-        parameters.setParseFailedReason(FailReason.INVALID_CONTENT_TYPE);
-        partsParseException = new ServletException(e);
-      } catch (SizeException e) {
-        parameters.setParseFailedReason(FailReason.POST_TOO_LARGE);
-//        checkSwallowInput();
-        partsParseException = new IllegalStateException(e);
-      } catch (IOException e) {
-        parameters.setParseFailedReason(FailReason.IO_ERROR);
-        partsParseException = e;
-        Throwable ppeCause = partsParseException.getCause();
-
-        if (ppeCause instanceof MalformedStreamException) {
-          String clientStr = "[client: " + getRemoteHost() + ", clientIP: " + getRemoteAddr() +"]";
-          String errMsg = "Error processing malformed multipart request from client "
-              + clientStr + ": " + ppeCause.getMessage();
-
-          log.error(errMsg);
-
-          partsParseException = getQuietMultipartStreamException((MalformedStreamException) ppeCause);
-        }
-      } catch (IllegalStateException e) {
-        // addParameters() will set parseFailedReason
-//        checkSwallowInput();
-        partsParseException = e;
       }
-    } finally {
-      // This might look odd but is correct. setParseFailedReason() only
-      // sets the failure reason if none is currently set. This code could
-      // be more efficient but it is written this way to be robust with
-      // respect to changes in the remainder of the method.
-      if (partsParseException != null || !success) {
-        parameters.setParseFailedReason(FailReason.UNKNOWN);
+    }
+  }
+
+  /**
+   * Equivalent of Tomcat's {@code checkSwallowInput()} -- drain the request
+   * input stream so that the connection can potentially be reused.
+   */
+  private void drainInputStream() {
+    try (InputStream is = getRequest().getInputStream()) {
+      byte[] buf = new byte[4096];
+      //noinspection StatementWithEmptyBody
+      while (is.read(buf) >= 0) {
+        // discard
       }
+    } catch (IOException e) {
+      log.debug("Error draining input stream after multipart parse failure", e);
     }
   }
 
@@ -397,7 +489,8 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   private void parseRequest(HttpServletRequest request) {
     try {
       Collection<Part> parts = getParts();
-      this.multipartParameterNames = new LinkedHashSet<>(parts.size());
+      // Spring 7: use CollectionUtils.newLinkedHashSet for proper initial capacity
+      this.multipartParameterNames = CollectionUtils.newLinkedHashSet(parts.size());
       MultiValueMap<String, MultipartFile> files = new LinkedMultiValueMap<>(parts.size());
       for (Part part : parts) {
         String headerValue = part.getHeader(HttpHeaders.CONTENT_DISPOSITION);
@@ -416,18 +509,31 @@ public class LockssMultipartHttpServletRequest extends AbstractMultipartHttpServ
   }
 
   /**
-   * Taken unmodified from {@link StandardMultipartHttpServletRequest#handleParseFailure(Throwable)}.
+   * Adapted from Spring 7's {@link StandardMultipartHttpServletRequest#handleParseFailure(Throwable)}.
+   *
+   * <p>Spring 7 changes: uses {@code toString()} on causes (not just {@code getMessage()}),
+   * normalises to {@code Locale.ROOT}, and recognises additional keywords: "limit", "count",
+   * "request"+"big"/"large".
+   *
+   * <p>LOCKSS-specific: also detects "no space" to throw a disk-full exception.
    */
   protected void handleParseFailure(Throwable ex) {
     // MaxUploadSizeExceededException ?
     Throwable cause = ex;
     do {
-      String msg = cause.getMessage();
+      // Spring 7: use toString() instead of getMessage() for broader matching
+      String msg = cause.toString();
       if (msg != null) {
-        msg = msg.toLowerCase();
-        if (msg.contains("exceed") && (msg.contains("size") || msg.contains("length"))) {
+        // Spring 7: use Locale.ROOT for case conversion
+        msg = msg.toLowerCase(Locale.ROOT);
+        if ((msg.contains("exceed") || msg.contains("limit"))
+            && (msg.contains("size") || msg.contains("length") || msg.contains("count"))) {
           throw new MaxUploadSizeExceededException(-1, ex);
         }
+        if (msg.contains("request") && (msg.contains("big") || msg.contains("large"))) {
+          throw new MaxUploadSizeExceededException(-1, ex);
+        }
+        // LOCKSS-specific: detect disk-full conditions
         if (msg.contains("no space")) {
           if (cause instanceof IOException iocause) {
             throw new org.lockss.util.LockssUncheckedDiskFullException("No space left in temp dir while receiving multipart request", iocause);
