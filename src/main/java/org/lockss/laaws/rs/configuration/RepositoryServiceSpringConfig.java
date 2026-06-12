@@ -32,16 +32,25 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.configuration;
 
+import org.apache.catalina.connector.Connector;
 import org.apache.commons.io.FileUtils;
+import org.apache.coyote.http11.AbstractHttp11Protocol;
+import org.junit.jupiter.api.Assertions;
 import org.lockss.config.ConfigManager;
 import org.lockss.laaws.rs.multipart.LockssMultipartResolver;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.io.storage.ArtifactDataStore;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
+import org.lockss.util.Constants;
 import org.lockss.util.rest.RestUtil;
+import org.mortbay.jetty.servlet.WebApplicationContext;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.boot.web.context.WebServerApplicationContext;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.web.embedded.tomcat.TomcatWebServer;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
@@ -56,25 +65,41 @@ import java.io.File;
 public class RepositoryServiceSpringConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
+  public static final String MULTIPART_PREFIX =
+      org.lockss.config.Configuration.PREFIX + "spring.multipart.";
+
   /** Max size of in-memory buffering of multipart requests */
   public static String PARAM_MULTIPART_MAX_IN_MEMORY_SIZE =
-    org.lockss.config.Configuration.PREFIX + "spring.multipart.maxInMemorySize";
+    MULTIPART_PREFIX + "maxInMemorySize";
 
   public static String DEFAULT_MULTIPART_UPLOAD_DIR = "repo-server";
 
   public static String PARAM_MULTIPART_UPLOAD_DIR =
-      org.lockss.config.Configuration.PREFIX + "spring.multipart.uploadDir";
+      MULTIPART_PREFIX + "uploadDir";
 
+  public static final String PARAM_MULTIPART_UPLOAD_TIMEOUT =
+      MULTIPART_PREFIX + "uploadTimeout";
+
+  public static final long DEFAULT_MULTIPART_UPLOAD_TIMEOUT = 15L * Constants.MINUTE;
+
+  public static final String PARAM_MULTIPART_DISABLE_UPLOAD_TIMEOUT =
+      MULTIPART_PREFIX + ".disableUploadTimeout";
+
+  public static final boolean DEFAULT_MULTIPART_DISABLE_UPLOAD_TIMEOUT = false;
+
+  @Autowired public WebServerApplicationContext webCtx;
   @Autowired public ArtifactDataStore ds;
   public static final String CONTENT_MULTIPARTS_DIR = "tmp/multiparts";
   public static final boolean DEFAULT_MULTIPART_USE_CONTENT_FS = true;
   public static final String PARAM_MULTIPART_USE_CONTENT_FS =
-            org.lockss.config.Configuration.PREFIX + "spring.multipart.useContentFS";
+            MULTIPART_PREFIX + "useContentFS";
 
   public static final int DEFAULT_MULTIPART_MAX_IN_MEMORY_SIZE =
     4 * (int)FileUtils.ONE_MB;
 
   LockssMultipartResolver multipartResolver;
+  private long uploadTimeout = DEFAULT_MULTIPART_UPLOAD_TIMEOUT;
+  private boolean disableUploadTimeout = DEFAULT_MULTIPART_DISABLE_UPLOAD_TIMEOUT;
 
   @Bean
   public RestTemplate restTemplate() {
@@ -85,6 +110,24 @@ public class RepositoryServiceSpringConfig {
   public LockssMultipartResolver multipartResolver(ObjectProvider<MultipartProperties> multipartPropsProvider) {
     multipartResolver = new LockssMultipartResolver(multipartPropsProvider.getIfAvailable());
     return multipartResolver;
+  }
+
+  private void setMultipartSettings(Connector connector) {
+    AbstractHttp11Protocol<?> proto = (AbstractHttp11Protocol<?>) connector.getProtocolHandler();
+    log.debug("Setting disableUploadTimeout to {} from {}",
+        disableUploadTimeout, proto.getDisableUploadTimeout());
+    log.debug("Setting connectionUploadTimeout to {} from {}",
+        uploadTimeout, proto.getConnectionUploadTimeout());
+
+    connector.setProperty("disableUploadTimeout", Boolean.toString(disableUploadTimeout));
+    connector.setProperty("connectionUploadTimeout", Long.toString(uploadTimeout));
+  }
+
+  @Bean
+  public WebServerFactoryCustomizer<TomcatServletWebServerFactory> uploadTimeoutCustomizer() {
+    return factory -> factory.addConnectorCustomizers(connector -> {
+      setMultipartSettings(connector);
+    });
   }
 
   // When ConfigManager is started, register a config callback to set the
@@ -102,8 +145,7 @@ public class RepositoryServiceSpringConfig {
 				     org.lockss.config.Configuration.Differences changedKeys) {
 
       if (changedKeys.contains(ConfigManager.PARAM_TMPDIR) ||
-          changedKeys.contains(PARAM_MULTIPART_UPLOAD_DIR) ||
-          changedKeys.contains(PARAM_MULTIPART_USE_CONTENT_FS)) {
+          changedKeys.contains(MULTIPART_PREFIX)) {
 
         String uploadDir =
             newConfig.get(PARAM_MULTIPART_UPLOAD_DIR, DEFAULT_MULTIPART_UPLOAD_DIR);
@@ -116,6 +158,15 @@ public class RepositoryServiceSpringConfig {
 
         log.debug("Setting multipart upload directory to {}", tmpDir);
         multipartResolver.setUploadTempDir(tmpDir);
+
+        uploadTimeout = newConfig.getTimeInterval(PARAM_MULTIPART_UPLOAD_TIMEOUT,
+                                                  DEFAULT_MULTIPART_UPLOAD_TIMEOUT);
+        disableUploadTimeout = newConfig.getBoolean(PARAM_MULTIPART_DISABLE_UPLOAD_TIMEOUT,
+                                                    DEFAULT_MULTIPART_DISABLE_UPLOAD_TIMEOUT);
+
+        // WebServerApplicationContext webCtx = (WebServerApplicationContext) appCtx;
+        TomcatWebServer webServer = (TomcatWebServer) webCtx.getWebServer();
+        setMultipartSettings(webServer.getTomcat().getConnector());
       }
 
       if (changedKeys.contains(PARAM_MULTIPART_MAX_IN_MEMORY_SIZE)) {
