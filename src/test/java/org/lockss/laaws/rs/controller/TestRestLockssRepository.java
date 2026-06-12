@@ -3155,7 +3155,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     Assertions.assertFalse(protocol.getDisableUploadTimeout(),
         "disableUploadTimeout should be false so the upload-phase read timeout is enforced");
-    Assertions.assertEquals(600_000, protocol.getConnectionUploadTimeout(),
+    // Our Customizer sets the default to 15 minutes
+    Assertions.assertEquals(900_000, protocol.getConnectionUploadTimeout(),
         "connectionUploadTimeout should match the value set by uploadTimeoutCustomizer");
   }
 
