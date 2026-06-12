@@ -31,6 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.controller;
 
+import org.apache.catalina.connector.Connector;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.io.FileUtils;
@@ -39,6 +40,7 @@ import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
@@ -83,6 +85,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.web.context.WebServerApplicationContext;
+import org.springframework.boot.web.embedded.tomcat.TomcatWebServer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
@@ -98,6 +102,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Socket;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -3129,6 +3135,137 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
         size.getTotalAllVersions() > 0);
     assertTrue("auSize totalLatestVersions should be > 0",
         size.getTotalLatestVersions() > 0);
+  }
+
+  /**
+   * Integration regression-guard: boots the full Spring context with an
+   * embedded Tomcat, then inspects the live connector to confirm the upload
+   * timeout customizer in {@code RepositoryServiceSpringConfig} actually
+   * reached the running protocol handler. A silent regression (wrong factory
+   * type, bean not picked up, autoconfiguration reordering) would leave
+   * disableUploadTimeout at its default and break long multipart uploads.
+   */
+  @Test
+  public void testUploadTimeoutCustomizerAppliedToConnector() {
+    WebServerApplicationContext webCtx = (WebServerApplicationContext) appCtx;
+    TomcatWebServer webServer = (TomcatWebServer) webCtx.getWebServer();
+    Connector connector = webServer.getTomcat().getConnector();
+    AbstractHttp11Protocol<?> protocol =
+        (AbstractHttp11Protocol<?>) connector.getProtocolHandler();
+
+    Assertions.assertFalse(protocol.getDisableUploadTimeout(),
+        "disableUploadTimeout should be false so the upload-phase read timeout is enforced");
+    Assertions.assertEquals(600_000, protocol.getConnectionUploadTimeout(),
+        "connectionUploadTimeout should match the value set by uploadTimeoutCustomizer");
+  }
+
+  /**
+   * End-to-end behavioral test for the upload timeout. Overrides the live
+   * connector's {@code connectionUploadTimeout} to 10s for this test only,
+   * then exercises two requests: a normal small upload that completes well
+   * within the timeout, and a stalled raw-socket upload that declares a
+   * Content-Length but never sends any body bytes. Empirically Tomcat runs
+   * roughly three timeout cycles (read → error → drain) before closing, so
+   * total elapsed scales with the configured timeout — proving the setting
+   * actually drives behavior end-to-end.
+   */
+  @Test
+  public void testUploadTimeoutBehavior() throws Exception {
+    runTestUploadTimeoutBehavior(5_000);
+    runTestUploadTimeoutBehavior(10_000);
+  }
+
+  private void runTestUploadTimeoutBehavior(int soTimeout) throws Exception {
+    // Mutate the running connector. Http11InputBuffer reads these properties
+    // per-connection via the protocol handler's getters, so the change takes
+    // effect on subsequent requests. The change is contained to this test
+    // because @DirtiesContext rebuilds the context after each test method.
+    WebServerApplicationContext webCtx = (WebServerApplicationContext) appCtx;
+    TomcatWebServer webServer = (TomcatWebServer) webCtx.getWebServer();
+    Connector connector = webServer.getTomcat().getConnector();
+    connector.setProperty("disableUploadTimeout", "false");
+    connector.setProperty("connectionUploadTimeout",
+        Integer.toString(soTimeout));
+
+    AbstractHttp11Protocol<?> proto =
+        (AbstractHttp11Protocol<?>) connector.getProtocolHandler();
+    Assertions.assertFalse(proto.getDisableUploadTimeout(),
+        "test override of disableUploadTimeout did not take effect");
+    Assertions.assertEquals(soTimeout, proto.getConnectionUploadTimeout(),
+        "test override of connectionUploadTimeout did not take effect");
+
+    // Fast path: A normal small artifact upload completes promptly
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace("ns-upload-timeout")
+        .setAuid("auid-upload-timeout")
+        .setUrl("http://example.com/upload-timeout-fast")
+        .setStatusLine(null)
+        .generateContent();
+
+    long fastStart = System.currentTimeMillis();
+    Artifact added = repoClient.addArtifact(spec.getArtifactData());
+    long fastElapsed = System.currentTimeMillis() - fastStart;
+    log.info("Fast upload completed in {} ms", fastElapsed);
+
+    Assertions.assertNotNull(added, "fast upload should succeed");
+    Assertions.assertTrue(fastElapsed < soTimeout,
+        "fast upload should not approach the upload timeout (took " + fastElapsed + "ms)");
+
+    // Stalled upload: Claim a body, never send one, expect server to close
+    long stallStart = System.currentTimeMillis();
+    long firstByteAt = -1;
+    long stallElapsed = -1;
+    try (Socket socket = new Socket("localhost", port)) {
+      // Client-side read timeout must comfortably exceed however long Tomcat
+      // takes to finish its read/error/drain cycles, otherwise SO_TIMEOUT
+      // would beat the server's close and mask a real failure.
+      socket.setSoTimeout(soTimeout * 6);
+      OutputStream out = socket.getOutputStream();
+      InputStream in = socket.getInputStream();
+
+      String basicAuth = Base64.getEncoder().encodeToString(
+          "lockss-u:lockss-p".getBytes(StandardCharsets.US_ASCII));
+      String request = "POST /artifacts HTTP/1.1\r\n"
+          + "Host: localhost:" + port + "\r\n"
+          + "Authorization: Basic " + basicAuth + "\r\n"
+          + "Content-Type: multipart/form-data; boundary=----stall\r\n"
+          + "Content-Length: 1024\r\n"
+          + "\r\n";
+      out.write(request.getBytes(StandardCharsets.US_ASCII));
+      out.flush();
+
+      try {
+        int rxByte;
+        while ((rxByte = in.read()) != -1) {
+          if (firstByteAt < 0) {
+            firstByteAt = System.currentTimeMillis();
+          }
+          // discard
+        }
+      } catch (SocketException e) {
+        fail("Stalled upload should not time out");
+      }
+    } finally {
+      stallElapsed = System.currentTimeMillis() - stallStart;
+    }
+
+    long firstByteElapsed = firstByteAt < 0 ? -1 : firstByteAt - stallStart;
+    log.info("Stalled upload: first byte at +{} ms, server closed at +{} ms",
+        firstByteElapsed, stallElapsed);
+
+    // The server's first response byte should arrive no earlier than one
+    // upload-timeout window — anything sooner means a different (shorter)
+    // timeout drove the response and our setting isn't actually in effect.
+    Assertions.assertTrue(firstByteElapsed >= soTimeout,
+        "server reacted before the configured " + soTimeout
+            + "ms upload timeout (first byte at " + firstByteElapsed + "ms)");
+
+    // And it must eventually close. 5x the timeout leaves comfortable headroom
+    // for the read/error/drain cycle Tomcat performs after the stall.
+    Assertions.assertTrue(stallElapsed < soTimeout * 5L,
+        "server failed to close stalled upload within "
+            + (soTimeout * 5L) + "ms (closed after "
+            + stallElapsed + "ms)");
   }
 
   private <T> void assertPredicateOverCollection(String description,
