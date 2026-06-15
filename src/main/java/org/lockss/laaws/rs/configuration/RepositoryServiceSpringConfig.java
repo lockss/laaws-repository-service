@@ -87,7 +87,10 @@ public class RepositoryServiceSpringConfig {
 
   public static final boolean DEFAULT_MULTIPART_DISABLE_UPLOAD_TIMEOUT = false;
 
-  @Autowired public WebServerApplicationContext webCtx;
+  // Optional: only present when running with an embedded web server (e.g.
+  // production, or @SpringBootTest with a real port).  Absent in MockMvc
+  // slice tests (@WebMvcTest), where the connector tuning below never runs.
+  @Autowired public ObjectProvider<WebServerApplicationContext> webCtxProvider;
   @Autowired public ArtifactDataStore ds;
   public static final String CONTENT_MULTIPARTS_DIR = "tmp/multiparts";
   public static final boolean DEFAULT_MULTIPART_USE_CONTENT_FS = true;
@@ -165,8 +168,14 @@ public class RepositoryServiceSpringConfig {
                                                     DEFAULT_MULTIPART_DISABLE_UPLOAD_TIMEOUT);
 
         // WebServerApplicationContext webCtx = (WebServerApplicationContext) appCtx;
-        TomcatWebServer webServer = (TomcatWebServer) webCtx.getWebServer();
-        setMultipartSettings(webServer.getTomcat().getConnector());
+        WebServerApplicationContext webCtx = webCtxProvider.getIfAvailable();
+        if (webCtx != null) {
+          TomcatWebServer webServer = (TomcatWebServer) webCtx.getWebServer();
+          setMultipartSettings(webServer.getTomcat().getConnector());
+        } else {
+          log.warn("No WebServerApplicationContext available; " +
+              "skipping Tomcat connector multipart reconfiguration");
+        }
       }
 
       if (changedKeys.contains(PARAM_MULTIPART_MAX_IN_MEMORY_SIZE)) {
