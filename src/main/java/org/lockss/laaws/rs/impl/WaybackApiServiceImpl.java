@@ -1,21 +1,61 @@
+/*
+Copyright (c) 2000-2025, Board of Trustees of Leland Stanford Jr. University
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+ */
+
 package org.lockss.laaws.rs.impl;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.DeferredFileOutputStream;
+import org.apache.curator.shaded.com.google.common.collect.Iterables;
 import org.archive.wayback.surt.SURTTokenizer;
+import org.lockss.app.LockssDaemon;
+import org.lockss.app.ServiceBinding;
+import org.lockss.app.ServiceDescr;
+import org.lockss.daemon.RestServicesManager;
 import org.lockss.laaws.rs.api.WaybackApiDelegate;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
+import org.lockss.util.rest.config.RestConfigClient;
+import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
-import org.lockss.util.rest.repo.model.Artifact;
-import org.lockss.util.rest.repo.model.ArtifactData;
-import org.lockss.util.rest.repo.model.ArtifactIdentifier;
-import org.lockss.util.rest.repo.model.ArtifactVersions;
+import org.lockss.util.rest.repo.model.*;
+import org.lockss.util.time.Deadline;
+import org.lockss.util.time.TimeBase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -24,8 +64,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import jakarta.servlet.http.HttpServletRequest;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
 import java.io.*;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +84,15 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
   @Autowired
   BaseLockssRepository repo;
 
+  @Autowired
+  protected RestTemplate restTemplate;
+
   private final HttpServletRequest request;
+  private String serviceUser;
+  private String servicePassword;
+
+  private RestServicesManager svcsMgr;
+  private ServiceBinding cfgSvcBinding;
 
   @Autowired
   public WaybackApiServiceImpl(HttpServletRequest request) {
@@ -57,7 +108,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
    *
    * @param namespace
    *          A String with the namespace.
-   * @param q
+   * @param cdxQuery
    *          A String with the query string. Supported fields are url, type
    *          (urlquery/prefixquery), offset, limit, request.anchordate,
    *          startdate and enddate.
@@ -73,10 +124,10 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
    *         records.
    */
   @Override
-  public ResponseEntity<String> getCdxOwb(String namespace, String q,
+  public ResponseEntity<String> getCdxOwb(String namespace, String cdxQuery,
                                           Integer count, Integer startPage, String accept, String acceptEncoding) {
     log.debug2("namespace = {}", namespace);
-    log.debug2("q = {}", q);
+    log.debug2("q = {}", cdxQuery);
     log.debug2("count = {}", count);
     log.debug2("startPage = {}", startPage);
     log.debug2("accept = {}", accept);
@@ -96,13 +147,26 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
+
+    if (!(repo.isReady() && isWaitCfgSvcReady())) {
+      try {
+        String title = "Resource Index Not Available Exception";
+        String message = "This LOCKSS Repository Service is not ready";
+        return new ResponseEntity<String>(getCdxOwbError(title, message), HttpStatus.SERVICE_UNAVAILABLE);
+      } catch (XMLStreamException e) {
+        // This should never happen
+        String xseErrorMessage = "Error building XML error response";
+        return getStringErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR, xseErrorMessage, e);
+      }
+    }
 
     // Validate the pagination.
     ServiceImplUtil.validatePagination(count, startPage, parsedRequest);
 
     try {
       // Parse the OpenWayback query.
-      Map<String, String> openWayBackQuery = parseOpenWayBackQueryString(q);
+      Map<String, String> openWayBackQuery = parseOpenWayBackQueryString(cdxQuery);
       log.trace("openWayBackQuery = {}", openWayBackQuery);
 
       String url = openWayBackQuery.get("url");
@@ -135,22 +199,132 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
       getCdxRecords(namespace, url, repo, isPrefix, count, startPage, date,
           records);
 
+      // An empty result will cause an NPE in OpenWayback so handle that differently:
+      if (records.getCdxRecords().isEmpty()) {
+        // Must match what OpenWayback expects to receive if there were no results
+        String title = "Resource Not In Archive";
+        String message = "Resource was not found in this LOCKSS archive";
+        return new ResponseEntity<String>(getCdxOwbError(title, message), HttpStatus.OK);
+      }
+
       // Convert the results to XML.
       String result = records.toXmlText();
       log.debug2("result = {}", result);
 
       return new ResponseEntity<String>(result, HttpStatus.OK);
     } catch (IllegalArgumentException | UnsupportedEncodingException bre) {
-      String message = "Cannot get the CDX records for namespace = '"
-          + namespace + "', q = '" + q + "'";
-      log.error(message, bre);
-      return getStringErrorResponseEntity(HttpStatus.BAD_REQUEST, message, bre);
+      try {
+        String title = "Bad Query Exception";
+        String message = "Cannot get the CDX records for namespace = '"
+            + namespace + "', q = '" + cdxQuery + "'";
+        log.error(message, bre);
+        return new ResponseEntity<String>(getCdxOwbError(title, message), HttpStatus.BAD_REQUEST);
+      } catch (XMLStreamException e) {
+        // This should never happen
+        String xseErrorMessage = "Error building XML error response";
+        return getStringErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR, xseErrorMessage, e);
+      }
     } catch (Exception e) {
       String message = "Cannot get the CDX records for namespace = '"
-          + namespace + "', q = '" + q + "'";
+          + namespace + "', q = '" + cdxQuery + "'";
       log.error(message, e);
       return getStringErrorResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR, message, e);
     }
+  }
+
+  private boolean isWaitCfgSvcReady() {
+    if (!waitReady()) {
+      // Timed out waiting for LockssDaemon to become ready
+      return false;
+    }
+
+    LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+    svcsMgr = daemon.getManagerByType(RestServicesManager.class);
+    cfgSvcBinding = daemon.getServiceBinding(ServiceDescr.SVC_CONFIG);
+
+    if (svcsMgr == null || cfgSvcBinding == null) return false;
+
+    RestServicesManager.ServiceStatus cfgSvcStatus =
+        svcsMgr.waitServiceReady(ServiceDescr.SVC_CONFIG, cfgSvcBinding, Deadline.in(5000));
+
+    return cfgSvcStatus != null && cfgSvcStatus.isReady();
+  }
+
+  private String getCdxOwbError(String title, String message) throws XMLStreamException {
+      StringWriter sw = new StringWriter();
+
+      try {
+        XMLStreamWriter writer =
+            XMLOutputFactory.newInstance().createXMLStreamWriter(sw);
+
+        writer.writeStartDocument(charsetName, "1.0");
+
+        // Start the top element.
+        writer.writeStartElement("wayback");
+
+        // Start the error element.
+        writer.writeStartElement("error");
+
+        writeXmlElement(writer, "title", title);
+        writeXmlElement(writer, "message", message);
+
+        // Finish the error element.
+        writer.writeEndElement();
+
+        // Finish the top element.
+        writer.writeEndDocument();
+
+        // Cleanup and finish.
+        writer.flush();
+        sw.flush();
+        writer.close();
+
+        // Return the text representation of this XML document.
+        String result = sw.toString();
+        log.debug2("result = {}", result);
+        return result;
+      } catch (XMLStreamException xse) {
+        log.error("Exception caught writing XML", xse);
+        throw xse;
+      } finally {
+        try {
+          sw.close();
+        } catch (Exception e) {}
+      }
+  }
+
+  /**
+   * Utility method to output an XML element.
+   *
+   * @param writer
+   *          An XMLStreamWriter where to output the XML element.
+   * @param name
+   *          A String with the name of the element.
+   * @param value
+   *          An Object with the value of the element.
+   * @exception XMLStreamException
+   *              if there are problems writing the XML element.
+   */
+  static void writeXmlElement(XMLStreamWriter writer, String name, Object value)
+      throws XMLStreamException {
+    log.debug2("name = {}", name);
+    if (value == null) {
+      log.debug2("value = {} (not writing)", value);
+      return;
+    }
+    log.debug2("value = {}", value);
+
+    try {
+      writer.writeStartElement(name);
+      writer.writeCharacters(value.toString());
+      writer.writeEndElement();
+    } catch (XMLStreamException xse) {
+      log.error("Exception caught writing XML for element:"
+          + " name = {}, value = {}", name, value, xse);
+      throw xse;
+    }
+
+    log.debug2("Done.");
   }
 
   /**
@@ -172,8 +346,8 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
    */
   @Override
   public ResponseEntity<String> getCdxPywb(String namespace, String url,
-                                           Integer limit, String matchType, String sort, String closest,
-                                           String output, String fl, String accept, String acceptEncoding) {
+                                           Integer limit, PywbMatchEnum matchType, PywbSortEnum sort, String closest,
+                                           PywbOutputEnum output, String fl, String accept, String acceptEncoding) {
     log.debug2("namespace = {}", namespace);
     log.debug2("url = {}", url);
     log.debug2("limit = {}", limit);
@@ -199,6 +373,11 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
+
+    if (!(repo.isReady() && isWaitCfgSvcReady())) {
+      return new ResponseEntity<String>(HttpStatus.SERVICE_UNAVAILABLE);
+    }
 
     try {
       // Initialize the results.
@@ -208,7 +387,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
       // Determine whether it is an exact query.
       boolean isExact =
-          matchType == null || matchType.toLowerCase().equals("exact");
+          matchType == null || matchType == PywbMatchEnum.EXACT;
       log.trace("isExact = {}", isExact);
 
       if (!isExact) {
@@ -217,7 +396,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
       // Determine whether it is a prefix query.
       boolean isPrefix =
-          matchType != null && matchType.toLowerCase().equals("prefix");
+          matchType == PywbMatchEnum.PREFIX;
       log.trace("isPrefix = {}", isPrefix);
 
       Integer startPage = null;
@@ -240,10 +419,9 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
       // Convert the results to the right format.
       String result = null;
 
-      if (output == null || output.trim().isEmpty()
-          || output.trim().toLowerCase().equals("cdx")) {
+      if (output == null || output == PywbOutputEnum.CDX) {
         result = records.toIaText();
-      } else if (output.trim().toLowerCase().equals("json")) {
+      } else if (output == PywbOutputEnum.JSON) {
         result = records.toJson();
       } else {
         String errorMessage = "Invalid output request parameter: " + output;
@@ -306,6 +484,7 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
 
     // Validate the repository.
     ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_CONTENT_ACCESS, Roles.ROLE_AU_ADMIN);
 
     try {
       String namespace = ServiceImplUtil.getArchiveFilenameNamespace(
@@ -371,6 +550,11 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
           "Cannot get the archive for fileName = '" + fileName + "'";
       log.error(message, iae);
       return getResourceErrorResponseEntity(HttpStatus.BAD_REQUEST, message, iae);
+    } catch (LockssNoSuchArtifactIdException e) {
+      String message =
+          "Cannot get the artifact for fileName = '" + fileName + "'";
+      log.error(message, e);
+      return getResourceErrorResponseEntity(HttpStatus.NOT_FOUND, message, e);
     } catch (Exception e) {
       String message =
           "Cannot get the archive for fileName = '" + fileName + "'";
@@ -419,26 +603,106 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     log.debug2("startPage = {}", startPage);
     log.debug2("closest = {}", closest);
 
-    Iterable<Artifact> iterable = null;
 
-    if (isPrefix) {
-      // Yes: Get from the repository the artifacts for URLs with the passed prefix.
-      iterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, url, ArtifactVersions.ALL);
-    } else {
-      // No: Get from the repository the artifacts for the passed URL.
-      iterable = repo.getArtifactsWithUrlFromAllAus(namespace, url, ArtifactVersions.ALL);
+    long poi = TimeBase.nowMs();
+    getCdxRecords0(restTemplate, namespace, url, repo, isPrefix, count, startPage, closest, records);
+    log.trace("getCdxRecords({}) took {}ms", url, TimeBase.msSince(poi));
+  }
+
+  void getCdxRecords0(RestTemplate restTemplate, String namespace, String url, LockssRepository repo,
+                      boolean isPrefix, Integer count, Integer startPage, String closest,
+                      CdxRecords records) throws IOException {
+
+    // Call "normalizeUrl" endpoint in the Configuration Service for a plugin normalized URL
+    List<String> normalizedUrls =
+        new RestConfigClient(getServiceEndpoint(ServiceDescr.SVC_CONFIG))
+            .setRestTemplate(restTemplate)
+            .addRequestHeaders(getAuthHeaders())
+            .normalizeUrl(url);
+
+    List<Iterable<Artifact>> artifactLists = new ArrayList<>();
+
+    for (String normalizedUrl : normalizedUrls) {
+      Iterable<Artifact> iterable = null;
+
+      if (isPrefix) {
+        // Yes: Get from the repository the artifacts for URLs with the passed prefix.
+        iterable = repo.getArtifactsWithUrlPrefixFromAllAus(namespace, normalizedUrl, VersionsEnum.ALL);
+      } else {
+        // No: Get from the repository the artifacts for the passed URL.
+        iterable = repo.getArtifactsWithUrlFromAllAus(namespace, normalizedUrl, VersionsEnum.ALL);
+      }
+
+      artifactLists.add(iterable);
     }
 
     // Initialize the iterator on the collection of artifacts to be returned.
-    Iterator<Artifact> artIterator = iterable.iterator();
+    Iterator<Artifact> artIterator = Iterables.concat(artifactLists).iterator();
 
     if (closest != null && !closest.trim().isEmpty()) {
       // Yes: Return all the artifacts found sorted by temporal proximity to the target timestamp.
       artIterator = getArtifactsSortedByTemporalGap(artIterator, closest).iterator();
+    } else if (normalizedUrls.size() > 1) {
+      // Multiple URL variants were concatenated; sort by collection date ascending
+      // to match the single-URL order produced by the repository.
+      List<Artifact> allArtifacts = new ArrayList<>();
+      artIterator.forEachRemaining(allArtifacts::add);
+      allArtifacts.sort(Comparator.comparingLong(Artifact::getCollectionDate));
+      artIterator = allArtifacts.iterator();
     }
 
     // Get the CDX records for the selected artifacts.
     getArtifactsCdxRecords(artIterator, repo, count, startPage, records);
+  }
+
+  /**
+   * Saves the authentication credentials, if any.
+   */
+  private void setAuthenticationCredentials() {
+    // Get the REST client credentials.
+    List<String> restClientCredentials = LockssDaemon.getLockssDaemon()
+        .getRestClientCredentials();
+    log.trace("restClientCredentials = " + restClientCredentials);
+
+    // Check whether there is a user name.
+    if (restClientCredentials != null && restClientCredentials.size() > 0) {
+      // Yes: Get the user name.
+      serviceUser = restClientCredentials.get(0);
+      log.trace("serviceUser = " + serviceUser);
+
+      // Check whether there is a user password.
+      if (restClientCredentials.size() > 1) {
+        // Yes: Get the user password.
+        servicePassword = restClientCredentials.get(1);
+      }
+    }
+  }
+
+  protected HttpHeaders getAuthHeaders() {
+    setAuthenticationCredentials();
+    HttpHeaders hdrs = new HttpHeaders();
+    hdrs.setBasicAuth(serviceUser, servicePassword);
+//    String reqIp = getRequestorIpAddress();
+//    if (!StringUtils.isEmpty(reqIp)) {
+//      hdrs.set("X-Forwarded-For", reqIp);
+//    }
+    return hdrs;
+  }
+
+  private String getServiceEndpoint(ServiceDescr sd) {
+    ServiceBinding binding = getServiceBinding(sd);
+    if (binding == null) {
+      throw new IllegalArgumentException("No service binding for " + sd);
+    }
+    return binding.getRestStem();
+  }
+
+  private ServiceBinding getServiceBinding(ServiceDescr sd) {
+    LockssDaemon daemon = getRunningLockssDaemon();
+    if (daemon == null) {
+      throw new IllegalStateException("No running LockssDaemon, can't access service bindings");
+    }
+    return daemon.getServiceBinding(sd);
   }
 
   /**
@@ -479,24 +743,31 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
     // Loop through all the artifacts that are potential results.
     int iteratorCounter = 0;
 
+    Set<String> fetched = new HashSet<>();
+
     while (artIterator.hasNext()) {
       // Get the next artifact.
       Artifact artifact = artIterator.next();
       log.trace("artifact = {}", artifact);
 
       // Check whether this artifact needs to be included in the results.
-      if (iteratorCounter > lastArticleSkipped) {
+      if ((iteratorCounter > lastArticleSkipped)
+         && (!fetched.contains(artifact.getContentDigest()))) {
         // Yes: Get the artifact identifier.
         String artifactUuid = artifact.getUuid();
         log.trace("artifactUuid = {}", artifactUuid);
 
-        // Create the result for this artifact.
+        // Create a CDX record for this artifact.
+        // NOTE: Reading an {@link ArtifactData} only for its Content-Type and HTTP
+        //  response status code is expensive; consider adding these fields to the
+        //  index if de-duplication isn't sufficient
         CdxRecord record = getCdxRecord(
-            repo.getArtifactData(artifact, LockssRepository.IncludeContent.NEVER));
+            repo.getArtifactData(artifact, IncludeContentEnum.NEVER));
         log.trace("record = {}", record);
 
         // Add this artifact to the results.
         records.addCdxRecord(record);
+        fetched.add(artifact.getContentDigest());
         log.trace("recordsCount = {}", records.getCdxRecordCount());
       }
 
@@ -508,10 +779,11 @@ public class WaybackApiServiceImpl extends BaseSpringApiServiceImpl implements W
         break;
       }
     }
+
   }
 
   /**
-   * Provides the CDX record of an artifact.
+   * Generates a CDX record of an artifact from its {@link ArtifactData}.
    *
    * @param artifactData
    *          An ArtifactData with the artifact data.

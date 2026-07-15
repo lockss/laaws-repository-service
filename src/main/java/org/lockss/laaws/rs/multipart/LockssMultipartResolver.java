@@ -103,7 +103,7 @@ public class LockssMultipartResolver extends StandardServletMultipartResolver {
     return multipartConfigFactory.createMultipartConfig();
   }
 
-  public void setUploadTempDir(File uploadTempDir) throws IOException {
+  public void setUploadTempDir(File uploadTempDir) {
     multipartConfigFactory.setLocation(uploadTempDir.getAbsolutePath());
   }
 

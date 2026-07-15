@@ -30,21 +30,29 @@
 
 package org.lockss.laaws.rs.configuration;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.lockss.config.ConfigManager;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.rs.io.storage.ArtifactDataStore;
+import org.lockss.rs.io.storage.ArtifactDataStoreVersion;
 import org.lockss.rs.io.storage.warc.LocalWarcArtifactDataStore;
-import org.lockss.rs.io.storage.warc.TestingWarcArtifactDataStore;
+import org.lockss.rs.io.storage.warc.TestingLocalWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.VolatileWarcArtifactDataStore;
 import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
+import org.lockss.util.ListUtil;
 import org.lockss.util.PatternIntMap;
+import org.lockss.util.SetUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 
-import java.util.List;
+import java.io.*;
+import java.util.*;
+
+import static org.lockss.rs.io.storage.warc.WarcArtifactDataStore.DATASTORE_VERSION_FILE;
 
 /**
  * Spring configuration beans for the configuration of the Repository Service's internal artifact data store.
@@ -53,18 +61,47 @@ import java.util.List;
 public class ArtifactDataStoreConfig {
   private final static L4JLogger log = L4JLogger.getLogger();
 
-  public final static String PARAM_FREE_SPACE_MAP = "org.lockss.repo.testing.freeSpaceMap";
+  private final static ObjectMapper mapper = new ObjectMapper()
+      .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+  public final static String PREFIX = "org.lockss.repo.";
+
+  public final static String PARAM_FREE_SPACE_MAP = PREFIX + "testing.freeSpaceMap";
 
   /**
    * Enables or disables the use of GZIP compression for WARC files in
    * WARC artifact data store implementations.
    */
-  public final static String PARAM_REPO_USE_WARC_COMPRESSION = "org.lockss.repo.warc.useCompression";
+  public final static String PARAM_REPO_USE_WARC_COMPRESSION = PREFIX + "warc.useCompression";
 
   /**
    * Default settings for use of GZIP compression for WARC files.
    */
   public final static boolean DEFAULT_REPO_USE_WARC_COMPRESSION = true;
+
+  public final static String PARAM_ARTIFACT_TO_STRING_SHORT_STYLE =
+    PREFIX + "artifactToStringShortStyle";
+
+  public final static String DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE =
+    "uuid,uri,version";
+
+  public final static String PARAM_INCLUDE_COMPRESSED_MIME_TYPES =
+      PREFIX + "includeCompressedContentTypes";
+
+  public final static List<String> DEFAULT_INCLUDE_COMPRESSED_MIME_TYPES =
+      Collections.EMPTY_LIST;
+
+  public final static String PARAM_EXCLUDE_COMPRESSED_MIME_TYPES =
+      PREFIX + "excludeCompressedContentTypes";
+
+  public final static List<String> DEFAULT_EXCLUDE_COMPRESSED_MIME_TYPES =
+      Collections.EMPTY_LIST;
+
+  public final static String PARAM_COMPRESSED_CONTENT_ENCODINGS =
+      PREFIX + "compressedContentEncodings";
+
+  public final static List<String> DEFAULT_COMPRESSED_CONTENT_ENCODINGS =
+      ListUtil.fromIterable(WarcArtifactDataStore.DEFAULT_COMPRESSED_CONTENT_ENCODINGS);
 
   private RepositoryServiceProperties repoProps;
 
@@ -78,12 +115,31 @@ public class ArtifactDataStoreConfig {
   }
 
   @Bean
-  public ArtifactDataStore setArtifactDataStore() throws Exception {
+  public ArtifactDataStore artifactDataStore() throws Exception {
     // Create WARC artifact data store and set use WARC compression
     ds = createWarcArtifactDataStore(parseDataStoreSpecs());
-
-    // Return the data store
+    ds.setStorageUrlPathPolicy(repoProps.getStorageUrlPathPolicy());
     return ds;
+  }
+
+  @Bean
+  public ArtifactDataStoreVersion artifactDataStoreVersion() {
+    try {
+      File versionFile = new File(repoProps.getRepositoryStateDir(), DATASTORE_VERSION_FILE);
+      ArtifactDataStoreVersion onDiskVersion = readArtifactDataStoreVersion(versionFile);
+      return onDiskVersion;
+    } catch (IOException e) {
+      throw new IllegalStateException("Couldn't read artifact index version", e);
+    }
+  }
+
+  private static ArtifactDataStoreVersion readArtifactDataStoreVersion(File versionFile) throws IOException {
+    try (InputStream is = new BufferedInputStream(new FileInputStream(versionFile))) {
+      return mapper.readValue(is, ArtifactDataStoreVersion.class);
+    } catch (FileNotFoundException e) {
+      log.debug("Could not find data store version file: " + versionFile);
+      return ArtifactDataStoreVersion.UNKNOWN;
+    }
   }
 
   private String parseDataStoreSpecs() {
@@ -113,14 +169,20 @@ public class ArtifactDataStoreConfig {
       case "local":
       case "testing":
         switch (dsType) {
-          case "local":
-            log.info("Configuring local artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
-            return new LocalWarcArtifactDataStore(repoProps.getLocalBaseDirs());
-
+        case "local":
+          {
+            File[] baseDirs = repoProps.getLocalBaseDirs();
+            log.info("Configuring local artifact data store [baseDirs: {}]",
+                     Arrays.asList(baseDirs));
+            return new LocalWarcArtifactDataStore(baseDirs);
+          }
           case "testing":
-            log.info("Configuring testing artifact data store [baseDirs: {}]", repoProps.getLocalBaseDirs());
-            return new TestingWarcArtifactDataStore(repoProps.getLocalBaseDirs());
-
+          {
+            File[] baseDirs = repoProps.getLocalBaseDirs();
+            log.info("Configuring testing artifact data store [baseDirs: {}]",
+                     Arrays.asList(baseDirs));
+            return new TestingLocalWarcArtifactDataStore(baseDirs);
+          }
           default:
             throw new RuntimeException("Shouldn't happen");
         }
@@ -148,12 +210,12 @@ public class ArtifactDataStoreConfig {
   private static class ArtifactDataStoreConfigCallback
       implements org.lockss.config.Configuration.Callback {
 
-    TestingWarcArtifactDataStore twads;
+    TestingLocalWarcArtifactDataStore twads;
     WarcArtifactDataStore wads;
 
     ArtifactDataStoreConfigCallback(WarcArtifactDataStore ds) {
-      if (ds instanceof TestingWarcArtifactDataStore) {
-        twads = (TestingWarcArtifactDataStore) ds;
+      if (ds instanceof TestingLocalWarcArtifactDataStore) {
+        twads = (TestingLocalWarcArtifactDataStore) ds;
       }
 
       wads = ds;
@@ -163,28 +225,46 @@ public class ArtifactDataStoreConfig {
                                      org.lockss.config.Configuration oldConfig,
                                      org.lockss.config.Configuration.Differences changedKeys) {
 
-      if (twads != null) {
-        PatternIntMap freeSpacePatternMap = PatternIntMap.EMPTY;
+      if (changedKeys.contains(PREFIX)) {
+        if (twads != null) {
+          PatternIntMap freeSpacePatternMap = PatternIntMap.EMPTY;
 
-        List lst = newConfig.getList(PARAM_FREE_SPACE_MAP, null);
+          List lst = newConfig.getList(PARAM_FREE_SPACE_MAP, null);
 
-        if (lst != null && !lst.isEmpty()) {
-          try {
-            freeSpacePatternMap = new PatternIntMap(lst);
-          } catch (IllegalArgumentException e) {
-            log.error("Illegal testing disk space map, ignoring", e);
+          if (lst != null && !lst.isEmpty()) {
+            try {
+              freeSpacePatternMap = new PatternIntMap(lst);
+            } catch (IllegalArgumentException e) {
+              log.error("Illegal testing disk space map, ignoring", e);
+            }
           }
+
+          twads.setTestingDiskSpaceMap(freeSpacePatternMap);
         }
 
-        twads.setTestingDiskSpaceMap(freeSpacePatternMap);
-      }
+        if (wads != null) {
+          boolean useWarcCompression =
+              newConfig.getBoolean(PARAM_REPO_USE_WARC_COMPRESSION, DEFAULT_REPO_USE_WARC_COMPRESSION);
+          wads.setDefaultUseWarcCompression(useWarcCompression);
+          wads.setArtifactToStringShortStyle(
+              newConfig.get(PARAM_ARTIFACT_TO_STRING_SHORT_STYLE, DEFAULT_ARTIFACT_TO_STRING_SHORT_STYLE));
 
-      if (wads != null) {
-        boolean useWarcCompression =
-          newConfig.getBoolean(PARAM_REPO_USE_WARC_COMPRESSION, DEFAULT_REPO_USE_WARC_COMPRESSION);
-        wads.setUseWarcCompression(useWarcCompression);
-      } else {
-        log.warn("configurationChanged() called before ConfigManager started.  Okey while running unit tests, should not happen during real startup");
+          wads.setCompressedContentEncodings(SetUtil.fromList(
+              newConfig.getList(PARAM_COMPRESSED_CONTENT_ENCODINGS, DEFAULT_COMPRESSED_CONTENT_ENCODINGS)));
+
+          List<String> includeContentTypes =
+              newConfig.getList(PARAM_INCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_INCLUDE_COMPRESSED_MIME_TYPES);
+          List<String> excludeContentTypes =
+              newConfig.getList(PARAM_EXCLUDE_COMPRESSED_MIME_TYPES, DEFAULT_EXCLUDE_COMPRESSED_MIME_TYPES);
+
+          Set<String> compressedMimeTypes = new HashSet<>(WarcArtifactDataStore.DEFAULT_COMPRESSED_MIME_TYPES);
+          compressedMimeTypes.addAll(includeContentTypes);
+          excludeContentTypes.forEach(compressedMimeTypes::remove);
+
+          wads.setCompressedMimeTypes(compressedMimeTypes);
+        } else {
+          log.warn("configurationChanged() called before ConfigManager started.  Okey while running unit tests, should not happen during real startup");
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 /*
 
-Copyright (c) 2000-2022, Board of Trustees of Leland Stanford Jr. University
+Copyright (c) 2000-2025, Board of Trustees of Leland Stanford Jr. University
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -32,9 +32,14 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.impl;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.core5.http.HttpHost;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.lockss.app.LockssDaemon;
 import org.lockss.laaws.rs.impl.WaybackApiServiceImpl.ClosestArtifact;
 import org.lockss.laaws.rs.model.CdxRecord;
 import org.lockss.laaws.rs.model.CdxRecords;
@@ -45,15 +50,43 @@ import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactData;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
+import org.lockss.util.time.TimeBase;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.RequestEntity;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.response.MockRestResponseCreators;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.IOException;
+import java.io.StringReader;
 import java.io.StringWriter;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 
 /**
  * Test class for org.lockss.laaws.rs.impl.WaybackApiServiceImpl.
@@ -62,6 +95,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
   private static L4JLogger log = L4JLogger.getLogger();
 
   private LockssRepository repository;
+  private static final String MOCK_REST_CFGSVC = "localhost:8080";
 
   /**
    * Sets up a test repository.
@@ -71,6 +105,7 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
    */
   @Before
   public void setUpArtifactDataStore() throws Exception {
+    getMockLockssDaemon().setServiceBindings("cfg=" + MOCK_REST_CFGSVC);
     getMockLockssDaemon().setAppRunning(true);
     repository = new VolatileLockssRepository();
     repository.initRepository();
@@ -86,6 +121,75 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
   protected boolean wantTempTmpDir() {
     return true;
+  }
+
+  @Test
+  @Ignore
+  public void testRemoteRepository() throws Exception {
+    long startms = TimeBase.nowMs();
+
+    String tmpl = "http://dev2.lockss.org:24611/wayback/cdx/owb/{namespace}";
+
+    UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(tmpl);
+    Map<String, Object> uriParams = new HashMap<>();
+    uriParams.put("namespace", "lockss");
+    builder.uriVariables(uriParams);
+
+//    builder.queryParam("q", "url:https://muse.jhu.edu/js/pre.js");
+    builder.queryParam("q", "url:https://muse.jhu.edu/js/references.js");
+    builder.queryParam("count", 10000);
+    builder.queryParam("start_page", 1);
+
+    HttpComponentsClientHttpRequestFactory clientHttpRequestFactory = new HttpComponentsClientHttpRequestFactory(
+        HttpClientBuilder.create()
+            .setProxy(new HttpHost("localhost", 3128))
+            .build());
+
+    RestTemplate restTemplate = new RestTemplate(clientHttpRequestFactory);
+    URI url = builder.build().toUri();
+
+    HttpHeaders hdrs = new HttpHeaders();
+    hdrs.setBasicAuth("username", "password");
+
+    RequestEntity<Void> request = RequestEntity.get(url)
+        .headers(hdrs)
+        .build();
+
+    ResponseEntity<String> response =
+        restTemplate.exchange(request, String.class);
+
+    if (response.getStatusCode().isError()) {
+      log.error("response.status = {}", response.getStatusCode());
+    }
+
+    log.info("response.body =\n{}", prettyPrintXml(response.getBody()));
+    log.info("response.timeMs = {}", TimeBase.msSince(startms));
+  }
+
+  public static String prettyPrintXml(String xmlString) throws ParserConfigurationException, IOException, SAXException, TransformerException {
+    // 1. Parse the XML string into a Document object using DocumentBuilder
+    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    DocumentBuilder db = dbf.newDocumentBuilder();
+    Document doc = db.parse(new InputSource(new StringReader(xmlString)));
+
+    // 2. Create a TransformerFactory and configure it for pretty printing
+    TransformerFactory tf = TransformerFactory.newInstance();
+    // This attribute ensures proper indentation with a specified indent-number
+//    tf.setAttribute("indent-number", 2); // Set indentation to 2 spaces
+
+    // 3. Create a Transformer and set output properties for indentation
+    Transformer transformer = tf.newTransformer();
+    transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+    transformer.setOutputProperty(OutputKeys.INDENT, "yes"); // Enable indentation
+    transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8"); // Specify encoding
+    // Optional: Omit XML declaration if not needed
+    // transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+
+    // 4. Transform the Document to a StringWriter for output
+    StringWriter writer = new StringWriter();
+    transformer.transform(new DOMSource(doc), new StreamResult(writer));
+
+    return writer.toString();
   }
 
   /**
@@ -429,6 +533,31 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(0, records.getCdxRecordCount());
   }
 
+  private class MyWaybackApiServiceImpl extends WaybackApiServiceImpl {
+    private String serviceUser;
+    private String servicePassword;
+
+    public MyWaybackApiServiceImpl(HttpServletRequest request) {
+      super(request);
+      this.setUsernameAndPassword("test.username", "test.password");
+    }
+
+    @Override
+    protected HttpHeaders getAuthHeaders() {
+      HttpHeaders hdrs = new HttpHeaders();
+      LockssDaemon daemon = LockssDaemon.getLockssDaemon();
+      daemon.getRestClientCredentials();
+      hdrs.setBasicAuth(serviceUser, servicePassword);
+      return hdrs;
+    }
+
+    protected WaybackApiServiceImpl setUsernameAndPassword(String username, String password) {
+      serviceUser = username;
+      servicePassword = password;
+      return this;
+    }
+  }
+
   /**
    * Tests the creation of CDX records for URLs.
    *
@@ -440,21 +569,35 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Populate the repository.
     List<Artifact> artifacts = new ArrayList<>();
 
-    artifacts.add( makeArtifact("coll1", "auid1", "www.url4.example.com", 1, MediaType.TEXT_HTML, 312345));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url3.example.com", 1, MediaType.TEXT_HTML, 212345));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 3, MediaType.TEXT_HTML, 134567));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 2, MediaType.TEXT_HTML, 123456));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", 1, MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url4.example.com", null, MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url3.example.com", null, MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 134567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 123456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 112345));
 
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 4, MediaType.TEXT_HTML, 45678));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 3, MediaType.TEXT_HTML, 34567));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 2, MediaType.TEXT_HTML, 23456));
-    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", 1, MediaType.TEXT_HTML, 12345));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 45678));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 34567));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 23456));
+    artifacts.add(makeArtifact("coll1", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 12345));
 
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url4.example.com", 1, MediaType.TEXT_HTML, 312345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url3.example.com", 1, MediaType.TEXT_HTML, 212345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url2.example.com", 1, MediaType.TEXT_HTML, 112345));
-    artifacts.add(makeArtifact("coll2", "auid1", "www.url1.example.com", 1, MediaType.TEXT_HTML, 12345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url4.example.com", null, MediaType.TEXT_HTML, 312345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url3.example.com", null, MediaType.TEXT_HTML, 212345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url2.example.com", null, MediaType.TEXT_HTML, 112345));
+    artifacts.add(makeArtifact("coll2", "auid1", "www.url1.example.com", null, MediaType.TEXT_HTML, 12345));
+
+    RestTemplate restTemplate = new RestTemplate();
+    MockRestServiceServer mockServer = MockRestServiceServer.createServer(restTemplate);
+
+    // Setup mock for the first four REST calls
+    for (int i = 0; i < 4; i++) {
+      String url = "www.url" + (i + 1) + ".example.com";
+      mockServer.expect(
+              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=" + url))
+          .andRespond(
+              MockRestResponseCreators.withSuccess(
+                  "[\"" + url + "\"]",
+                  MediaType.APPLICATION_JSON));
+    }
 
     // Get exact CDX records for www.url1.example.com in the first collection.
     String collId = "coll1";
@@ -462,8 +605,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
     CdxRecords records = new CdxRecords();
 
-    new WaybackApiServiceImpl(null)
-        .getCdxRecords(collId, url, repository, false, null, null, null, records);
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false, null, null, null, records);
 
     // Validate count.
     assertEquals(4, records.getCdxRecordCount());
@@ -510,7 +653,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.url2.example.com";
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, null, records);
 
     // Validate count.
@@ -553,7 +697,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     collId = "coll1";
     url = "www.url3.example.com";
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, null, records);
 
     // Validate count.
@@ -576,11 +721,21 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     assertEquals(ServiceImplUtil.getArtifactArchiveName(collId,
 	artifact.getUuid()), cdxRecord.getArchiveName());
 
+    // Setup mock for the next REST calls
+    mockServer.reset();
+    mockServer.expect(
+            requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=www."))
+        .andRespond(
+            MockRestResponseCreators.withSuccess(
+                "[\"www.\"]",
+                MediaType.APPLICATION_JSON));
+
     // Get prefix CDX records for www. in the first collection.
     collId = "coll1";
     url = "www.";
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, true,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, true,
 	null, null, null, records);
 
     // Validate count.
@@ -610,8 +765,21 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Chronological order is 19700101000152, 19700101000203, 19700101000214.
     collId = "coll1";
     url = "www.url2.example.com";
+
+    // Setup mock for the next seven REST calls to Configuration Service
+    mockServer.reset();
+    for (int i = 0; i < 7; i++) {
+      mockServer.expect(
+              requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=" + url))
+          .andRespond(
+              MockRestResponseCreators.withSuccess(
+                  "[\"" + url + "\"]",
+                  MediaType.APPLICATION_JSON));
+    }
+
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000000", records);
 
     // Validate count.
@@ -642,7 +810,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the first chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000150", records);
 
     // Validate count.
@@ -654,7 +823,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the first chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000154", records);
 
     // Validate count.
@@ -666,7 +836,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the second chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000201", records);
 
     // Validate count.
@@ -680,7 +851,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the second chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000205", records);
 
     // Validate count.
@@ -694,7 +866,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right before the third chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000212", records);
 
     // Validate count.
@@ -708,7 +881,8 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
     // Get "closest" CDX records for www.url2.example.com in the first
     // collection from right after the third chronological record.
     records = new CdxRecords();
-    new WaybackApiServiceImpl(null).getCdxRecords(collId, url, repository, false,
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, collId, url, repository, false,
 	null, null, "19700101000216", records);
 
     // Validate count.
@@ -794,5 +968,61 @@ public class TestWaybackApiServiceImpl extends SpringLockssTestCase4 {
 
     // Commit artifact
     return repository.commitArtifact("coll1", art.getUuid());
+  }
+
+  /**
+   * Regression test: when normalizeUrl returns multiple URL variants (e.g.
+   * http:// and https://), getCdxRecords0 must return results sorted globally
+   * by collection date ascending, not two concatenated ascending groups.
+   */
+  @Test
+  public void testGetCdxRecords0_multipleNormalizedUrls_sortedByTimestamp()
+      throws Exception {
+    // Create artifacts under two different URLs with interleaved timestamps.
+    // URL A artifacts: timestamps 10000, 30000, 50000 (ascending within URL)
+    // URL B artifacts: timestamps 20000, 40000        (ascending within URL)
+    //
+    // Without the fix, concatenation would yield: 10000, 30000, 50000, 20000, 40000
+    // With the fix, globally ascending:           10000, 20000, 30000, 40000, 50000
+
+    String httpUrl = "http://www.example.com/page";
+    String httpsUrl = "https://www.example.com/page";
+
+    makeArtifact("coll1", "auid1", httpsUrl, null, MediaType.TEXT_HTML, 10000);
+    makeArtifact("coll1", "auid1", httpsUrl, null, MediaType.TEXT_HTML, 30000);
+    makeArtifact("coll1", "auid1", httpsUrl, null, MediaType.TEXT_HTML, 50000);
+
+    makeArtifact("coll1", "auid1", httpUrl, null, MediaType.TEXT_HTML, 20000);
+    makeArtifact("coll1", "auid1", httpUrl, null, MediaType.TEXT_HTML, 40000);
+
+    // Mock normalizeUrl to return both URL variants.
+    RestTemplate restTemplate = new RestTemplate();
+    MockRestServiceServer mockServer =
+        MockRestServiceServer.createServer(restTemplate);
+
+    String encodedHttpUrl = URLEncoder.encode(httpUrl, StandardCharsets.UTF_8);
+    mockServer
+        .expect(requestTo("http://" + MOCK_REST_CFGSVC + "/utils/normalizeurl?url=" + encodedHttpUrl))
+        .andRespond(
+            MockRestResponseCreators.withSuccess("[\"" + httpsUrl + "\",\"" + httpUrl + "\"]", MediaType.APPLICATION_JSON));
+
+    // Call getCdxRecords0 with closest=null (the calendar/timemap case).
+    CdxRecords records = new CdxRecords();
+    new MyWaybackApiServiceImpl(null)
+        .getCdxRecords0(restTemplate, "coll1", httpUrl, repository, false, null, null, null, records);
+
+    // All 5 artifacts should be present.
+    assertEquals(5, records.getCdxRecordCount());
+
+    // Verify globally ascending order by timestamp.
+    long previousTimestamp = -1;
+    for (int i = 0; i < records.getCdxRecordCount(); i++) {
+      long ts = records.getCdxRecords().get(i).getTimestamp();
+      assertTrue("CDX records must be sorted by timestamp ascending: "
+              + "record " + i + " timestamp " + ts
+              + " should be > previous " + previousTimestamp,
+          ts > previousTimestamp);
+      previousTimestamp = ts;
+    }
   }
 }

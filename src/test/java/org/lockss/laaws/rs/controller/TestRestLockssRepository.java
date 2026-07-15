@@ -31,6 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 package org.lockss.laaws.rs.controller;
 
+import org.apache.catalina.connector.Connector;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.io.FileUtils;
@@ -39,6 +40,7 @@ import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
@@ -49,41 +51,62 @@ import org.junit.runner.RunWith;
 import org.lockss.laaws.rs.api.ArchivesApi;
 import org.lockss.laaws.rs.impl.ArtifactsApiServiceImpl;
 import org.lockss.log.L4JLogger;
+import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
+import org.lockss.rs.io.index.ArtifactIndex;
 import org.lockss.spring.test.SpringLockssTestCase4;
-import org.lockss.test.ConfigurationUtil;
-import org.lockss.test.LockssTestCase4;
-import org.lockss.test.RandomInputStream;
-import org.lockss.test.ZeroInputStream;
-import org.lockss.test.ThrowingInputStream;
+import org.lockss.test.*;
 import org.lockss.util.ListUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
 import org.lockss.util.io.DeferredTempFileOutputStream;
 import org.lockss.util.io.FileUtil;
+import org.lockss.util.rest.RestUtil;
 import org.lockss.util.rest.exception.LockssRestHttpException;
+import org.lockss.util.rest.multipart.MultipartMessage;
+import org.lockss.util.rest.repo.LockssArtifactAlreadyExistsException;
 import org.lockss.util.rest.repo.LockssNoSuchArtifactIdException;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.repo.RestLockssRepository;
 import org.lockss.util.rest.repo.model.*;
 import org.lockss.util.rest.repo.util.ArtifactConstants;
+import org.lockss.util.rest.repo.util.ArtifactDataUtil;
 import org.lockss.util.rest.repo.util.ArtifactSpec;
+import org.lockss.util.rest.repo.util.NamedInputStreamResource;
+import org.lockss.util.test.FileTestUtil;
 import org.lockss.util.test.LockssTestCase5;
 import org.lockss.util.time.TimeBase;
+import org.mockito.ArgumentMatchers;
+import org.mockserver.integration.ClientAndServer;
+import org.mockserver.model.Header;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpHeaders;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.web.context.WebServerApplicationContext;
+import org.springframework.boot.web.embedded.tomcat.TomcatWebServer;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.io.Resource;
+import org.springframework.http.*;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -99,8 +122,12 @@ import java.util.stream.StreamSupport;
 import java.util.zip.GZIPOutputStream;
 
 import static java.nio.file.StandardOpenOption.APPEND;
+import static org.lockss.app.LockssApp.PARAM_SERVICE_BINDINGS;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.*;
+import static org.mockserver.integration.ClientAndServer.startClientAndServer;
+import static org.mockserver.model.HttpRequest.request;
+import static org.mockserver.model.HttpResponse.response;
 
 /**
  * Tests an embedded LOCKSS Repository Service instance configured with an internal {@link LocalLockssRepository}.
@@ -109,8 +136,11 @@ import static org.mockito.Mockito.doThrow;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-@ContextConfiguration(classes = { MyTestConfig.class })
+@ContextConfiguration(classes = { DefaultTestRepositoryApplicationConfiguration.class })
 public class TestRestLockssRepository extends SpringLockssTestCase4 {
+
+  private ClientAndServer mockServer;
+
   private final static L4JLogger log = L4JLogger.getLogger();
 
   protected static int MAX_RANDOM_FILE = 50000;
@@ -125,9 +155,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     AUSIZE_ZERO.setTotalAllVersions(0L);
     AUSIZE_ZERO.setTotalWarcSize(0L);
   }
-
-
-  static boolean WRONG = false;
 
   // TEST DATA
 
@@ -177,15 +204,35 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   protected static String[] AUIDS = {AUID1, AUID2, "Auid2"};
   protected static String[] URLS = {URL1, URL2, URL2.toUpperCase(), URL3};
 
+  // Credentials.
+  private final Credentials USER_ADMIN =
+      this.new Credentials("lockss-u", "lockss-p");
+  private final Credentials AU_ADMIN =
+      this.new Credentials("au-admin", "I'mAuAdmin");
+  private final Credentials CONTENT_ADMIN =
+      this.new Credentials("content-admin", "I'mContentAdmin");
+  private final Credentials CONTENT_ACCESS =
+      new Credentials("content-access", "I'mContentAdmin");
+  private final Credentials ANYBODY =
+      this.new Credentials("someUser", "somePassword");
+
   @LocalServerPort
   private int port;
+
+  // The application Context used to specify the command line arguments to be
+  // used for the tests.
+  @Autowired
+  ApplicationContext appCtx;
 
   static List<File> tmpDirs = new ArrayList<>();
 
   @Autowired
   LockssRepository internalRepo;
 
-
+  private String tempDirPath;
+  private String dbPort;
+  @Autowired
+  private ArtifactIndex artifactIndex;
 
   @AfterClass
   public static void deleteTempDirs() throws Exception {
@@ -203,30 +250,140 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   // the repository
   Map<String, ArtifactSpec> highestCommittedVerSpec = new HashMap<String, ArtifactSpec>();
 
-  /**
-   * Provides a newly built LOCKSS repository implemented by a remote REST
-   * Repository service.
-   *
-   * @return a LockssRepository with the newly built LOCKSS repository.
-   * @throws Exception if there are problems.
-   */
-  public RestLockssRepository makeLockssRepository() throws Exception {
-    log.info("port = " + port);
-    return new RestLockssRepository(
-        new URL(String.format("http://localhost:%d", port)), null, null);
-  }
-
   @Before
   public void setUpArtifactDataStore() throws Exception {
     TimeBase.setSimulated();
-    getMockLockssDaemon().setAppRunning(true);
-    internalRepo.initRepository();
-    this.repoClient = makeLockssRepository();
+    // Get the temporary directory used during the test.
+    tempDirPath = setUpDiskSpace();
+
+    dbPort = Integer.toString(TcpTestUtil.findUnboundTcpPort());
+    ConfigurationUtil.addFromArgs(RepositoryDbManager.PARAM_DATASOURCE_PORTNUMBER,
+        dbPort);
+
+    setupMockServerClient();
+    setupLockssApp();
+    setupRepositoryClient(USER_ADMIN);
+  }
+
+  public void setupMockServerClient() throws IOException {
+    int mockServerPort = TcpTestUtil.findUnboundTcpPort();
+    mockServer = startClientAndServer(mockServerPort);
+
+    String cfgSvcBinding = "cfg=localhost:" + mockServerPort + ":" + mockServerPort;
+//    ConfigurationUtil.addFromArgs(PARAM_SERVICE_BINDINGS, cfgSvcBinding);
+
+    try {
+      addParamToMiscConfig(PARAM_SERVICE_BINDINGS, cfgSvcBinding);
+      // addToMiscConfig("org.lockss.log.RestServicesManager", "DEBUG2");
+    } catch (IOException e) {
+      log.error("Could not add misc configuration parameters", e);
+      throw e;
+    }
+  }
+
+  @Override
+  protected MockLockssDaemon newMockLockssDaemon() {
+    return null;
+  }
+
+  private void setupRepositoryClient(Credentials crd) throws IOException {
+    repoClient = new RestLockssRepository(
+        new URL(String.format("http://localhost:%d", port)), crd.getUser(), crd.getPassword());
+  }
+  
+  public void setupLockssApp() throws Exception {
+    // Set up the temporary directory where the test data will reside.
+    setUpTempDirectory(this.getClass().getCanonicalName());
+
+    // Set up the UI port.
+    setUpUiPort(UI_PORT_CONFIGURATION_TEMPLATE, UI_PORT_CONFIGURATION_FILE);
+    
+    // Specify the command line parameters to be used for the tests.
+    List<String> cmdLineArgs = getCommandLineArguments();
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add("test/config/testAuthOn.txt");
+
+    // This is a one way to configure REST credentials so that this service can 
+    // make REST calls to other services. The "-s" mechanism was intended for
+    // Kubernetes secrets and the file will be deleted after being read.
+    File lockssAuth =
+        FileTestUtil.writeTempFile("lockss-auth", "lockss-u:lockss-p");
+    cmdLineArgs.add("-s");
+    cmdLineArgs.add("rest:" + lockssAuth);
+
+    log.info("cmdLineArgs: " + cmdLineArgs);
+
+    // XXX This is kinda wonky.  SpringRunner has already set up the
+    // test environment; this starts (parts of?) it over again
+    CommandLineRunner runner = appCtx.getBean(CommandLineRunner.class);
+    runner.run(cmdLineArgs.toArray(new String[cmdLineArgs.size()]));
+  }
+
+  /**
+   * Provides the standard command line arguments to start the server.
+   *
+   * @return a {@code List<String>} with the command line arguments.
+   */
+  private List<String> getCommandLineArguments() {
+    log.debug2("Invoked");
+
+    List<String> cmdLineArgs = new ArrayList<String>();
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add(getPlatformDiskSpaceConfigPath());
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add(getUiPortConfigFile().getAbsolutePath());
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add("test/config/lockss.txt");
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add("test/config/lockss.opt");
+    cmdLineArgs.add("-p");
+    cmdLineArgs.add(getMiscConfigPath());
+
+    log.debug2("cmdLineArgs = {}", cmdLineArgs);
+    return cmdLineArgs;
   }
 
   @After
   public void tearDownArtifactDataStore() throws Exception {
+    mockServer.stop();
     this.repoClient = null;
+  }
+
+  @Test
+  public void testContinuationAndLimit()  throws Exception {
+    String ns = "test-namespace";
+    String auid = "test-auid";
+
+    // Setup page limit on server
+    ConfigurationUtil.setFromArgs("org.lockss.repository.artifact.pagesize.default", "2");
+
+    List<Artifact> committed = new ArrayList<>();
+
+    for (int i = 0; i < 10; i++) {
+      ArtifactSpec spec = new ArtifactSpec()
+          .setNamespace(ns)
+          .setAuid(auid)
+          .setUrl("url" + i)
+          .setCollectionDate(TimeBase.nowMs())
+          .generateContent();
+
+      Artifact addedArtifact =
+          repoClient.addArtifact(spec.getArtifactData());
+
+      committed.add(repoClient.commitArtifact(addedArtifact));
+    }
+
+    // Re-fetch each artifact after all commits are done, so that storageUrls
+    // reflect the final committed state.
+    List<Artifact> artifacts = new ArrayList<>();
+    for (Artifact c : committed) {
+      artifacts.add(repoClient.getArtifact(c.getNamespace(), c.getAuid(), c.getUri()));
+    }
+
+    Iterable<Artifact> result = repoClient.getArtifacts(ns, auid);
+
+    assertIterableEquals(artifacts, result);
+
   }
 
   @Test
@@ -305,13 +462,13 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   /**
-   * Tests resource Artifact, ensure it creates the correct WARC record type.
+   * Tests resource Artifact.
    */
   @Test
   public void testResourceArtifact() throws Exception {
     HttpHeaders headers = new HttpHeaders();
-
     headers.add("Content-Type", "x-ms-wmv");
+    
     ArtifactSpec spec = new ArtifactSpec()
       .setUrl("https://example.lockss.org/foo2")
       .setContentLength(100)
@@ -322,14 +479,795 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     Artifact artifact = addUncommitted(spec);
     Artifact committed = commit(spec, artifact);
     spec.assertArtifact(repoClient, committed);
+
     ArtifactData ad = repoClient.getArtifactData(committed);
+
     assertEquals(headers.getFirst("Content-Type"),
         ad.getHttpHeaders().getFirst("Content-Type"));
+
     assertFalse(ad.isHttpResponse());
-    Artifact copied = waitCopied(spec);
-    String path = new URL(copied.getStorageUrl()).getPath();
-    String warcstr = StringUtil.fromFile(path);
-    assertMatchesRE("WARC-Type: resource", warcstr);
+    assertNull(ad.getHttpStatus());
+  }
+
+  /**
+   * Tests for {@link RestLockssRepository#startBulkStore(String, String)} and
+   * {@link RestLockssRepository#finishBulkStore(String, String)}. Verifies that making these REST API
+   * calls result in the Repository Service calling {@link ArtifactIndex#startBulkStore(String, String)}
+   * and {@link ArtifactIndex#finishBulkStore(String, String, int)}, respectively.
+   */
+  @Test
+  public void testHandleBulk() throws Exception {
+    String ns = "test";
+    String auid = "test";
+
+    doNothing().when(artifactIndex).startBulkStore(ns, auid);
+    doNothing().when(artifactIndex).finishBulkStore(eq(ns), eq(auid), ArgumentMatchers.anyInt());
+
+    repoClient.startBulkStore(ns, auid);
+    verify(artifactIndex).startBulkStore(ns, auid);
+
+    repoClient.finishBulkStore(ns, auid);
+    verify(artifactIndex).finishBulkStore(eq(ns), eq(auid), ArgumentMatchers.anyInt());
+  }
+
+  @Test
+  public void testRoles() throws Exception {
+    RestEndpointCall getNamespaces = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble GET request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/namespaces", null, null);
+
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getNamespaces, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getNamespaces, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getNamespaces, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getNamespaces, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall addArtifactsFromArchive = (Credentials credentials) -> {
+      boolean storeDuplicate = false;
+      String excludeStatusPattern = null;
+
+      // Generate an artifact for the test
+      ArtifactSpec spec = new ArtifactSpec();
+      spec.generateContent();
+
+      MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+
+      // Attach AUID part
+      parts.add("auid", spec.getAuid());
+
+      // Attach archive part
+      HttpHeaders archivePartHeaders = new HttpHeaders();
+
+      // FIXME: Content-Length must be set to avoid the InputStream from being read to
+      //  determine the Content-Length
+      archivePartHeaders.setContentLength(0);
+      MediaType APPLICATION_WARC = MediaType.valueOf("application/warc");
+      archivePartHeaders.setContentType(APPLICATION_WARC);
+
+      InputStream warcArchive = getResourceAsStream("/test.warc");
+      Resource archiveResource = new NamedInputStreamResource("archive", warcArchive);
+
+      parts.add("archive", new HttpEntity<>(archiveResource, archivePartHeaders));
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(parts, requestHeaders);
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", spec.getNamespace());
+      if (storeDuplicate) {
+        queryParams.put("storeDuplicate", "true");
+      }
+      if (!StringUtils.isEmpty(excludeStatusPattern)) {
+        queryParams.put("excludeStatusPattern", excludeStatusPattern);
+      }
+
+      // Build REST endpoint
+      String endpoint = "http://localhost:" + port + "/archives";
+      URI endpointUri = RestUtil.getRestUri(endpoint, null, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Resource> response = testTemplate
+          .exchange(endpointUri, HttpMethod.POST, requestEntity, Resource.class);
+
+      return response;
+    };
+
+    assertResponseStatus(addArtifactsFromArchive, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(addArtifactsFromArchive, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(addArtifactsFromArchive, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getArtifactsFromAllAus = (Credentials credentials) -> {
+      String namespace = null;
+      String prefix = "https://www.lockss.org/";
+      VersionsEnum versions = VersionsEnum.ALL;
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("urlPrefix", prefix);
+      queryParams.put("versions", versions.toString());
+
+      if (namespace != null) {
+        queryParams.put("namespace", namespace);
+      }
+
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+      HttpHeaders requestHeaders = new HttpHeaders();
+
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactsFromAllAus, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactsFromAllAus, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getArtifactsFromAllAus, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getArtifactsFromAllAus, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall createArtifact = (Credentials credentials) -> {
+      // Generate an artifact for the test
+      ArtifactSpec spec = new ArtifactSpec()
+          .setUrl("https://www.lockss.org/");
+      spec.generateContent();
+
+      ArtifactData ad = spec.getArtifactData();
+
+      // Transform ArtifactData into multiparts
+      MultiValueMap<String, Object> parts =
+          ArtifactDataUtil.generateMultipartMapFromArtifactData(ad, IncludeContentEnum.ALWAYS, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(parts, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<MultipartMessage> response = testTemplate
+          .exchange(endpointUri, HttpMethod.POST, requestEntity, MultipartMessage.class);
+
+      return response;
+    };
+
+    assertResponseStatus(createArtifact, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(createArtifact, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(createArtifact, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(createArtifact, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getArtifactDataByMultipart = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+      IncludeContentEnum includeContent = IncludeContentEnum.ALWAYS;
+
+      URI endpointUri = artifactByUuidEndpoint(namespace, artifactUuid, includeContent);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setAccept(
+          // Order matters! We expect a multipart response if success or JSON error message otherwise
+          ListUtil.list(MediaType.MULTIPART_FORM_DATA, MediaType.APPLICATION_JSON));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<MultipartMessage> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, MultipartMessage.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactDataByMultipart, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactDataByMultipart, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByMultipart, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByMultipart, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall updateArtifact = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+
+      UriComponentsBuilder builder =
+          UriComponentsBuilder.fromUri(artifactByUuidEndpoint(namespace, artifactUuid, null))
+          .queryParam("committed", "true");
+      URI endpointUri = builder.build().encode().toUri();
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setContentType(MediaType.valueOf("multipart/form-data"));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      MultiValueMap<String, Object> EMPTY_MULTIPART_MAP = new LinkedMultiValueMap<>();
+      HttpEntity requestEntity = new HttpEntity<>(EMPTY_MULTIPART_MAP, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.PUT, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(updateArtifact, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(updateArtifact, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(updateArtifact, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(updateArtifact, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall deleteArtifact = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+
+      URI endpointUri = artifactByUuidEndpoint(namespace, artifactUuid, null);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Void> response = testTemplate
+          .exchange(endpointUri, HttpMethod.DELETE, requestEntity, Void.class);
+
+      return response;
+    };
+
+    assertResponseStatus(deleteArtifact, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(deleteArtifact, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(deleteArtifact, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(deleteArtifact, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getArtifactDataByPayload = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+      IncludeContentEnum includeContent = IncludeContentEnum.ALWAYS;
+
+      URI endpointUri =
+          artifactDataEndpointUri(namespace, artifactUuid, "payload", includeContent);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      requestHeaders.setAccept(ListUtil.list(MediaType.ALL, MediaType.APPLICATION_JSON));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Resource> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, Resource.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactDataByPayload, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactDataByPayload, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByPayload, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByPayload, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getArtifactDataByResponse = (Credentials credentials) -> {
+      String namespace = "test";
+      String artifactUuid = "test";
+      IncludeContentEnum includeContent = IncludeContentEnum.ALWAYS;
+
+      URI endpointUri =
+          artifactDataEndpointUri(namespace, artifactUuid, "response", includeContent);
+
+      // Set Accept header in request
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+      MediaType APPLICATION_HTTP_RESPONSE = MediaType.parseMediaType("application/http;msgtype=response");
+      requestHeaders.setAccept(ListUtil.list(APPLICATION_HTTP_RESPONSE, MediaType.APPLICATION_JSON));
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpEntity requestEntity = new HttpEntity<>(requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Void> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, Void.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getArtifactDataByResponse, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getArtifactDataByResponse, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByResponse, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getArtifactDataByResponse, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getAus = (Credentials credentials) -> {
+      String namespace = "test";
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+
+      // Build REST endpoint
+      URI endpointUri = RestUtil.getRestUri("http://localhost:" + port + "/aus", null, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getAus, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getAus, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getAus, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getAus, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall handleBulkAuOp = (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+      BulkAuOpEnum op = BulkAuOpEnum.START;
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+      queryParams.put("op", op.toString());
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("auid", auid);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/aus/{auid}/bulk", uriParams, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.POST, requestEntity, String.class);
+
+      return response;
+    };
+
+    // The test uses a VolatileArtifactIndex whose startBulkStore and finishBulkStore methods
+    // are inherited from AbstractArtifactIndex and throw UnsupportedOperationException, which
+    // is mapped to a 501 Not Implemented response:
+    assertResponseStatus(handleBulkAuOp, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(handleBulkAuOp, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(handleBulkAuOp, AU_ADMIN, HttpStatus.NOT_IMPLEMENTED);
+    assertResponseStatus(handleBulkAuOp, USER_ADMIN, HttpStatus.NOT_IMPLEMENTED);
+
+    RestEndpointCall getAuArtifacts = (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+      queryParams.put("auid", auid);
+      queryParams.put("version", "latest");
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getAuArtifacts, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getAuArtifacts, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getAuArtifacts, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getAuArtifacts, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getAuSize = (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("namespace", namespace);
+      queryParams.put("auid", auid);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/artifacts", null, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getAuSize, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getAuSize, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getAuSize, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getAuSize, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getCdxOwb = (Credentials credentials) -> {
+      String namespace = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("q", "url:" + URLEncoder.encode("https://www.lockss.org/foo+baz", StandardCharsets.UTF_8));
+//      queryParams.put("count", namespace);
+//      queryParams.put("start_page", namespace);
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("namespace", namespace);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/wayback/cdx/owb/{namespace}", uriParams, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    final String LOCKSS_VERSION = "2.0.90-beta2";
+    final String COMPONENT_VERSION = "2.10.0-SNAPSHOT";
+    final String API_VERSION = "2.0.0";
+    final long READY_TIME_EPOCH_MS = 1754706972643L;
+
+    final String CONFIG_SERVICE_READY_JSON = """
+        {
+          "componentName": "laaws-configuration-service",
+          "serviceName": "LOCKSS Configuration Service REST API",
+          "lockssVersion": "%s",
+          "componentVersion": "%s",
+          "apiVersion": "%s",
+          "ready": true,
+          "readyTime": %d,
+          "reason": null,
+          "startupStatus": "AUS_STARTED"
+        }
+        """.formatted(LOCKSS_VERSION, COMPONENT_VERSION, API_VERSION, READY_TIME_EPOCH_MS);
+
+    // Mock CfgSvc status endpoint
+    mockServer
+        .when(request()
+            .withMethod("GET")
+            .withPath("/status"))
+        .respond(response()
+            .withStatusCode(200)
+            .withHeaders(new Header("Content-Type", "application/json"))
+            .withBody(CONFIG_SERVICE_READY_JSON));
+
+    final String NORMALIZE_URL_JSON = """
+        [
+          "http://www.lockss.org/foo+baz"
+        ]
+        """;
+
+    // Mock CfgSvc normalizeUrl endpoint
+    mockServer
+        .when(request()
+            .withMethod("GET")
+            .withQueryStringParameter("url", "https://www.lockss.org/foo+baz")
+            .withPath("/utils/normalizeurl"))
+        .respond(response()
+            .withStatusCode(200)
+            .withHeaders(new Header("Content-Type", "application/json"))
+            .withBody(NORMALIZE_URL_JSON));
+
+    assertResponseStatus(getCdxOwb, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getCdxOwb, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getCdxOwb, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getCdxOwb, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getCdxPywb = (Credentials credentials) -> {
+      String namespace = "test";
+      String auid = "test";
+
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("url", "https://www.lockss.org/foo+baz");
+//      queryParams.put("limit", "");
+//      queryParams.put("matchType", "");
+//      queryParams.put("sort", "");
+//      queryParams.put("closest", "");
+//      queryParams.put("output", "");
+//      queryParams.put("fl", "");
+
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("namespace", namespace);
+
+      // Build REST endpoint
+      URI endpointUri = RestUtil.getRestUri("http://localhost:" + port + "/wayback/cdx/pywb/{namespace}",
+          uriParams, queryParams);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getCdxPywb, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getCdxPywb, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(getCdxPywb, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getCdxPywb, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getWarcArchive = (Credentials credentials) -> {
+      Map<String, String> uriParams = new HashMap<>();
+      uriParams.put("fileName", "test:test.warc");
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/wayback/warcs/{fileName}", uriParams, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity requestEntity = new HttpEntity<>(null, requestHeaders);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<Resource> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, Resource.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getWarcArchive, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getWarcArchive, CONTENT_ACCESS, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getWarcArchive, AU_ADMIN, HttpStatus.NOT_FOUND);
+    assertResponseStatus(getWarcArchive, USER_ADMIN, HttpStatus.NOT_FOUND);
+
+    RestEndpointCall getChecksumAlgorithms = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/checksumalgorithms", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getChecksumAlgorithms, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getChecksumAlgorithms, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getChecksumAlgorithms, AU_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getChecksumAlgorithms, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getRepoInfo = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/repoinfo", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getRepoInfo, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getRepoInfo, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getRepoInfo, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getRepoInfo, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall getStorageInfo = (Credentials credentials) -> {
+      HttpHeaders requestHeaders = new HttpHeaders();
+      requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+      // Assemble POST request entity
+      HttpEntity<MultiValueMap<String, Object>> requestEntity =
+          new HttpEntity<>(null, requestHeaders);
+
+      // Build REST endpoint
+      URI endpointUri =
+          RestUtil.getRestUri("http://localhost:" + port + "/repoinfo/storage", null, null);
+
+      // Initialize the request to the REST service.
+      RestTemplateBuilder templateBuilder = RestUtil.getRestTemplateBuilder(0, 0);
+
+      // Make the request and get the response.
+      TestRestTemplate testTemplate = new TestRestTemplate(templateBuilder);
+      ResponseEntity<String> response = testTemplate
+          .exchange(endpointUri, HttpMethod.GET, requestEntity, String.class);
+
+      return response;
+    };
+
+    assertResponseStatus(getStorageInfo, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getStorageInfo, CONTENT_ACCESS, HttpStatus.FORBIDDEN);
+    assertResponseStatus(getStorageInfo, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(getStorageInfo, USER_ADMIN, HttpStatus.OK);
+  }
+
+  private URI artifactDataEndpointUri(String namespace, String artifactUuid, String responseDataType,
+                                      IncludeContentEnum includeContent) {
+    Map<String, String> uriParams = new HashMap<>();
+    Map<String, String> queryParams = new HashMap<>();
+
+    // URI path parameters
+    uriParams.put("uuid", artifactUuid);
+    uriParams.put("endpoint", responseDataType);
+
+    // Query parameters
+    if (namespace != null) {
+      queryParams.put("namespace", namespace);
+    }
+
+    if (includeContent != null) {
+      queryParams.put("includeContent", includeContent.toString());
+    }
+
+    return RestUtil.getRestUri("http://localhost:" + port + "/artifacts/{uuid}/{endpoint}",
+        uriParams, queryParams);
+  }
+
+  private URI artifactByUuidEndpoint(String namespace,
+                                     String artifactUuid, IncludeContentEnum includeContent) {
+    Map<String, String> uriParams = new HashMap<>();
+    uriParams.put("uuid", artifactUuid);
+
+    Map<String, String> queryParams = new HashMap<>();
+
+    if (namespace != null) {
+      queryParams.put("namespace", namespace);
+    }
+
+    if (includeContent != null) {
+      // includeContent defaults to ALWAYS but lets be explicit to avoid confusion
+      queryParams.put("includeContent", includeContent.toString());
+    }
+
+    return RestUtil.getRestUri("http://localhost:" + port + "/artifacts/{uuid}", uriParams, queryParams);
+  }
+
+  private void assertResponseStatus(RestEndpointCall call, Credentials cred, HttpStatus expectedStatus)
+      throws IOException {
+    ResponseEntity<?> response = call.execute(cred);
+
+    // Get the response status.
+    HttpStatusCode statusCode = response.getStatusCode();
+    HttpStatus status = HttpStatus.valueOf(statusCode.value());
+    assertEquals(expectedStatus, status);
+  }
+
+  private interface RestEndpointCall {
+    ResponseEntity<?> execute(Credentials credentials) throws IOException;
   }
 
   /**
@@ -791,16 +1729,50 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   }
 
   @Test
-  public void testAddArtifact() throws IOException {
-
+  public void testAddArtifact() throws Exception {
     ArtifactSpec spec = new ArtifactSpec()
-        .setUrl("http://hyperwolf.ai/")
-        .setCollectionDate(1234);
+        .setUrl("https://www.lockss.org/example");
 
     spec.generateContent();
 
-    Artifact result = repoClient.addArtifact(spec.getArtifactData());
-    assertNotNull(result);
+    // Add an artifact from the spec twice without specify a version
+    Artifact a1 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a1);
+    spec.assertArtifact(repoClient, a1);
+    assertEquals(1, (long)a1.getVersion());
+
+    Artifact a2 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a2);
+    spec.assertArtifact(repoClient, a2);
+    assertEquals(2, (long)a2.getVersion());
+
+    // Give the spec the version of an existing uncomitted artifact and demonstrate that
+    // it replaces the existing artifact:
+    spec.setVersion(2);
+    Artifact committedArtifact = repoClient.addArtifact(spec.getArtifactData());
+    spec.assertArtifact(repoClient, committedArtifact);
+
+    // Commmit that artifact now and demonstrate that an attempt at replacing the artifact
+    // results in a LockssArtifactAlreadyExistsException:
+    repoClient.commitArtifact(committedArtifact);
+    assertThrows(LockssArtifactAlreadyExistsException.class,
+        () -> repoClient.addArtifact(spec.getArtifactData()));
+
+    // Give the spec a specific non-existing version and assert success
+    assertNull(repoClient.getArtifactVersion(
+        spec.getNamespace(), spec.getAuid(), spec.getUrl(), 4, true));
+    spec.setVersion(4);
+    Artifact a4 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a4);
+    spec.assertArtifact(repoClient, a4);
+    assertEquals(4, (long)a4.getVersion());
+
+    // Remove version from spec; add again and assert the version is what we expect
+    spec.setVersion(null);
+    Artifact a5 = repoClient.addArtifact(spec.getArtifactData());
+    assertNotNull(a5);
+    spec.assertArtifact(repoClient, a5);
+    assertEquals(5, (long)a5.getVersion());
   }
 
   @Test
@@ -830,7 +1802,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   public void testAddArtifact_badRequest() throws Exception {
     // Try adding an artifact with no URL.
     assertThrowsMatch(LockssRestHttpException.class,
-        "400 Bad Request: addArtifact",
+        "400 Bad Request: Could not add artifact to remote repository",
         () -> {
           addUncommitted(new ArtifactSpec().setUrl(null));
         });
@@ -969,11 +1941,6 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
-  public void testFromAllAusMethods() throws IOException {
-    testGetArtifactsWithUrlFromAllAus();
-    testGetArtifactsWithUrlPrefixFromAllAus();
-  }
-
   public void testAllNoSideEffect() throws Exception {
     testGetArtifact();
     testGetArtifactData();
@@ -1027,7 +1994,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertEquals(SIM_TIME, ad2.getStoreDate());
   }
 
-  /** Test for {@link RestLockssRepository#getArtifactData(Artifact, LockssRepository.IncludeContent)}. */
+  /** Test for {@link RestLockssRepository#getArtifactData(Artifact, IncludeContentEnum)}. */
   @Test
   public void testConditionalContent() throws IOException {
     runTestConditionalContent(false);
@@ -1076,33 +2043,33 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     spec_large.setCommitted(true);
     spec_larger.setCommitted(true);
 
-    assertReceivesNoContent(art_small_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_small_c, IncludeContentEnum.NEVER);
+    assertReceivesContent(art_small_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_small_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_large_c, IncludeContentEnum.NEVER);
+    assertReceivesNoContent(art_large_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_large_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_larger_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.NEVER);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_larger_c, IncludeContentEnum.ALWAYS);
 
     // Set the threshold to something larger
     ConfigurationUtil.addFromArgs(ArtifactsApiServiceImpl.PARAM_SMALL_CONTENT_THRESHOLD,
         "" + (len_large + len_larger) / 2);
 
-    assertReceivesNoContent(art_small_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_small_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_small_c, IncludeContentEnum.NEVER);
+    assertReceivesContent(art_small_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_small_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_large_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_large_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_large_c, IncludeContentEnum.NEVER);
+    assertReceivesContent(art_large_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_large_c, IncludeContentEnum.ALWAYS);
 
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.NEVER);
-    assertReceivesNoContent(art_larger_c, LockssRepository.IncludeContent.IF_SMALL);
-    assertReceivesContent(art_larger_c, LockssRepository.IncludeContent.ALWAYS);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.NEVER);
+    assertReceivesNoContent(art_larger_c, IncludeContentEnum.IF_SMALL);
+    assertReceivesContent(art_larger_c, IncludeContentEnum.ALWAYS);
   }
 
   // Ensure artifact names can be arbitrary strings (not nec. URL).
@@ -1138,7 +2105,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   /**
    * Assert that the repo supplies content with the ArtifactData
    */
-  void assertReceivesContent(Artifact art, LockssRepository.IncludeContent ic)
+  void assertReceivesContent(Artifact art, IncludeContentEnum ic)
       throws IOException {
     ArtifactData ad = repoClient.getArtifactData(art, ic);
     assertTrue(ad.hasContentInputStream());
@@ -1147,7 +2114,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   /**
    * Assert that the repo does not supply content with the ArtifactData
    */
-  void assertReceivesNoContent(Artifact art, LockssRepository.IncludeContent ic)
+  void assertReceivesNoContent(Artifact art, IncludeContentEnum ic)
       throws IOException {
     ArtifactData ad = repoClient.getArtifactData(art, ic);
     assertFalse(ad.hasContentInputStream());
@@ -1164,14 +2131,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     // Artifact not found
     for (ArtifactSpec spec : notFoundArtifactSpecs()) {
-      log.info("s.b. notfound: " + spec);
+      log.debug2("s.b. notfound: " + spec);
       assertNull("Null or non-existent name shouldn't be found: " + spec,
           getArtifact(repoClient, spec, false));
     }
 
     // Ensure that a no-version retrieval gets the expected highest version
     for (ArtifactSpec highSpec : highestCommittedVerSpec.values()) {
-      log.info("highSpec: " + highSpec);
+      log.debug2("highSpec: " + highSpec);
       highSpec.assertArtifact(repoClient, repoClient.getArtifact(
           highSpec.getNamespace(),
           highSpec.getAuid(),
@@ -1221,7 +2188,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
-  /** Test for {@link RestLockssRepository#getArtifactDataByPayload(Artifact, LockssRepository.IncludeContent)}. */
+  /** Test for {@link RestLockssRepository#getArtifactDataByPayload(Artifact, IncludeContentEnum)}. */
   @Test
   public void testGetArtifactDataByPayload() throws Exception {
     // Resource backed artifact
@@ -1231,8 +2198,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(resourceSpec);
 
-    assertArtifactDataFromPayload(resourceSpec, LockssRepository.IncludeContent.NEVER);
-    assertArtifactDataFromPayload(resourceSpec, LockssRepository.IncludeContent.ALWAYS);
+    assertArtifactDataFromPayload(resourceSpec, IncludeContentEnum.NEVER);
+    assertArtifactDataFromPayload(resourceSpec, IncludeContentEnum.ALWAYS);
 
     // Test IF_SMALL behavior with resource artifacts
     ArtifactSpec resourceSpecUnderThreshold = new ArtifactSpec()
@@ -1249,8 +2216,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(resourceSpecOverThreshold);
 
-    assertArtifactDataFromPayload(resourceSpecUnderThreshold, LockssRepository.IncludeContent.IF_SMALL);
-    assertArtifactDataFromPayload(resourceSpecOverThreshold, LockssRepository.IncludeContent.IF_SMALL);
+    assertArtifactDataFromPayload(resourceSpecUnderThreshold, IncludeContentEnum.IF_SMALL);
+    assertArtifactDataFromPayload(resourceSpecOverThreshold, IncludeContentEnum.IF_SMALL);
 
     // Test response artifact
     ArtifactSpec responseSpec = new ArtifactSpec()
@@ -1259,8 +2226,8 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(responseSpec);
 
-    assertArtifactDataFromPayload(responseSpec, LockssRepository.IncludeContent.NEVER);
-    assertArtifactDataFromPayload(responseSpec, LockssRepository.IncludeContent.ALWAYS);
+    assertArtifactDataFromPayload(responseSpec, IncludeContentEnum.NEVER);
+    assertArtifactDataFromPayload(responseSpec, IncludeContentEnum.ALWAYS);
 
     // Test IF_SMALL behavior with response artifacts
     ArtifactSpec responseSpecUnderThreshold = new ArtifactSpec()
@@ -1277,12 +2244,12 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     addUncommitted(responseSpecOverThreshold);
 
-    assertArtifactDataFromPayload(responseSpecUnderThreshold, LockssRepository.IncludeContent.IF_SMALL);
-    assertArtifactDataFromPayload(responseSpecOverThreshold, LockssRepository.IncludeContent.IF_SMALL);
+    assertArtifactDataFromPayload(responseSpecUnderThreshold, IncludeContentEnum.IF_SMALL);
+    assertArtifactDataFromPayload(responseSpecOverThreshold, IncludeContentEnum.IF_SMALL);
   }
 
   public void assertArtifactDataFromPayload(ArtifactSpec spec,
-                                            LockssRepository.IncludeContent includeContent) throws Exception {
+                                            IncludeContentEnum includeContent) throws Exception {
 
     ArtifactData ad = repoClient.getArtifactDataByPayload(
         spec.getArtifact(), includeContent);
@@ -1310,9 +2277,9 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       Assertions.assertEquals(spec.getStorageUrl(), ad.getStorageUrl());
     }
 
-    boolean expectContent = includeContent == LockssRepository.IncludeContent.ALWAYS ||
+    boolean expectContent = includeContent == IncludeContentEnum.ALWAYS ||
         (spec.getContentLength() <= ArtifactsApiServiceImpl.DEFAULT_SMALL_CONTENT_THRESHOLD &&
-            includeContent == LockssRepository.IncludeContent.IF_SMALL);
+            includeContent == IncludeContentEnum.IF_SMALL);
 
     if (expectContent) {
       new LockssTestCase5().assertSameBytes(
@@ -1362,7 +2329,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // different version so can't use that here.
 
     for (ArtifactSpec spec : neverFoundArtifactSpecs) {
-      log.info("s.b. notfound: " + spec);
+      log.debug2("s.b. notfound: " + spec);
       assertNull("Null or non-existent name shouldn't be found: " + spec,
           getArtifactVersion(repoClient, spec, 1, false));
       assertNull("Null or non-existent name shouldn't be found: " + spec,
@@ -1394,7 +2361,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
     // Ensure that a non-existent version isn't found
     for (ArtifactSpec highSpec : highestVerSpec.values()) {
-      log.info("highSpec: " + highSpec);
+      log.debug2("highSpec: " + highSpec);
       assertNull(repoClient.getArtifactVersion(highSpec.getNamespace(),
           highSpec.getAuid(),
           highSpec.getUrl(),
@@ -1695,6 +2662,40 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     }
   }
 
+  // Exercise a large iterator.  Needs a better test framework to
+  // create 10s of 1000s of Artifact
+  @Test
+  public void testGetLotsOfArtifacts() throws Exception {
+    String anyColl = null;
+    String anyAuid = null;
+
+//     repoClient.startBulkStore(NS1, AUID1);
+    for (int suff = 1; suff <= 100; suff++) {
+    ArtifactSpec spec = new ArtifactSpec()
+      .setNamespace(NS1)
+      .setAuid(AUID1)
+      .setUrl("base" + suff)
+      .setContent(CONTENT1)
+      .setCollectionDate(1234)
+      .toCommit(true);
+
+      ArtifactData ad = spec.getArtifactData();
+      Artifact newArt = repoClient.addArtifact(ad);
+      Artifact commArt = repoClient.commitArtifact(spec.getNamespace(),
+                                                   newArt.getUuid());
+    }
+//     repoClient.finishBulkStore(NS1, AUID1);
+
+    int n = 0;
+    for (Artifact art : repoClient.getArtifacts(NS1, AUID1)) {
+      if ((n % 1000) == 0) {
+        Thread.sleep(500);
+      }
+      n++;
+    }
+    log.debug("Iter returned {} artifacts", n);
+  }
+
   public void testGetAllArtifactsWithPrefix() throws IOException {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
@@ -1838,24 +2839,24 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, VersionsEnum.ALL));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, VersionsEnum.ALL));
 
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(null, null, VersionsEnum.LATEST));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL",
-        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlFromAllAus(NS1, null, VersionsEnum.LATEST));
 
     // Non-existent namespace or url
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.ALL));
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, ArtifactVersions.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, VersionsEnum.ALL));
 
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.LATEST));
-    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, ArtifactVersions.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlFromAllAus(NS1, NO_URL, VersionsEnum.LATEST));
 
     // For each distinct URL in the specs, ask the repo for all artifacts
     // with that URL, check against the specs (sorted by (uri, auid,
@@ -1869,7 +2870,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
               .filter(spec -> spec.getUrl().equals(urlSpec.getUrl()))
               .filter(spec -> spec.getNamespace().equals(urlSpec.getNamespace())),
           repoClient.getArtifactsWithUrlFromAllAus(urlSpec.getNamespace(),
-              urlSpec.getUrl(), ArtifactVersions.ALL));
+              urlSpec.getUrl(), VersionsEnum.ALL));
 
       ArtifactSpec.assertArtList(repoClient,
           committedSpecStream()
@@ -1890,7 +2891,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                       .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
               ),
           repoClient.getArtifactsWithUrlFromAllAus(urlSpec.getNamespace(),
-              urlSpec.getUrl(), ArtifactVersions.LATEST));
+              urlSpec.getUrl(), VersionsEnum.LATEST));
     }
   }
 
@@ -1898,25 +2899,25 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, VersionsEnum.ALL));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.ALL));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, VersionsEnum.ALL));
 
     // Illegal args
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(null, null, VersionsEnum.LATEST));
     assertThrowsMatch(IllegalArgumentException.class,
         "Null URL prefix",
-        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, ArtifactVersions.LATEST));
+        () -> repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, null, VersionsEnum.LATEST));
 
     // Non-existent namespace or url
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.ALL));
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, ArtifactVersions.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.ALL));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, VersionsEnum.ALL));
 
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, ArtifactVersions.LATEST));
-    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, ArtifactVersions.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NO_NAMESPACE, URL1, VersionsEnum.LATEST));
+    assertEmpty(repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, NO_URL, VersionsEnum.LATEST));
 
     // Get all the Artifacts beginning with URL_PREFIX, check agains the specs
     // (sorted by (uri, auid, version), to match ...AllAus())
@@ -1925,7 +2926,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
             .filter(spec -> spec.getUrl().startsWith(URL_PREFIX))
             .filter(spec -> spec.getNamespace().equals(NS1)),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, ArtifactVersions.ALL));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, VersionsEnum.ALL));
 
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
@@ -1945,14 +2946,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                     .thenComparing(ArtifactSpec::getAuid)
                     .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
             ),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, ArtifactVersions.LATEST));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, URL_PREFIX, VersionsEnum.LATEST));
 
     // Same with empty prefix
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
             .sorted(ArtifactSpec.ART_SPEC_COMPARATOR_BY_URL)
             .filter(spec -> spec.getNamespace().equals(NS1)),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", ArtifactVersions.ALL));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.ALL));
 
     ArtifactSpec.assertArtList(repoClient,
         committedSpecStream()
@@ -1971,7 +2972,30 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
                     .thenComparing(ArtifactSpec::getAuid)
                     .thenComparing(Comparator.comparingInt(ArtifactSpec::getVersion).reversed())
             ),
-        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", ArtifactVersions.LATEST));
+        repoClient.getArtifactsWithUrlPrefixFromAllAus(NS1, "", VersionsEnum.LATEST));
+  }
+
+  @Test
+  public void testGetAuIds_queryEncoding() throws Exception {
+    // Use a valid namespace (must match ^[a-zA-Z0-9][a-zA-Z0-9._-]*$)
+    // and put the '+' in the auid to exercise query parameter encoding
+    String ns = NS1;
+    String auid = "org|lockss|plugin+extra:test";
+
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace(ns)
+        .setAuid(auid)
+        .setUrl(URL1)
+        .setCollectionDate(1234);
+
+    spec.generateContent();
+
+    Artifact uncommitted = repoClient.addArtifact(spec.getArtifactData());
+    repoClient.commitArtifact(ns, uncommitted.getUuid());
+
+    Artifact artifact = repoClient.getArtifact(NS1, auid, URL1);
+    assertNotNull(artifact);
+    assertEquals(auid, artifact.getAuid());
   }
 
   public void testGetAuIds() throws IOException {
@@ -2004,6 +3028,257 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
             .iterator();
     assertEquals(IteratorUtils.toList(expColl),
         IteratorUtils.toList(repoClient.getNamespaces().iterator()));
+  }
+
+  @Test
+  public void testNamedAU() throws IOException {
+    String namedAuid = "org|lockss|plugin|NamedPlugin&handle~Migration+Reports";
+    String url1 = "http://host1.com/path/file1";
+    String url2 = "http://host1.com/path/file2";
+    String urlPrefix = "http://host1.com/path/";
+
+    // First artifact (url1)
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace(NS1)
+        .setAuid(namedAuid)
+        .setUrl(url1)
+        .setContent(CONTENT1)
+        .setCollectionDate(1234)
+        .toCommit(true);
+
+    ArtifactData ad = spec.getArtifactData();
+    Artifact newArt = repoClient.addArtifact(ad);
+    repoClient.commitArtifact(spec.getNamespace(), newArt.getUuid());
+    spec.setCommitted(true);
+
+    // getArtifact (latest version of a single URL)
+    spec.assertArtifact(repoClient, repoClient.getArtifact(
+        spec.getNamespace(),
+        spec.getAuid(),
+        spec.getUrl()));
+
+    // Second artifact (url2, same AUID)
+    ArtifactSpec spec2 = new ArtifactSpec()
+        .setNamespace(NS1)
+        .setAuid(namedAuid)
+        .setUrl(url2)
+        .setContent("content string 2")
+        .setCollectionDate(1235)
+        .toCommit(true);
+
+    ArtifactData ad2 = spec2.getArtifactData();
+    Artifact newArt2 = repoClient.addArtifact(ad2);
+    repoClient.commitArtifact(spec2.getNamespace(), newArt2.getUuid());
+    spec2.setCommitted(true);
+
+    // Third artifact (second version of url1, same AUID)
+    ArtifactSpec spec1v2 = new ArtifactSpec()
+        .setNamespace(NS1)
+        .setAuid(namedAuid)
+        .setUrl(url1)
+        .setContent("content string 1 v2")
+        .setCollectionDate(1236)
+        .toCommit(true);
+
+    ArtifactData ad1v2 = spec1v2.getArtifactData();
+    Artifact newArt1v2 = repoClient.addArtifact(ad1v2);
+    repoClient.commitArtifact(spec1v2.getNamespace(), newArt1v2.getUuid());
+    spec1v2.setCommitted(true);
+
+    // getArtifacts(ns, auid) - latest version of all URLs
+    Iterable<Artifact> latestArts = repoClient.getArtifacts(NS1, namedAuid);
+    List<Artifact> latestList = IteratorUtils.toList(latestArts.iterator());
+    assertPredicateOverCollection("getArtifacts AUID round-trip, latest version of each URL", latestList, 2,
+        (a) -> namedAuid.equals(a.getAuid()));
+
+    // getArtifactsAllVersions(ns, auid) - all versions of all URLs
+    Iterable<Artifact> allVerArts = repoClient.getArtifactsAllVersions(NS1, namedAuid);
+    List<Artifact> allVerList = IteratorUtils.toList(allVerArts.iterator());
+    assertPredicateOverCollection("getArtifactsAllVersions AUID round-trip, all versions", allVerList, 3,
+        (a) -> namedAuid.equals(a.getAuid()));
+
+    // getArtifactsWithPrefix(ns, auid, prefix) - latest versions matching prefix
+    Iterable<Artifact> prefixArts = repoClient.getArtifactsWithPrefix(NS1, namedAuid, urlPrefix);
+    List<Artifact> prefixList = IteratorUtils.toList(prefixArts.iterator());
+    assertPredicateOverCollection("getArtifactsWithPrefix AUID round-trip, latest with prefix", prefixList, 2,
+        (a) -> namedAuid.equals(a.getAuid()));
+
+    // getArtifactsWithPrefixAllVersions(ns, auid, prefix) - all versions matching prefix
+    Iterable<Artifact> prefixAllArts = repoClient.getArtifactsWithPrefixAllVersions(NS1, namedAuid, urlPrefix);
+    List<Artifact> prefixAllList = IteratorUtils.toList(prefixAllArts.iterator());
+    assertPredicateOverCollection("getArtifactsWithPrefixAllVersions AUID round-trip, all versions with prefix", prefixAllList, 3,
+        (a) -> namedAuid.equals(a.getAuid()));
+
+    // getArtifactsAllVersions(ns, auid, url) - all versions of a specific URL
+    Iterable<Artifact> urlAllVerArts = repoClient.getArtifactsAllVersions(NS1, namedAuid, url1);
+    List<Artifact> urlAllVerList = IteratorUtils.toList(urlAllVerArts.iterator());
+    assertPredicateOverCollection("getArtifactsAllVersions(url) AUID+URI round-trip, all versions of url1", urlAllVerList, 2,
+        (a) -> namedAuid.equals(a.getAuid()) && url1.equals(a.getUri()));
+
+    // getArtifactVersion(ns, auid, url, version) - specific version
+    Artifact artV1 = repoClient.getArtifactVersion(NS1, namedAuid, url1, 1);
+    assertNotNull("getArtifactVersion should find version 1", artV1);
+    assertEquals(1, artV1.getVersion().intValue());
+    assertEquals("getArtifactVersion v1 AUID round-trip", namedAuid, artV1.getAuid());
+    assertEquals("getArtifactVersion v1 URI round-trip", url1, artV1.getUri());
+
+    Artifact artV2 = repoClient.getArtifactVersion(NS1, namedAuid, url1, 2);
+    assertNotNull("getArtifactVersion should find version 2", artV2);
+    assertEquals(2, artV2.getVersion().intValue());
+    assertEquals("getArtifactVersion v2 AUID round-trip", namedAuid, artV2.getAuid());
+    assertEquals("getArtifactVersion v2 URI round-trip", url1, artV2.getUri());
+
+    // auSize(ns, auid)
+    AuSize size = repoClient.auSize(NS1, namedAuid);
+    assertNotNull("auSize should return a result", size);
+    assertTrue("auSize totalAllVersions should be > 0",
+        size.getTotalAllVersions() > 0);
+    assertTrue("auSize totalLatestVersions should be > 0",
+        size.getTotalLatestVersions() > 0);
+  }
+
+  /**
+   * Integration regression-guard: boots the full Spring context with an
+   * embedded Tomcat, then inspects the live connector to confirm the upload
+   * timeout customizer in {@code RepositoryServiceSpringConfig} actually
+   * reached the running protocol handler. A silent regression (wrong factory
+   * type, bean not picked up, autoconfiguration reordering) would leave
+   * disableUploadTimeout at its default and break long multipart uploads.
+   */
+  @Test
+  public void testUploadTimeoutCustomizerAppliedToConnector() {
+    WebServerApplicationContext webCtx = (WebServerApplicationContext) appCtx;
+    TomcatWebServer webServer = (TomcatWebServer) webCtx.getWebServer();
+    Connector connector = webServer.getTomcat().getConnector();
+    AbstractHttp11Protocol<?> protocol =
+        (AbstractHttp11Protocol<?>) connector.getProtocolHandler();
+
+    Assertions.assertFalse(protocol.getDisableUploadTimeout(),
+        "disableUploadTimeout should be false so the upload-phase read timeout is enforced");
+    // Our Customizer sets the default to 15 minutes
+    Assertions.assertEquals(900_000, protocol.getConnectionUploadTimeout(),
+        "connectionUploadTimeout should match the value set by uploadTimeoutCustomizer");
+  }
+
+  /**
+   * End-to-end behavioral test for the upload timeout. Overrides the live
+   * connector's {@code connectionUploadTimeout} to 10s for this test only,
+   * then exercises two requests: a normal small upload that completes well
+   * within the timeout, and a stalled raw-socket upload that declares a
+   * Content-Length but never sends any body bytes. Empirically Tomcat runs
+   * roughly three timeout cycles (read → error → drain) before closing, so
+   * total elapsed scales with the configured timeout — proving the setting
+   * actually drives behavior end-to-end.
+   */
+  @Test
+  public void testUploadTimeoutBehavior() throws Exception {
+    runTestUploadTimeoutBehavior(5_000);
+    runTestUploadTimeoutBehavior(10_000);
+  }
+
+  private void runTestUploadTimeoutBehavior(int soTimeout) throws Exception {
+    // Mutate the running connector. Http11InputBuffer reads these properties
+    // per-connection via the protocol handler's getters, so the change takes
+    // effect on subsequent requests. The change is contained to this test
+    // because @DirtiesContext rebuilds the context after each test method.
+    WebServerApplicationContext webCtx = (WebServerApplicationContext) appCtx;
+    TomcatWebServer webServer = (TomcatWebServer) webCtx.getWebServer();
+    Connector connector = webServer.getTomcat().getConnector();
+    connector.setProperty("disableUploadTimeout", "false");
+    connector.setProperty("connectionUploadTimeout",
+        Integer.toString(soTimeout));
+
+    AbstractHttp11Protocol<?> proto =
+        (AbstractHttp11Protocol<?>) connector.getProtocolHandler();
+    Assertions.assertFalse(proto.getDisableUploadTimeout(),
+        "test override of disableUploadTimeout did not take effect");
+    Assertions.assertEquals(soTimeout, proto.getConnectionUploadTimeout(),
+        "test override of connectionUploadTimeout did not take effect");
+
+    // Fast path: A normal small artifact upload completes promptly
+    ArtifactSpec spec = new ArtifactSpec()
+        .setNamespace("ns-upload-timeout")
+        .setAuid("auid-upload-timeout")
+        .setUrl("http://example.com/upload-timeout-fast")
+        .setStatusLine(null)
+        .generateContent();
+
+    long fastStart = System.currentTimeMillis();
+    Artifact added = repoClient.addArtifact(spec.getArtifactData());
+    long fastElapsed = System.currentTimeMillis() - fastStart;
+    log.info("Fast upload completed in {} ms", fastElapsed);
+
+    Assertions.assertNotNull(added, "fast upload should succeed");
+    Assertions.assertTrue(fastElapsed < soTimeout,
+        "fast upload should not approach the upload timeout (took " + fastElapsed + "ms)");
+
+    // Stalled upload: Claim a body, never send one, expect server to close
+    long stallStart = System.currentTimeMillis();
+    long firstByteAt = -1;
+    long stallElapsed = -1;
+    try (Socket socket = new Socket("localhost", port)) {
+      // Client-side read timeout must comfortably exceed however long Tomcat
+      // takes to finish its read/error/drain cycles, otherwise SO_TIMEOUT
+      // would beat the server's close and mask a real failure.
+      socket.setSoTimeout(soTimeout * 6);
+      OutputStream out = socket.getOutputStream();
+      InputStream in = socket.getInputStream();
+
+      String basicAuth = Base64.getEncoder().encodeToString(
+          "lockss-u:lockss-p".getBytes(StandardCharsets.US_ASCII));
+      String request = "POST /artifacts HTTP/1.1\r\n"
+          + "Host: localhost:" + port + "\r\n"
+          + "Authorization: Basic " + basicAuth + "\r\n"
+          + "Content-Type: multipart/form-data; boundary=----stall\r\n"
+          + "Content-Length: 1024\r\n"
+          + "\r\n";
+      out.write(request.getBytes(StandardCharsets.US_ASCII));
+      out.flush();
+
+      try {
+        int rxByte;
+        while ((rxByte = in.read()) != -1) {
+          if (firstByteAt < 0) {
+            firstByteAt = System.currentTimeMillis();
+          }
+          // discard
+        }
+      } catch (SocketException e) {
+        fail("Stalled upload should not time out");
+      }
+    } finally {
+      stallElapsed = System.currentTimeMillis() - stallStart;
+    }
+
+    long firstByteElapsed = firstByteAt < 0 ? -1 : firstByteAt - stallStart;
+    log.info("Stalled upload: first byte at +{} ms, server closed at +{} ms",
+        firstByteElapsed, stallElapsed);
+
+    // The server's first response byte should arrive no earlier than one
+    // upload-timeout window — anything sooner means a different (shorter)
+    // timeout drove the response and our setting isn't actually in effect.
+    Assertions.assertTrue(firstByteElapsed >= soTimeout,
+        "server reacted before the configured " + soTimeout
+            + "ms upload timeout (first byte at " + firstByteElapsed + "ms)");
+
+    // And it must eventually close. 5x the timeout leaves comfortable headroom
+    // for the read/error/drain cycle Tomcat performs after the stall.
+    Assertions.assertTrue(stallElapsed < soTimeout * 5L,
+        "server failed to close stalled upload within "
+            + (soTimeout * 5L) + "ms (closed after "
+            + stallElapsed + "ms)");
+  }
+
+  private <T> void assertPredicateOverCollection(String description,
+                                                 Collection<T> items,
+                                                 int expectedCount,
+                                                 Predicate<? super T> predicate) {
+    int actualCount = items.size();
+    assertEquals(description, expectedCount, actualCount);
+
+    for (T item : items) {
+      assertTrue(description + " (failed for item: " + item + ")", predicate.test(item));
+    }
   }
 
   // SCENARIOS
@@ -2124,7 +3399,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   // Add Artifacts to the repository as specified by the named scenario
   void instantiateScanario(String name) throws IOException {
-    log.info("Adding scenario: " + name);
+    log.info("Setting up scenario: " + name);
     instantiateScanario(getVariantSpecs(name));
   }
 
@@ -2140,7 +3415,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   void logAdded() {
     for (ArtifactSpec spec : addedSpecs) {
-      log.info("spec: " + spec);
+      log.debug2("spec: " + spec);
     }
   }
 
@@ -2281,7 +3556,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
       return null;
     } else {
       Pair<String, String> res = set.iterator().next();
-      log.info("Found ns au mismatch: " +
+      log.debug("Found ns au mismatch: " +
           res.getLeft() + ", " + res.getRight());
       logAdded();
       return res;
@@ -2317,7 +3592,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   Artifact getArtifact(LockssRepository repository, ArtifactSpec spec,
                        boolean includeUncommitted) throws IOException {
-    log.info(String.format("getArtifact(%s, %s, %s)",
+    log.debug2(String.format("getArtifact(%s, %s, %s)",
         spec.getNamespace(),
         spec.getAuid(),
         spec.getUrl(),
@@ -2338,7 +3613,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
   Artifact getArtifactVersion(LockssRepository repository, ArtifactSpec spec,
                               int ver, boolean includeUncommitted)
       throws IOException {
-    log.info(String.format("getArtifactVersion(%s, %s, %s, %d)",
+    log.debug2(String.format("getArtifactVersion(%s, %s, %s, %d)",
         spec.getNamespace(),
         spec.getAuid(),
         spec.getUrl(),
@@ -2355,7 +3630,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     if (!spec.hasContent()) {
       spec.generateContent();
     }
-    log.info("adding: " + spec);
+    log.debug2("adding: " + spec);
 
     ArtifactData ad = spec.getArtifactData();
     Artifact newArt = repoClient.addArtifact(ad);
@@ -2412,7 +3687,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertFalse(uncommittedArt.getCommitted());
 
     String artUuid = art.getUuid();
-    log.info("committing: " + art);
+    log.debug2("committing: " + art);
     Artifact commArt = repoClient.commitArtifact(spec.getNamespace(), artUuid);
     assertNotNull(commArt);
 
@@ -2469,7 +3744,7 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     // Include an uncommitted artifact, if any
     ArtifactSpec uncSpec = anyUncommittedSpecButVer();
     if (uncSpec != null) {
-      log.info("adding an uncommitted spec: " + uncSpec);
+      log.debug2("adding an uncommitted spec: " + uncSpec);
       res.add(uncSpec);
     }
 

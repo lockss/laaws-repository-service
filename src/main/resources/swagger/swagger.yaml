@@ -1,5 +1,4 @@
-# Copyright (c) 2000-2020, Board of Trustees of Leland Stanford Jr. University
-# All rights reserved.
+# Copyright (c) 2000-2026, Board of Trustees of Leland Stanford Jr. University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -15,7 +14,7 @@
 # may be used to endorse or promote products derived from this software without
 # specific prior written permission.
 #
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
 # ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
@@ -27,25 +26,47 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-openapi: 3.0.1
+openapi: 3.0.3
 info:
   title: LOCKSS Repository Service REST API
   description: REST API of the LOCKSS Repository Service
+  version: 2.0.0
   contact:
     name: LOCKSS Support
-    url: 'https://www.lockss.org/'
+    url: https://www.lockss.org/
     email: lockss-support@lockss.org
   license:
     name: BSD-3-Clause
-    url: 'https://opensource.org/licenses/BSD-3-Clause'
-  version: 2.0.0
+    url: https://opensource.org/licenses/BSD-3-Clause
 servers:
-  - url: http://laaws.lockss.org:443/
+  - url: "{proto}://{hostname}:{port}/"
+    description: LOCKSS Respository Service
+    variables:
+      proto:
+        description: "The protocol (default: http)."
+        enum:
+          - http
+          - https
+        default: http
+      hostname:
+        description: The service host name (or IP address).
+        default: localhost
+      port:
+        description: "The service port (default: 24611)."
+        default: 24611
+security:
+- basicAuth: []
 tags:
-  - name: Default
-    description: Default section
-  - name: repository
-    description: Tasks on the repository
+  - name: artifacts
+    description: Artifact operations
+  - name: aus
+    description: Archival unit (AU) operations
+  - name: repo
+    description: Repository operations
+  - name: status
+    description: Status operations
+  - name: wayback
+    description: Replay operations
 paths:
   /namespaces:
     get:
@@ -53,6 +74,7 @@ paths:
         - repo
       summary: Get namespaces of the committed artifacts in the repository
       operationId: getNamespaces
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       responses:
         '200':
           description: Status 200
@@ -74,6 +96,7 @@ paths:
         - artifacts
       summary: Imports artifacts from an archive
       operationId: addArtifacts
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -127,8 +150,12 @@ paths:
     get:
       tags:
         - artifacts
-      summary: Returns all artifacts that match a given a URL or URL prefix and/or version.
-      operationId: getArtifactsFromAllAus
+      summary: Get artifacts in the repository
+      description: Get a list of all artifacts in a namespace, optionally filtered by
+        Archival Unit, URL, URL prefix, and/or version. Returns a pageful of results
+        defined by the continuation token and size.
+      operationId: getArtifacts
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -136,6 +163,11 @@ paths:
           schema:
             type: string
             default: lockss
+        - name: auid
+          in: query
+          description: Identifier of the Archival Unit containing the artifacts
+          schema:
+            type: string
         - name: url
           in: query
           description: The URL contained by the artifacts
@@ -146,15 +178,16 @@ paths:
           description: The prefix to be matched by the artifact URLs
           schema:
             type: string
-        - name: versions
+        - name: version
           in: query
-          description: Versions of the artifacts to return
+          description: The version of the artifacts to return ('all' for all versions, 'latest' for the latest version, or a specific positive integer version number)
           schema:
             type: string
-            default: all
-            enum:
-              - all
-              - latest
+        - name: includeUncommitted
+          in: query
+          description: Indication of whether uncommitted artifacts should be returned
+          schema:
+            type: boolean
         - name: limit
           in: query
           description: The requested maximum number of artifacts per response
@@ -183,6 +216,7 @@ paths:
         - artifacts
       summary: Create an artifact
       operationId: createArtifact
+      # new roles: ROLE_AU_ADMIN
       requestBody:
         content:
           multipart/form-data:
@@ -229,6 +263,7 @@ paths:
         - artifacts
       summary: Get artifact and metadata
       operationId: getArtifactDataByMultipart
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -244,14 +279,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: "Multipart/form-data containing the following parts:
@@ -259,10 +289,6 @@ paths:
            See POST /artifacts for more information."
           content:
             multipart/form-data:
-              schema:
-                type: string
-                format: binary
-            application/json:
               schema:
                 type: string
                 format: binary
@@ -277,6 +303,7 @@ paths:
         - artifacts
       summary: Update the property of an artifact
       operationId: updateArtifact
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -314,6 +341,7 @@ paths:
         - artifacts
       summary: Remove an artifact from the repository
       operationId: deleteArtifact
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -343,6 +371,7 @@ paths:
         - artifacts
       summary: Get artifact payload
       operationId: getArtifactDataByPayload
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -358,14 +387,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: Artifact's payload
@@ -386,6 +410,7 @@ paths:
         - artifacts
       summary: Get artifact data as HTTP response
       operationId: getArtifactDataByResponse
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -401,15 +426,9 @@ paths:
             type: string
         - name: includeContent
           in: query
-          description: Controls whether to include the artifact content part in multipart
-            response
+          description: Controls whether to include the artifact content part in the multipart response
           schema:
-            type: string
-            default: ALWAYS
-            enum:
-              - NEVER
-              - IF_SMALL
-              - ALWAYS
+            $ref: '#/components/schemas/includeContentEnum'
       responses:
         '200':
           description: Artifact's payload
@@ -432,6 +451,7 @@ paths:
       description: Get a list of all Archival Unit identifiers in a namespace or a
         pageful of the list defined by the continuation token and size
       operationId: getAus
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -470,6 +490,7 @@ paths:
         - aus
       summary: Marks the AUID for bulk artifact transfer
       operationId: handleBulkAuOp
+      # new roles: ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -485,80 +506,14 @@ paths:
             type: string
         - name: op
           in: query
+          description: Bulk AU operation
           required: true
           schema:
-            type: string
-            enum:
-            - start
-            - finish
+            $ref: '#/components/schemas/bulkAuOpEnum'
       responses:
         '200':
           description: Bulk operation succeeded
           content: { }
-        default:
-          description: The resulting error payload.
-          content:
-            application/json:
-              schema:
-                type: object
-  /aus/{auid}/artifacts:
-    get:
-      tags:
-        - artifacts
-      summary: Get artifacts in an Archival Unit
-      description: Get a list of all artifacts in a namespace and Archival Unit or
-        a pageful of the list defined by the continuation token and size
-      operationId: getArtifacts
-      parameters:
-        - name: namespace
-          in: query
-          description: Namespace of the artifacts
-          schema:
-            type: string
-            default: lockss
-        - name: auid
-          in: path
-          description: Identifier of the Archival Unit containing the artifacts
-          required: true
-          schema:
-            type: string
-        - name: url
-          in: query
-          description: The URL contained by the artifacts
-          schema:
-            type: string
-        - name: urlPrefix
-          in: query
-          description: The prefix to be matched by the artifact URLs
-          schema:
-            type: string
-        - name: version
-          in: query
-          description: The version of the artifact
-          schema:
-            type: string
-        - name: includeUncommitted
-          in: query
-          description: Indication of whether uncommitted artifacts should be returned
-          schema:
-            type: boolean
-        - name: limit
-          in: query
-          description: The requested maximum number of artifacts per response
-          schema:
-            type: integer
-        - name: continuationToken
-          in: query
-          description: The continuation token of the next page of artifacts to be returned
-          schema:
-            type: string
-      responses:
-        '200':
-          description: The requested artifacts
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/artifactPageInfo'
         default:
           description: The resulting error payload.
           content:
@@ -571,6 +526,7 @@ paths:
         - aus
       summary: Get the size of Archival Unit artifacts in a namespace
       operationId: getArtifactsSize
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: query
@@ -585,7 +541,7 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: Returns an AuSize containing the sizes of all the artifacts,
             only the latest artifact version of all URLs, and the sum of the size
             of all the underlying WARC files, of an AU.
@@ -606,6 +562,7 @@ paths:
       summary: Get the status of the service
       description: Get the status of the service
       operationId: getStatus
+      # no credentials required
       responses:
         '200':
           description: The status of the service
@@ -626,6 +583,7 @@ paths:
       summary: Get OpenWayback CDX records
       description: Get the OpenWayback CDX records of a URL in a namespace
       operationId: getCdxOwb
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: path
@@ -679,6 +637,7 @@ paths:
       summary: Get PyWayback CDX records
       description: Get the PyWayback CDX records of a URL in a namespace
       operationId: getCdxPywb
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: namespace
           in: path
@@ -699,22 +658,14 @@ paths:
             type: integer
         - name: matchType
           in: query
+          description: Match type
           schema:
-            type: string
-            enum:
-              - exact
-              - prefix
-              - host
-              - domain
-              - range
+            $ref: '#/components/schemas/pywbMatchEnum'
         - name: sort
           in: query
+          description: Sorting behavior
           schema:
-            type: string
-            enum:
-              - default
-              - closest
-              - reverse
+            $ref: '#/components/schemas/pywbSortEnum'
         - name: closest
           in: query
           description: Timestamp for sort=closest mode
@@ -724,10 +675,7 @@ paths:
           in: query
           description: Output format
           schema:
-            type: string
-            enum:
-              - cdx
-              - json
+            $ref: '#/components/schemas/pywbOutputEnum'
         - name: fl
           in: query
           description: Comma-separated list of fields to include in output
@@ -763,6 +711,7 @@ paths:
       summary: Get a WARC archive
       description: Get the contents of a single WARC record as a WARC archive
       operationId: getWarcArchive
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
       parameters:
         - name: fileName
           in: path
@@ -806,6 +755,7 @@ paths:
       summary: Get the supported checksum algorithms
       description: Get a list of the names of the supported checksum algorithms
       operationId: getSupportedChecksumAlgorithms
+      # new roles: ROLE_CAUTIOUS
       responses:
         '200':
           description: The names of the supported checksum algorithms
@@ -828,6 +778,7 @@ paths:
       summary: Get repository information
       description: Get properties of the repository
       operationId: getRepositoryInformation
+      # new roles: ROLE_AU_ADMIN
       responses:
         '200':
           description: The repository information
@@ -848,6 +799,7 @@ paths:
       summary: Get repository storage information
       description: Get properties of the repository storage
       operationId: getStorageInfo
+      # new roles: ROLE_AU_ADMIN
       responses:
         '200':
           description: The repository storage information
@@ -863,6 +815,221 @@ paths:
                 type: object
 components:
   schemas:
+    apiStatus:
+      title: Repository API Status
+      description: The status information of the service
+      required:
+        - apiVersion
+        - ready
+      type: object
+      properties:
+        apiVersion:
+          title: API Version
+          description: The version of the API
+          type: string
+        componentName:
+          title: Component Name
+          description: The name of the component
+          type: string
+        componentVersion:
+          title: Component Version
+          description: The version of the component software
+          type: string
+        lockssVersion:
+          title: LOCKSS Version
+          description: The version of the LOCKSS system
+          type: string
+        ready:
+          title: Ready
+          description: The indication of whether the service is available
+          type: boolean
+        serviceName:
+          title: Service Name
+          description: The name of the service
+          type: string
+        readyTime:
+          title: Ready Time
+          description: The time the service last became ready.
+          type: integer
+          format: int64
+        reason:
+          title: Reason
+          description: The reason the service isn't ready.
+          type: string
+        startupStatus:
+          title: Startup Status
+          description: Enum indicating progress of plugin/AU processing at startup.
+          type: string
+          enum:
+            - NONE
+            - PLUGINS_CRAWLING
+            - PLUGINS_COLLECTED
+            - PLUGINS_LOADING
+            - PLUGINS_LOADED
+            - AUS_STARTING
+            - AUS_STARTED
+    artifact:
+      type: object
+      required:
+        - uuid
+        - namespace
+        - auid
+        - uri
+        - version
+        - committed
+        - storageUrl
+        - contentLength
+        - contentDigest
+        - collectionDate
+      properties:
+        uuid:
+          title: UUID
+          description: The artifact's UUID
+          type: string
+          nullable: false
+        namespace:
+          title: Namespace
+          description: The artifact's namespace
+          type: string
+          nullable: false
+          default: lockss
+        auid:
+          title: AUID
+          description: The artifact's AUID
+          type: string
+          nullable: false
+        uri:
+          title: URI
+          description: The artifact's URI
+          type: string
+          nullable: false
+        version:
+          title: Version
+          description: The artifact's version number
+          type: integer
+          nullable: false
+        committed:
+          title: Committed
+          description: The artifact's committed flag
+          type: boolean
+          nullable: false
+        storageUrl:
+          title: Storage URL
+          description: The artifact's storage URL
+          type: string
+          nullable: false
+        contentLength:
+          title: Content Length
+          description: The length of the artifact's content
+          type: integer
+          format: int64
+          nullable: false
+        contentDigest:
+          title: Content Digest
+          description: The digest of the artifact's content
+          type: string
+          nullable: false
+        collectionDate:
+          title: Collection Date
+          description: The artifact's collection date
+          type: integer
+          format: int64
+          nullable: false
+    artifactPageInfo:
+      required:
+        - artifacts
+        - pageInfo
+      type: object
+      properties:
+        artifacts:
+          title: Artifacts
+          description: The artifacts included in the page
+          type: array
+          items:
+            $ref: '#/components/schemas/artifact'
+          nullable: false
+        pageInfo:
+          title: Page Information
+          description: Information about the page
+          $ref: '#/components/schemas/pageInfo'
+          nullable: false
+    artifactProperties:
+      type: object
+      properties:
+        namespace:
+          type: string
+          default: lockss
+        uuid:
+          type: string
+        auid:
+          type: string
+        uri:
+          type: string
+        version:
+          type: integer
+        contentLength:
+          type: integer
+          format: int64
+        contentDigest:
+          type: string
+        collectionDate:
+          type: integer
+          format: int64
+        storeDate:
+          type: integer
+          format: int64
+        state:
+          type: string
+    auSize:
+      type: object
+      required:
+        - totalLatestVersions
+        - totalAllVersions
+        - totalWarcSize
+      properties:
+        totalLatestVersions:
+          title: Latest Versions
+          description: Total content size of all latest versions
+          type: integer
+          format: int64
+          nullable: true
+        totalAllVersions:
+          title: All Versions
+          description: Total content size of all versions
+          type: integer
+          format: int64
+          nullable: true
+        totalWarcSize:
+          title: WARC Size
+          description: Total WARC file size
+          type: integer
+          format: int64
+          nullable: true
+    auidPageInfo:
+      type: object
+      required:
+        - auids
+        - pageInfo
+      properties:
+        auids:
+          title: AUIDs
+          description: The AUIDs included in the page
+          type: array
+          items:
+            type: string
+          nullable: false
+        pageInfo:
+          title: Page Information
+          description: Information about the page
+          $ref: '#/components/schemas/pageInfo'
+          nullable: false
+    bulkAuOpEnum:
+      title: Bulk AU Operation
+      description: Versions of the artifacts to return
+      type: string
+      enum:
+        - start
+        - finish
     errorResult:
       type: object
       required:
@@ -900,214 +1067,188 @@ components:
             - EXCLUDED
         statusMessage:
           type: string
-    artifactPageInfo:
-      required:
-        - artifacts
-        - pageInfo
-      type: object
-      properties:
-        artifacts:
-          description: The artifacts included in the page
-          type: array
-          items:
-            $ref: '#/components/schemas/artifact'
-        pageInfo:
-          $ref: '#/components/schemas/pageInfo'
-    auSize:
-      type: object
-      properties:
-        totalLatestVersions:
-          type: integer
-          format: int64
-        totalAllVersions:
-          type: integer
-          format: int64
-        totalWarcSize:
-          type: integer
-          format: int64
-    artifactProperties:
-      type: object
-      properties:
-        namespace:
-          type: string
-          default: lockss
-        uuid:
-          type: string
-        auid:
-          type: string
-        uri:
-          type: string
-        version:
-          type: integer
-        contentLength:
-          type: integer
-          format: int64
-        contentDigest:
-          type: string
-        collectionDate:
-          type: integer
-          format: int64
-        storeDate:
-          type: integer
-          format: int64
-        state:
-          type: string
-    artifact:
-      type: object
-      properties:
-        committed:
-          type: boolean
-        storageUrl:
-          type: string
-        namespace:
-          type: string
-          default: lockss
-        uuid:
-          type: string
-        auid:
-          type: string
-        uri:
-          type: string
-        version:
-          type: integer
-        contentLength:
-          type: integer
-          format: int64
-        contentDigest:
-          type: string
-        collectionDate:
-          type: integer
-          format: int64
-    streamingResponseBody:
-      type: object
-    apiStatus:
-      description: The status information of the service
-      required:
-        - apiVersion
-        - ready
-      type: object
-      properties:
-        apiVersion:
-          description: The version of the API
-          type: string
-        componentName:
-          description: The name of the component
-          type: string
-        componentVersion:
-          description: The version of the component software
-          type: string
-        lockssVersion:
-          description: The version of the LOCKSS system
-          type: string
-        ready:
-          description: The indication of whether the service is available
-          type: boolean
-        serviceName:
-          description: The name of the service
-          type: string
-        readyTime:
-          description: The time the service last became ready.
-          type: integer
-          format: int64
-        reason:
-          description: The reason the service isn't ready.
-          type: string
-        startupStatus:
-          description: Enum indicating progress of plugin/AU processing at startup.
-          type: string
-          enum:
-            - NONE
-            - PLUGINS_CRAWLING
-            - PLUGINS_COLLECTED
-            - PLUGINS_LOADING
-            - PLUGINS_LOADED
-            - AUS_STARTING
-            - AUS_STARTED
-    auidPageInfo:
-      required:
-        - auids
-        - pageInfo
-      type: object
-      properties:
-        auids:
-          description: The Archival Unit identifiers included in the page
-          type: array
-          items:
-            type: string
-        pageInfo:
-          $ref: '#/components/schemas/pageInfo'
+    includeContentEnum:
+      title: Include Content
+      description: Whether to include the artifact content part in a multipart response
+      type: string
+      default: ALWAYS
+      enum:
+        - NEVER
+        - IF_SMALL
+        - ALWAYS
     pageInfo:
+      title: Page Information
       description: The information related to pagination of content
+      type: object
       required:
+        - totalCount
+        - itemsInPage
         - continuationToken
         - curLink
         - nextLink
-        - resultsPerPage
-        - totalCount
-      type: object
       properties:
         totalCount:
-          description: The total number of results
+          title: Total Count 
+          description: The total number of items
           type: integer
           format: int32
-        resultsPerPage:
-          description: The number of results per page
+          nullable: true
+        itemsInPage:
+          title: Items in Page
+          description: The number of items in the page
           type: integer
           format: int32
+          nullable: false
         continuationToken:
+          title: Continuation Token
           description: The continuation token
           type: string
+          nullable: true
         curLink:
+          title: Current Request
           description: The link of the current request
           type: string
+          nullable: false
         nextLink:
+          title: Next Request
           description: The link of the next request
           type: string
-    repositoryInfo:
-      description: Information about the repository
-      required:
-        - indexInfo
-        - storeInfo
+          nullable: true
+    pywbMatchEnum:
+      title: Match Type
+      description: Match type in Pywb CDX queries
+      type: string
+      enum:
+        - exact
+        - prefix
+        - host
+        - domain
+        - range
+    pywbOutputEnum:
+      title: Output Format
+      description: Output format in Pywb CDX queries
+      type: string
+      default: cdx
+      enum:
+        - cdx
+        - json
+    pywbSortEnum:
+      title: Sort
+      description: Sorting behavior in Pywb CDX queries
+      type: string
+      enum:
+        - default
+        - closest
+        - reverse
+    streamingResponseBody:
       type: object
+    repositoryInfo:
+      title: Repository Information
+      description: Information about the repository
+      type: object
+      required:
+        - storeInfo
+        - indexInfo
       properties:
         storeInfo:
+          title: Storage Area Information
+          description: Information about the repository's storage areas
           $ref: '#/components/schemas/storageInfo'
+          nullable: false
         indexInfo:
+          title: Artifact Index Information
+          description: Information about the repository's artifact index
           $ref: '#/components/schemas/storageInfo'
+          nullable: false
+        repositoryStatistics:
+          title: Repository Statistics
+          description: Miscellaneous statistics about the repository
+          $ref: '#/components/schemas/repositoryStatistics'
+          nullable: true
+    repositoryStatistics:
+      description: "Various statistics about the repository's internal operation."
+      type: object
+      properties:
+        timeSpentReiteratingIterators:
+          description: "Time spent reiterating a new artifact iterator during continuation."
+          type: integer
+          format: int64
+          nullable: true
     storageInfo:
       required:
-        - avail
+        - type
         - name
+        - path
+        - components
+        - sizeKB
+        - usedKB
+        - availKB
         - percentUsed
         - percentUsedString
-        - size
-        - type
-        - used
       description: Information about a repository storage area
       type: object
       properties:
         type:
+          title: Type
           description: Type of the storage area
           type: string
+          nullable: false
         name:
+          title: Name
           description: Name of the storage area
           type: string
-        size:
-          description: Size in bytes of the storage area
-          type: integer
-          format: int64
-        used:
-          description: Used size in bytes of the storage area
-          type: integer
-          format: int64
-        avail:
-          description: Available size in bytes of the storage area
-          type: integer
-          format: int64
-        percentUsedString:
-          description: 'Percentage of size used, formatted as a string'
+          nullable: false
+        path:
+          title: Path
+          description: Path, if applicable
           type: string
+          nullable: true
+        components:
+          title: Components
+          description: Storage areas that comprise this one
+          type: array
+          items:
+            $ref: '#/components/schemas/storageInfo'
+          nullable: true
+        sizeKB:
+          title: Size (KB)
+          description: Size of the storage area (in KB)
+          type: integer
+          format: int64
+          nullable: true
+        usedKB:
+          title: Used (KB)
+          description: Size of the used storage area (in KB)
+          type: integer
+          format: int64
+          nullable: true
+        availKB:
+          title: Available (KB)
+          description: Size of the available storage area (in KB)
+          type: integer
+          format: int64
+          nullable: true
         percentUsed:
-          description: Percentage of size used
+          title: Percentage Used
+          description: Percentage of the storage area used
           type: number
           format: double
+          nullable: true
+        percentUsedString:
+          title: Used (%)
+          description: Percentage of the storage area used, formatted as a string
+          type: string
+          nullable: true
+    versionsEnum:
+      title: Versions
+      description: Versions of the artifacts to return
+      type: string
+      default: latest
+      enum:
+        - all
+        - latest
+  securitySchemes:
+    basicAuth:
+      type: http
+      description: HTTP Basic Authentication. Works over HTTP and HTTPS.
+      scheme: basic

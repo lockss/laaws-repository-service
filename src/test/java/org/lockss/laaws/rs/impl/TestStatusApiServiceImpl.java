@@ -36,12 +36,12 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lockss.app.LockssApp;
-import org.lockss.app.LockssDaemon;
+import org.lockss.laaws.rs.controller.DefaultTestRepositoryApplicationConfiguration;
 import org.lockss.log.L4JLogger;
 import org.lockss.rs.BaseLockssRepository;
 import org.lockss.rs.io.index.AbstractArtifactIndex;
-import org.lockss.rs.io.index.VolatileArtifactIndex;
 import org.lockss.spring.test.SpringLockssTestCase4;
+import org.lockss.test.MockLockssDaemon;
 import org.lockss.util.rest.repo.LockssRepository;
 import org.lockss.util.rest.status.ApiStatus;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -55,18 +55,16 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Test class for org.lockss.laaws.mdq.api.MetadataApiServiceImpl and
- * org.lockss.laaws.mdq.api.UrlsApiServiceImpl.
- */
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ContextConfiguration(classes = { DefaultTestRepositoryApplicationConfiguration.class })
 public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
   private static L4JLogger log = L4JLogger.getLogger();
 
@@ -88,12 +86,12 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
   public void setUpBeforeEachTest() throws IOException {
     log.debug2("port = {}", port);
 
-    getMockLockssDaemon().setAppRunning(true);
     // Set up the temporary directory where the test data will reside.
     setUpTempDirectory(TestStatusApiServiceImpl.class.getCanonicalName());
 
     // Set up the UI port.
     setUpUiPort(UI_PORT_CONFIGURATION_TEMPLATE, UI_PORT_CONFIGURATION_FILE);
+    getMockLockssDaemon().setAppRunning(true);
 
     log.debug2("Done");
   }
@@ -189,7 +187,7 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
     ApiStatus expected = new ApiStatus("swagger/swagger.yaml");
     expected.setReady(true);
     expected.setReadyTime(LockssApp.getLockssApp().getReadyTime());
-    expected.setStartupStatus(LockssDaemon.getLockssDaemon().getStartupStatus());
+    expected.setStartupStatus(ApiStatus.StartupStatus.NONE);
 
     JSONAssert.assertEquals(expected.toJson(), successResponse.getBody(),
 	false);
@@ -197,8 +195,8 @@ public class TestStatusApiServiceImpl extends SpringLockssTestCase4 {
     // ensure that repo.isReady() is included in ApiStatus.getReady()
     // (lots of assumptions here about the implementation classes used
     // in the test.)
-    VolatileArtifactIndex index =
-      (VolatileArtifactIndex)((BaseLockssRepository)repo).getArtifactIndex();
+    AbstractArtifactIndex index =
+        (AbstractArtifactIndex) ((BaseLockssRepository)repo).getArtifactIndex();
     index.setState(AbstractArtifactIndex.ArtifactIndexState.STOPPED);
     ResponseEntity<String> resp2 = new TestRestTemplate().exchange(
 	getTestUrlTemplate("/status"), HttpMethod.GET, null, String.class);

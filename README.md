@@ -38,10 +38,10 @@ ongoing development.
 
 ## Standard build and deployment
 The LOCKSS cluster, including this project, is normally built and deployed using
-the LOCKSS Installer, which uses `docker`.
+the LOCKSS Installer, which uses `kubernetes`.
 
 You can find more information about the installation of the LOCKSS system in the
-[LOCKSS system manual](https://lockss.github.io/software/manual).
+[LOCKSS system manual](https://docs.lockss.org/projects/manual).
 
 ## Development build and deployment
 ### Clone the repo

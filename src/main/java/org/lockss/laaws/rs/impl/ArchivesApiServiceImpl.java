@@ -7,6 +7,8 @@ import org.apache.commons.io.FileUtils;
 import org.archive.format.warc.WARCConstants;
 import org.lockss.laaws.rs.api.ArchivesApiDelegate;
 import org.lockss.log.L4JLogger;
+import org.lockss.spring.auth.AuthUtil;
+import org.lockss.spring.auth.Roles;
 import org.lockss.spring.base.BaseSpringApiServiceImpl;
 import org.lockss.spring.error.LockssRestServiceException;
 import org.lockss.util.StringUtil;
@@ -75,6 +77,9 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
 
     log.debug2("Parsed request: {}", parsedRequest);
 
+    ServiceImplUtil.checkRepositoryReady(repo, parsedRequest);
+    AuthUtil.checkHasRole(Roles.ROLE_AU_ADMIN);
+
     MimeType archiveType = MimeType.valueOf(archive.getContentType());
 
     if (archiveType.equals(APPLICATION_WARC)) {
@@ -115,6 +120,14 @@ public class ArchivesApiServiceImpl extends BaseSpringApiServiceImpl implements 
             return new ResponseEntity<>(jsonResult, headers, HttpStatus.OK);
           }
         }
+      } catch (IllegalArgumentException iae) {
+        String message = iae.getMessage();
+        log.warn(message);
+        log.warn("Parsed request: {}", parsedRequest);
+        throw new LockssRestServiceException(
+            LockssRestHttpException.ServerErrorType.NONE,
+            HttpStatus.BAD_REQUEST,
+            message, parsedRequest);
       } catch (IOException e) {
         String errorMessage = "Error adding artifacts from archive";
         throw new LockssRestServiceException(LockssRestHttpException.ServerErrorType.APPLICATION_ERROR,

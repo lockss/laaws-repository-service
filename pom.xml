@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-Copyright (c) 2000-2023, Board of Trustees of Leland Stanford Jr. University
+Copyright (c) 2000-2026, Board of Trustees of Leland Stanford Jr. University
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -38,13 +38,13 @@ POSSIBILITY OF SUCH DAMAGE.
   <parent>
     <groupId>org.lockss</groupId>
     <artifactId>lockss-parent-pom</artifactId>
-    <version>1.17.1</version>
+    <version>1.18.0</version>
     <relativePath />
   </parent>
 
   <groupId>org.lockss.laaws</groupId>
   <artifactId>laaws-repository-service</artifactId>
-  <version>2.15.1</version>
+  <version>2.16.0</version>
   <packaging>jar</packaging>
   
   <name>laaws-repository-service</name>
@@ -53,13 +53,13 @@ POSSIBILITY OF SUCH DAMAGE.
   <properties>
     <!-- Is a Spring project -->
     <build.java.spring.skip>false</build.java.spring.skip>
-    <build.java.package>org.lockss.laaws.rs</build.java.package>
+    <build.java.projectAbbr>rs</build.java.projectAbbr>
     <build.java.mainClass>${build.java.package}.RepositoryApplication</build.java.mainClass>
 
     <!-- Is a Docker project -->
     <build.docker.skip>false</build.docker.skip>
-    <build.docker.dockerBuild.servicePort>24610</build.docker.dockerBuild.servicePort>
-    <build.docker.dockerBuild.restPort>24610</build.docker.dockerBuild.restPort>
+    <build.docker.dockerBuild.servicePort>24611</build.docker.dockerBuild.servicePort>
+    <build.docker.dockerBuild.restPort>24611</build.docker.dockerBuild.restPort>
   </properties>
 
   <dependencies>

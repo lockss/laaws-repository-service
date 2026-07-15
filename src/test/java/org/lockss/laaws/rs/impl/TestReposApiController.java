@@ -42,11 +42,11 @@ import org.lockss.util.UrlUtil;
 import org.lockss.util.rest.repo.model.Artifact;
 import org.lockss.util.rest.repo.model.ArtifactPageInfo;
 import org.lockss.util.rest.repo.model.AuidPageInfo;
+import org.lockss.util.rest.repo.model.VersionsEnum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -64,19 +64,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @RunWith(SpringRunner.class)
 @WebMvcTest(RepoinfoApiController.class)
 @AutoConfigureMockMvc()
-@ComponentScan(basePackages = { "org.lockss.laaws.rs",
-    "org.lockss.laaws.rs.api" })
+// We can't use a @ContextConfiguration here because the tests rely on a @MockBean to mock the
+// internal BaseLockssRepository behavior.
 public class TestReposApiController extends SpringLockssTestCase4 {
     private final static L4JLogger log = L4JLogger.getLogger();
 
     @Autowired
     private MockMvc controller;
-
-//    @MockBean
-//    private ArtifactIndex artifactIndex;
-
-//    @MockBean
-//    private ArtifactDataStore artifactStore;
 
     @MockBean
     private BaseLockssRepository repo;
@@ -84,20 +78,6 @@ public class TestReposApiController extends SpringLockssTestCase4 {
     // The value of the Authorization header to be used when calling the REST
     // service.
     private String authHeaderValue = null;
-
-//    @TestConfiguration
-//    public static class RepoControllerTestConfig {
-//        @Bean
-//        public LockssArtifactClientRepository setRepository() {
-//            return new MockLockssArtifactRepositoryImpl();
-//        }
-//    }
-//
-//
-//    @After
-//    public void tearDown() throws Exception {
-//        // Nothing? Let it the JVM perform a GC
-//    }
 
     @Test
     public void getNamespaces() throws Exception {
@@ -240,10 +220,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the iterator hash code.
-      Integer iteratorHashCode =
-	  new AuidContinuationToken(continuationToken).getIteratorHashCode();
-      assertNotNull(iteratorHashCode);
+      // Get the iterator ID.
+      String iteratorId =
+	  new AuidContinuationToken(continuationToken).getIteratorId();
+      assertNotNull(iteratorId);
 
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
@@ -268,16 +248,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the iterator hash code is the same.
-      assertEquals(iteratorHashCode,
-	  new AuidContinuationToken(continuationToken).getIteratorHashCode());
+      // Verify that the iterator ID is the same.
+      assertEquals(iteratorId,
+	  new AuidContinuationToken(continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
       // Remove the last digit of the continuation token, resulting in the
-      // specification of a different iterator hash code.
+      // specification of a different iterator ID.
       URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
           .replaceQueryParam("continuationToken",
               continuationToken.substring(0, continuationToken.length() - 1))
@@ -302,9 +282,9 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the iterator hash code is not the same.
-      assertNotEquals(iteratorHashCode,
-	  new AuidContinuationToken(continuationToken).getIteratorHashCode());
+      // Verify that the iterator ID is not the same.
+      assertNotEquals(iteratorId,
+	  new AuidContinuationToken(continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -367,7 +347,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //              .build().toUri();
 
       URI endpointUri =
-          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          new URI("/artifacts?auid=" + UrlUtil.encodeUrl(auId) + "&namespace="+UrlUtil.encodeUrl(namespace)+
               "&version" +
               "=all&limit=9");
 
@@ -482,7 +462,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //              .queryParam("limit", 2)
 //              .build().toUri();
 
-      URI endpointUri = new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+      URI endpointUri = new URI("/artifacts?auid=" + UrlUtil.encodeUrl(auId) + "&namespace="+UrlUtil.encodeUrl(namespace)+
           "&version=all&limit=2");
 
       String content = controller.perform(getAuthBuilder(get(endpointUri)))
@@ -502,10 +482,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the iterator hash code.
-      Integer iteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(iteratorHashCode);
+      // Get the iterator ID.
+      String iteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(iteratorId);
 
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
@@ -529,16 +509,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(iteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(iteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
       // Remove the last digit of the continuation token, resulting in the
-      // specification of a different iterator hash code.
+      // specification of a different iterator ID.
       URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
           .replaceQueryParam("continuationToken",
               UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
@@ -562,13 +542,13 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the new iterator hash code.
-      Integer newIteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(newIteratorHashCode);
+      // Get the new iterator ID.
+      String newIteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(newIteratorId);
 
-      // Verify that the new iterator hash code is not the same.
-      assertNotEquals(iteratorHashCode, newIteratorHashCode);
+      // Verify that the new iterator ID is not the same.
+      assertNotEquals(iteratorId, newIteratorId);
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -592,9 +572,9 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(newIteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(newIteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -640,7 +620,7 @@ public class TestReposApiController extends SpringLockssTestCase4 {
 //              .buildAndExpand(uriVars).toUri();
 
       URI endpointUri =
-          new URI("/aus/" + UrlUtil.encodeUrl(auId) + "/artifacts?namespace="+UrlUtil.encodeUrl(namespace)+
+          new URI("/artifacts?auid=" + UrlUtil.encodeUrl(auId) + "&namespace="+UrlUtil.encodeUrl(namespace)+
               "&version" +
               "=all&limit=2"
               + "&urlPrefix=" + UrlUtil.encodeUrl(urlPrefix));
@@ -662,10 +642,10 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       String continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the iterator hash code.
-      Integer iteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(iteratorHashCode);
+      // Get the iterator ID.
+      String iteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(iteratorId);
 
       // Get the link needed to get the next page.
       String nextLink = api.getPageInfo().getNextLink();
@@ -689,16 +669,16 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(iteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(iteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
       assertNotNull(nextLink);
 
       // Remove the last digit of the continuation token, resulting in the
-      // specification of a different iterator hash code.
+      // specification of a different iterator ID.
       URI nextLinkUri = UriComponentsBuilder.fromHttpUrl(nextLink)
           .replaceQueryParam("continuationToken",
               UrlUtil.encodeUrl(continuationToken.substring(0, continuationToken.length() - 1)))
@@ -722,13 +702,13 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Get the new iterator hash code.
-      Integer newIteratorHashCode = new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode();
-      assertNotNull(newIteratorHashCode);
+      // Get the new iterator ID.
+      String newIteratorId = new ArtifactContinuationToken(
+	  continuationToken).getIteratorId();
+      assertNotNull(newIteratorId);
 
-      // Verify that the new iterator hash code is not the same.
-      assertNotEquals(iteratorHashCode, newIteratorHashCode);
+      // Verify that the new iterator ID is not the same.
+      assertNotEquals(iteratorId, newIteratorId);
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -752,9 +732,9 @@ public class TestReposApiController extends SpringLockssTestCase4 {
       continuationToken = api.getPageInfo().getContinuationToken();
       assertNotNull(continuationToken);
 
-      // Verify that the new iterator hash code is the same.
-      assertEquals(newIteratorHashCode, new ArtifactContinuationToken(
-	  continuationToken).getIteratorHashCode());
+      // Verify that the new iterator ID is the same.
+      assertEquals(newIteratorId, new ArtifactContinuationToken(
+	  continuationToken).getIteratorId());
 
       // Get the link needed to get the next page.
       nextLink = api.getPageInfo().getNextLink();
@@ -849,6 +829,186 @@ public class TestReposApiController extends SpringLockssTestCase4 {
         */
 
     }
+
+  /**
+   * Tests the pagination of artifacts retrieved from all AUs (across-AUs query),
+   * verifying that the next link includes version, namespace, url, limit, and
+   * continuationToken parameters.
+   *
+   * @throws Exception if there are problems.
+   */
+  @Test
+  public void testAllAusPagination() throws Exception {
+    log.debug2("Invoked");
+
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    String namespace = "ns/Id:ABC";
+    String url = "http://test.com/page1";
+
+    // Set up the repository to be ready.
+    given(repo.isReady()).willReturn(true);
+
+    // Set up the namespace.
+    List<String> namespaces = new ArrayList<>();
+    namespaces.add(namespace);
+    given(repo.getNamespaces()).willReturn(namespaces);
+
+    // Create artifacts from multiple AUs.
+    List<Artifact> artifacts = new ArrayList<>();
+    artifacts.add(new Artifact("id01", namespace, "auid1", url, 1, true,
+        "surl", 1, null));
+    artifacts.add(new Artifact("id02", namespace, "auid2", url, 1, true,
+        "surl", 1, null));
+    artifacts.add(new Artifact("id03", namespace, "auid3", url, 1, true,
+        "surl", 1, null));
+
+    // Mock the all AUs repository method.
+    given(repo.getArtifactsWithUrlFromAllAus(namespace, url, VersionsEnum.ALL))
+        .willReturn(artifacts);
+
+    // Request with limit=2 to force pagination, version=all, namespace
+    URI endpointUri = new URI("/artifacts?url=" + UrlUtil.encodeUrl(url)
+        + "&namespace=" + UrlUtil.encodeUrl(namespace)
+        + "&version=all&limit=2");
+
+    String content = controller.perform(getAuthBuilder(get(endpointUri)))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    ArtifactPageInfo api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // First page should have 2 artifacts
+    assertEquals(2, api.getArtifacts().size());
+    assertEquals(artifacts.get(0), api.getArtifacts().get(0));
+    assertEquals(artifacts.get(1), api.getArtifacts().get(1));
+
+    // There should be more artifacts to return
+    assertNotNull(api.getPageInfo().getContinuationToken());
+
+    // Get and verify the next link
+    String nextLink = api.getPageInfo().getNextLink();
+    assertNotNull(nextLink);
+
+    // Verify that the next link contains the expected query parameters
+    assertTrue("Next link should contain version=all: " + nextLink,
+        nextLink.contains("version=all"));
+    assertTrue("Next link should contain namespace=: " + nextLink,
+        nextLink.contains("namespace="));
+    assertTrue("Next link should contain url=: " + nextLink,
+        nextLink.contains("url="));
+    assertTrue("Next link should contain limit=: " + nextLink,
+        nextLink.contains("limit="));
+    assertTrue("Next link should contain continuationToken=: " + nextLink,
+        nextLink.contains("continuationToken="));
+
+    // Follow the next link to get the remaining artifacts
+    content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // Second page should have the remaining artifact
+    assertEquals(1, api.getArtifacts().size());
+    assertEquals(artifacts.get(2), api.getArtifacts().get(0));
+
+    // Verify there are no more artifacts to return
+    assertNull(api.getPageInfo().getContinuationToken());
+    assertNull(api.getPageInfo().getNextLink());
+
+    log.debug2("Done");
+  }
+
+  /**
+   * Tests the pagination of artifacts across AUs with urlPrefix, verifying that
+   * the next link includes version, namespace, urlPrefix, limit, and
+   * continuationToken parameters.
+   *
+   * @throws Exception if there are problems.
+   */
+  @Test
+  public void testAllAusUrlPrefixPagination() throws Exception {
+    log.debug2("Invoked");
+
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    String namespace = "ns/Id:ABC";
+    String urlPrefix = "http://test.com/";
+
+    // Set up the repository to be ready.
+    given(repo.isReady()).willReturn(true);
+
+    // Set up the namespace.
+    List<String> namespaces = new ArrayList<>();
+    namespaces.add(namespace);
+    given(repo.getNamespaces()).willReturn(namespaces);
+
+    // Create artifacts from multiple AUs with URLs matching the prefix.
+    List<Artifact> artifacts = new ArrayList<>();
+    artifacts.add(new Artifact("id01", namespace, "auid1",
+        "http://test.com/page1", 1, true, "surl", 1, null));
+    artifacts.add(new Artifact("id02", namespace, "auid2",
+        "http://test.com/page2", 1, true, "surl", 1, null));
+    artifacts.add(new Artifact("id03", namespace, "auid3",
+        "http://test.com/page3", 1, true, "surl", 1, null));
+
+    // Mock the all AUs repository method with urlPrefix
+    given(repo.getArtifactsWithUrlPrefixFromAllAus(namespace, urlPrefix,
+        VersionsEnum.LATEST)).willReturn(artifacts);
+
+    // Request with limit=2, version=latest (default), namespace, urlPrefix
+    URI endpointUri = new URI("/artifacts?urlPrefix="
+        + UrlUtil.encodeUrl(urlPrefix)
+        + "&namespace=" + UrlUtil.encodeUrl(namespace)
+        + "&version=latest&limit=2");
+
+    String content = controller.perform(getAuthBuilder(get(endpointUri)))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    ArtifactPageInfo api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // First page should have two artifacts
+    assertEquals(2, api.getArtifacts().size());
+
+    // There should be more artifacts to return
+    assertNotNull(api.getPageInfo().getContinuationToken());
+
+    // Get and verify the next link
+    String nextLink = api.getPageInfo().getNextLink();
+    assertNotNull(nextLink);
+
+    // Verify that the next link contains the expected query parameters
+    assertTrue("Next link should contain version=latest: " + nextLink,
+        nextLink.contains("version=latest"));
+    assertTrue("Next link should contain namespace=: " + nextLink,
+        nextLink.contains("namespace="));
+    assertTrue("Next link should contain urlPrefix=: " + nextLink,
+        nextLink.contains("urlPrefix="));
+    assertTrue("Next link should contain limit=: " + nextLink,
+        nextLink.contains("limit="));
+    assertTrue("Next link should contain continuationToken=: " + nextLink,
+        nextLink.contains("continuationToken="));
+
+    // Follow the next link to get the remaining artifacts
+    content = controller.perform(getAuthBuilder(get(new URI(nextLink))))
+        .andExpect(status().isOk()).andReturn().getResponse()
+        .getContentAsString();
+
+    api = mapper.readValue(content, ArtifactPageInfo.class);
+
+    // Second page should have the remaining artifact
+    assertEquals(1, api.getArtifacts().size());
+
+    // Verify there are no more artifacts to return
+    assertNull(api.getPageInfo().getContinuationToken());
+    assertNull(api.getPageInfo().getNextLink());
+
+    log.debug2("Done");
+  }
 
   /**
    * Tests the validation of request limits.

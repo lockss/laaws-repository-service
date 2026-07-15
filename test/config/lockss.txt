@@ -40,3 +40,11 @@ org.lockss.ui.users.1.roles=contentAdminRole
 org.lockss.ui.users.2.user=au-admin
 org.lockss.ui.users.2.password=SHA1:d80a88b9abe5bbea6759eb86e88d648b405447ef
 org.lockss.ui.users.2.roles=auAdminRole
+
+# UI username-passwd = content-access/I'mContentAdmin
+org.lockss.ui.users.3.user=content-access
+org.lockss.ui.users.3.password=SHA1:3edf8dd2b96a6a344bf70a2cc7794a3baffbbc7c
+org.lockss.ui.users.3.roles=accessContentRole
+
+# AccountManager now enabled by default but startup causes errors in test env
+org.lockss.accounts.enabled=false
