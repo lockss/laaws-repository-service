@@ -57,7 +57,7 @@ POSSIBILITY OF SUCH DAMAGE.
     <build.java.mainClass>${build.java.package}.RepositoryApplication</build.java.mainClass>
 
     <!-- Is a Docker project -->
-    <skipDockerBuild>false</skipDockerBuild>
+    <skipDocker>false</skipDocker>
     <build.docker.dockerBuild.servicePort>24611</build.docker.dockerBuild.servicePort>
     <build.docker.dockerBuild.restPort>24611</build.docker.dockerBuild.restPort>
   </properties>
