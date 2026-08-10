@@ -52,12 +52,12 @@ POSSIBILITY OF SUCH DAMAGE.
 
   <properties>
     <!-- Is a Spring project -->
-    <build.java.spring.skip>false</build.java.spring.skip>
+    <skipSpring>false</skipSpring>
     <build.java.projectAbbr>rs</build.java.projectAbbr>
     <build.java.mainClass>${build.java.package}.RepositoryApplication</build.java.mainClass>
 
     <!-- Is a Docker project -->
-    <build.docker.skip>false</build.docker.skip>
+    <skipDockerBuild>false</skipDockerBuild>
     <build.docker.dockerBuild.servicePort>24611</build.docker.dockerBuild.servicePort>
     <build.docker.dockerBuild.restPort>24611</build.docker.dockerBuild.restPort>
   </properties>
