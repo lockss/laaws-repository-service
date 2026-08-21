@@ -62,6 +62,40 @@ public class ArtifactIndexConfig {
   public final static long DEFAULT_SOLR_HARDCOMMTI_INTERVAL =
     SolrArtifactIndex.DEFAULT_SOLR_HARDCOMMIT_INTERVAL;
 
+  /**
+   * How a reindex resolves two artifacts that claim the same (namespace, AUID,
+   * URL, version) under different artifact UUIDs.
+   *
+   * <p>The artifact index enforces uniqueness on the artifact UUID only, so
+   * nothing prevents such a pair from existing. It arises when content is
+   * re-crawled after a V1-to-V2 migration: the re-crawl stores a new UUID at a
+   * URL and version the migrated artifact already claims, and a subsequent
+   * reindex would add a second row that reads then resolve arbitrarily.
+   * Reindexing arbitrates instead, keeping exactly one of them and deleting
+   * the other.
+   *
+   * <p>The choice is made on the artifact's collection date:
+   * <ul>
+   *   <li><code>PreferEarliest</code> (the default) keeps the artifact with
+   *   the earliest collection date, which preserves the original V1 crawl's
+   *   provenance -- the migration timestamps of migrated content are typically
+   *   later than the crawl dates they replaced.</li>
+   *   <li><code>PreferLatest</code> keeps the artifact with the latest
+   *   collection date, i.e. the most recently crawled copy.</li>
+   * </ul>
+   *
+   * <p>When the two collection dates are equal the artifact already in the
+   * index is kept, so re-running a reindex does not churn it.
+   *
+   * <p>Applies to the SQL artifact index and to the reindex path only; other
+   * index implementations key on the artifact UUID and are unaffected.
+   */
+  public final static String PARAM_VERSION_CONFLICT_RESOLUTION =
+    "org.lockss.repo.index.reindex.versionConflictResolution";
+  public final static SQLArtifactIndex.VersionConflictResolution
+    DEFAULT_VERSION_CONFLICT_RESOLUTION =
+    SQLArtifactIndex.DEFAULT_VERSION_CONFLICT_RESOLUTION;
+
   private final static L4JLogger log = L4JLogger.getLogger();
 
   private final static ObjectMapper mapper = new ObjectMapper()
@@ -70,6 +104,9 @@ public class ArtifactIndexConfig {
   private final RepositoryServiceProperties repoProps;
   private final ApplicationArguments appArgs;
   private SolrArtifactIndex solrIndex;
+  // Captured here rather than read off the artifactIndex() bean because that
+  // bean may be a DispatchingArtifactIndex wrapping this one.
+  private SQLArtifactIndex sqlIndex;
 
   @Autowired
   public ArtifactIndexConfig(RepositoryServiceProperties repoProps,
@@ -140,7 +177,8 @@ public class ArtifactIndexConfig {
 
       case "derby":
       case "pgsql":
-        return new SQLArtifactIndex();
+        sqlIndex = new SQLArtifactIndex();
+        return sqlIndex;
 
       case "dispatching":
         // Create Solr index
@@ -201,6 +239,21 @@ public class ArtifactIndexConfig {
         if (solrIndex != null) {
           solrIndex.setHardCommitInterval(newConfig.getTimeInterval(PARAM_SOLR_HARDCOMMTI_INTERVAL,
                                                                     DEFAULT_SOLR_HARDCOMMTI_INTERVAL));
+        }
+      }
+
+      if (changedKeys.contains(PARAM_VERSION_CONFLICT_RESOLUTION)) {
+        if (sqlIndex != null) {
+          sqlIndex.setVersionConflictResolution(
+              (SQLArtifactIndex.VersionConflictResolution)
+              newConfig.getEnum(SQLArtifactIndex.VersionConflictResolution.class,
+                                PARAM_VERSION_CONFLICT_RESOLUTION,
+                                DEFAULT_VERSION_CONFLICT_RESOLUTION));
+        } else {
+          // Not a SQL index: the parameter has no meaning for the Solr,
+          // volatile or local indexes, which key on artifact UUID.
+          log.debug("Ignoring {}: artifact index is not a SQLArtifactIndex",
+                    PARAM_VERSION_CONFLICT_RESOLUTION);
         }
       }
     }
