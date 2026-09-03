@@ -91,6 +91,62 @@ paths:
               schema:
                 type: object
   /archives:
+    get:
+      tags:
+        - artifacts
+      summary: Exports the artifacts of an Archival Unit to an archive
+      description: Streams an archive containing the artifacts of an Archival Unit.
+        The archive is generated and streamed as it is read from the repository,
+        so its length is not known in advance.
+      operationId: exportArtifacts
+      # new roles: ROLE_CONTENT_ACCESS, ROLE_AU_ADMIN
+      parameters:
+        - name: auid
+          in: query
+          description: Archival Unit ID (AUID) of the artifacts to export
+          required: true
+          schema:
+            type: string
+        - name: namespace
+          in: query
+          description: Namespace of the artifacts
+          schema:
+            type: string
+            default: lockss
+        - name: archiveType
+          in: query
+          description: 'The type of archive to generate; only WARC is supported'
+          schema:
+            type: string
+            default: WARC
+        - name: compress
+          in: query
+          description: 'If true, each record of the archive is individually GZIP compressed'
+          schema:
+            type: boolean
+            default: false
+        - name: versions
+          in: query
+          description: Whether to export all the versions of each artifact or only the latest
+          schema:
+            type: string
+            default: all
+            enum:
+              - all
+              - latest
+      responses:
+        '200':
+          description: An archive containing the artifacts of the Archival Unit
+          content:
+            application/warc:
+              schema:
+                $ref: '#/components/schemas/streamingResponseBody'
+        default:
+          description: The resulting error payload.
+          content:
+            application/json:
+              schema:
+                type: object
     post:
       tags:
         - artifacts

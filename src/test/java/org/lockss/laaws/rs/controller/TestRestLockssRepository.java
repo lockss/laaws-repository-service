@@ -45,6 +45,9 @@ import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.message.BasicStatusLine;
 import org.archive.format.warc.WARCConstants;
+import org.archive.io.ArchiveReader;
+import org.archive.io.ArchiveRecord;
+import org.archive.io.ArchiveRecordHeader;
 import org.junit.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
@@ -54,9 +57,11 @@ import org.lockss.log.L4JLogger;
 import org.lockss.repository.RepositoryDbManager;
 import org.lockss.rs.LocalLockssRepository;
 import org.lockss.rs.io.index.ArtifactIndex;
+import org.lockss.rs.io.storage.warc.WarcArtifactDataStore;
 import org.lockss.spring.test.SpringLockssTestCase4;
 import org.lockss.test.*;
 import org.lockss.util.ListUtil;
+import org.lockss.util.MapUtil;
 import org.lockss.util.PreOrderComparator;
 import org.lockss.util.StringUtil;
 import org.lockss.util.io.DeferredTempFileOutputStream;
@@ -98,6 +103,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -599,6 +605,14 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertResponseStatus(addArtifactsFromArchive, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
     assertResponseStatus(addArtifactsFromArchive, AU_ADMIN, HttpStatus.OK);
     assertResponseStatus(addArtifactsFromArchive, USER_ADMIN, HttpStatus.OK);
+
+    RestEndpointCall exportArtifactsToArchive = (Credentials credentials) ->
+        exportArtifacts(credentials, NS1, AUID1, null);
+
+    assertResponseStatus(exportArtifactsToArchive, CONTENT_ADMIN, HttpStatus.FORBIDDEN);
+    assertResponseStatus(exportArtifactsToArchive, CONTENT_ACCESS, HttpStatus.OK);
+    assertResponseStatus(exportArtifactsToArchive, AU_ADMIN, HttpStatus.OK);
+    assertResponseStatus(exportArtifactsToArchive, USER_ADMIN, HttpStatus.OK);
 
     RestEndpointCall getArtifactsFromAllAus = (Credentials credentials) -> {
       String namespace = null;
@@ -1614,6 +1628,258 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
     assertNull(repoClient.getArtifact(namespace, auId, url2));
     assertEquals(1, artver(repoClient.getArtifact(namespace, auId, url3)));
 
+  }
+
+  /**
+   * Test for {@link ArchivesApi#exportArtifacts(String, String, String, Boolean, String)}.
+   * <p>
+   * Exports an AU, re-imports the resulting archive into a second AU through
+   * {@link ArchivesApi#addArtifacts(String, MultipartFile, String, Boolean, String)}, and asserts
+   * that the two AUs contain the same artifacts.
+   */
+  @Test
+  public void testExportArtifacts() throws Exception {
+    String namespace = "exportns";
+    String srcAuId = "exportSrcAu";
+
+    String url1 = "http://www.lockss.org/export1.txt";
+    String url2 = "http://www.lockss.org/export2.txt";
+
+    int numVersions = 3;
+
+    // Populate the source AU with two URLs of three versions each
+    DeferredTempFileOutputStream dfos =
+        new DeferredTempFileOutputStream((int) FileUtils.ONE_MB, "test-warc");
+
+    Map<String, List<ArtifactSpec>> specs = new LinkedHashMap<>();
+
+    for (String url : ListUtil.list(url1, url2)) {
+      List<ArtifactSpec> urlSpecs = new ArrayList<>(numVersions);
+
+      for (int i = 0; i < numVersions; i++) {
+        ArtifactSpec spec = createArtifactSpec(namespace, srcAuId, url);
+        spec.setCommitted(true);
+        urlSpecs.add(spec);
+        writeWarcRecord(spec, dfos);
+      }
+
+      specs.put(url, urlSpecs);
+    }
+
+    dfos.close();
+
+    assertImportedOk(namespace, srcAuId, dfos.getDeleteOnCloseInputStream(), 2 * numVersions);
+
+    waitCopied(namespace, srcAuId, url1);
+    waitCopied(namespace, srcAuId, url2);
+
+    //// Export all the versions of the AU and re-import them into another AU
+    {
+      byte[] archive = assertExportedOk(USER_ADMIN, namespace, srcAuId, null);
+
+      String dstAuId = "exportDstAu";
+      assertImportedOk(namespace, dstAuId, new ByteArrayInputStream(archive), 2 * numVersions);
+
+      assertSameArtifacts(namespace, srcAuId, dstAuId);
+
+      // The records of each URL are written oldest version first
+      assertEquals(ListUtil.list(url1 + " 1", url1 + " 2", url1 + " 3",
+              url2 + " 1", url2 + " 2", url2 + " 3"),
+          readArchiveRecords(archive));
+
+      // Assert the exported content is that of the artifacts that were imported into the source AU
+      for (Map.Entry<String, List<ArtifactSpec>> entry : specs.entrySet()) {
+        List<ArtifactSpec> urlSpecs = entry.getValue();
+
+        for (int version = 1; version <= urlSpecs.size(); version++) {
+          ArtifactSpec spec = urlSpecs.get(version - 1);
+
+          Artifact artifact = repoClient.getArtifactVersion(namespace, dstAuId,
+              entry.getKey(), version, true);
+
+          assertNotNull(artifact);
+          assertEquals(spec.getContentDigest(), artifact.getContentDigest());
+        }
+      }
+    }
+
+    //// Export only the latest version of each URL
+    {
+      byte[] archive = assertExportedOk(USER_ADMIN, namespace, srcAuId,
+          MapUtil.map("versions", "latest"));
+
+      String dstAuId = "exportLatestDstAu";
+      assertImportedOk(namespace, dstAuId, new ByteArrayInputStream(archive), 2);
+
+      for (Map.Entry<String, List<ArtifactSpec>> entry : specs.entrySet()) {
+        List<ArtifactSpec> urlSpecs = entry.getValue();
+        ArtifactSpec latest = urlSpecs.get(urlSpecs.size() - 1);
+
+        List<Artifact> versions = ListUtil.fromIterable(
+            repoClient.getArtifactsAllVersions(namespace, dstAuId, entry.getKey()));
+
+        assertEquals(1, versions.size());
+        assertEquals(latest.getContentDigest(), versions.get(0).getContentDigest());
+      }
+    }
+
+    //// Export a GZIP compressed archive
+    {
+      byte[] archive = assertExportedOk(USER_ADMIN, namespace, srcAuId,
+          MapUtil.map("compress", "true"));
+
+      // Each record is its own GZIP member, so the archive begins with a GZIP member header
+      assertTrue(archive.length > 2);
+      assertEquals(0x1f, archive[0] & 0xff);
+      assertEquals(0x8b, archive[1] & 0xff);
+
+      String dstAuId = "exportGzipDstAu";
+      assertImportedOk(namespace, dstAuId, new ByteArrayInputStream(archive), 2 * numVersions);
+
+      assertSameArtifacts(namespace, srcAuId, dstAuId);
+    }
+
+    //// Export an AU that has no artifacts
+    {
+      byte[] archive = assertExportedOk(USER_ADMIN, namespace, NO_AUID, null);
+      assertEquals(0, archive.length);
+    }
+
+    //// Bad requests
+    assertEquals(HttpStatus.BAD_REQUEST,
+        exportStatus(USER_ADMIN, namespace, srcAuId, MapUtil.map("archiveType", "ZIP")));
+
+    assertEquals(HttpStatus.BAD_REQUEST,
+        exportStatus(USER_ADMIN, namespace, srcAuId, MapUtil.map("versions", "some")));
+
+    // Missing AUID
+    assertEquals(HttpStatus.BAD_REQUEST,
+        exportStatus(USER_ADMIN, namespace, null, null));
+  }
+
+  /**
+   * Imports an archive through the {@code POST /archives} endpoint and asserts that all of its
+   * records were imported successfully.
+   */
+  private void assertImportedOk(String namespace, String auId, InputStream archive,
+                                int expectedArtifacts) throws IOException {
+    List<ImportStatus> result = ListUtil.fromIterable(repoClient.addArtifacts(
+        namespace, auId, archive, LockssRepository.ArchiveType.WARC));
+
+    assertEquals(expectedArtifacts, result.size());
+
+    for (ImportStatus status : result) {
+      assertEquals(ImportStatus.StatusEnum.OK, status.getStatus());
+    }
+  }
+
+  /**
+   * Asserts that two AUs contain the same artifacts: the same URLs, with the same version numbers
+   * and the same content.
+   */
+  private void assertSameArtifacts(String namespace, String expectedAuId, String actualAuId)
+      throws IOException {
+    List<Artifact> expected =
+        ListUtil.fromIterable(repoClient.getArtifactsAllVersions(namespace, expectedAuId));
+    List<Artifact> actual =
+        ListUtil.fromIterable(repoClient.getArtifactsAllVersions(namespace, actualAuId));
+
+    assertEquals(expected.size(), actual.size());
+
+    for (int i = 0; i < expected.size(); i++) {
+      Artifact expectedArtifact = expected.get(i);
+      Artifact actualArtifact = actual.get(i);
+
+      assertEquals(expectedArtifact.getUri(), actualArtifact.getUri());
+      assertEquals(expectedArtifact.getVersion(), actualArtifact.getVersion());
+      assertEquals(expectedArtifact.getContentLength(), actualArtifact.getContentLength());
+      assertEquals(expectedArtifact.getContentDigest(), actualArtifact.getContentDigest());
+
+      try (ArtifactData expectedData = repoClient.getArtifactData(expectedArtifact);
+           ArtifactData actualData = repoClient.getArtifactData(actualArtifact)) {
+        assertTrue(IOUtils.contentEquals(expectedData.getInputStream(),
+            actualData.getInputStream()));
+      }
+    }
+  }
+
+  /**
+   * Provides the URL and artifact version of each record of a WARC archive, in the order in which
+   * the records appear in it.
+   */
+  private List<String> readArchiveRecords(byte[] archive) throws IOException {
+    List<String> records = new ArrayList<>();
+
+    ArchiveReader reader = new WarcArtifactDataStore.UncompressedWARCReader(
+        "archive.warc", new ByteArrayInputStream(archive));
+
+    reader.setDigest(false);
+
+    for (ArchiveRecord record : reader) {
+      ArchiveRecordHeader header = record.getHeader();
+
+      records.add(header.getHeaderValue(ArtifactConstants.ARTIFACT_URI_KEY) + " " +
+          header.getHeaderValue(ArtifactConstants.ARTIFACT_VERSION_KEY));
+    }
+
+    return records;
+  }
+
+  /**
+   * Calls the {@code GET /archives} endpoint, asserts that it succeeded and provides the archive
+   * it returned.
+   */
+  private byte[] assertExportedOk(Credentials credentials, String namespace, String auId,
+                                  Map<String, String> queryParams) throws IOException {
+    ResponseEntity<byte[]> response = exportArtifacts(credentials, namespace, auId, queryParams);
+
+    assertEquals(HttpStatus.OK, HttpStatus.valueOf(response.getStatusCode().value()));
+    assertEquals(MediaType.valueOf("application/warc"), response.getHeaders().getContentType());
+
+    byte[] archive = response.getBody();
+    return archive == null ? new byte[0] : archive;
+  }
+
+  /**
+   * Calls the {@code GET /archives} endpoint and provides the status of the response.
+   */
+  private HttpStatus exportStatus(Credentials credentials, String namespace, String auId,
+                                  Map<String, String> queryParams) throws IOException {
+    return HttpStatus.valueOf(
+        exportArtifacts(credentials, namespace, auId, queryParams).getStatusCode().value());
+  }
+
+  /**
+   * Calls the {@code GET /archives} endpoint.
+   */
+  private ResponseEntity<byte[]> exportArtifacts(Credentials credentials, String namespace,
+                                                 String auId, Map<String, String> queryParams)
+      throws IOException {
+    Map<String, String> params = new HashMap<>();
+
+    if (auId != null) {
+      params.put("auid", auId);
+    }
+
+    if (namespace != null) {
+      params.put("namespace", namespace);
+    }
+
+    if (queryParams != null) {
+      params.putAll(queryParams);
+    }
+
+    HttpHeaders requestHeaders = new HttpHeaders();
+    requestHeaders.setBasicAuth(credentials.getUser(), credentials.getPassword());
+
+    URI endpointUri =
+        RestUtil.getRestUri("http://localhost:" + port + "/archives", null, params);
+
+    TestRestTemplate testTemplate =
+        new TestRestTemplate(RestUtil.getRestTemplateBuilder(0, 0));
+
+    return testTemplate.exchange(endpointUri, HttpMethod.GET,
+        new HttpEntity<>(null, requestHeaders), byte[].class);
   }
 
   private int artver(Artifact art) {
