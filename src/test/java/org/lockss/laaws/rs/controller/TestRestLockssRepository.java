@@ -386,6 +386,77 @@ public class TestRestLockssRepository extends SpringLockssTestCase4 {
 
   }
 
+  /**
+   * End-to-end cover for #733: the AU count travels over REST, is correct, and
+   * is not merely the number of AUIDs the response page happened to carry.
+   * <p>
+   * This exercises the whole path the "Repositories and Namespaces" status
+   * table uses — {@link RestLockssRepository#getAuIdCount(String)}, the
+   * {@code /aus} endpoint's {@code totalCount}, and the index count behind it —
+   * rather than each piece in isolation.
+   */
+  @Test
+  public void testGetAuIdCountOverRest() throws Exception {
+    String ns = "count-namespace";
+
+    assertEquals(0, repoClient.getAuIdCount(ns));
+
+    // Three AUs, each with several URLs, so a count that accidentally counted
+    // artifacts or URLs instead of AUs would not come out at three.
+    for (String auid : new String[] {"count-auid-a", "count-auid-b",
+                                     "count-auid-c"}) {
+      for (int i = 0; i < 3; i++) {
+        ArtifactSpec spec = new ArtifactSpec()
+            .setNamespace(ns)
+            .setAuid(auid)
+            .setUrl("url" + i)
+            .setCollectionDate(TimeBase.nowMs())
+            .generateContent();
+
+        repoClient.commitArtifact(repoClient.addArtifact(spec.getArtifactData()));
+      }
+    }
+
+    // The client asks for a single item and reads the total, so a total that
+    // was really the page size would report 1 here rather than 3.
+    assertEquals(3, repoClient.getAuIdCount(ns));
+
+    // And it agrees with the enumeration it replaces.
+    long enumerated = 0;
+    for (String auid : repoClient.getAuIds(ns)) {
+      enumerated++;
+    }
+    assertEquals(enumerated, repoClient.getAuIdCount(ns));
+
+    // A namespace nothing was written to counts zero rather than failing.
+    assertEquals(0, repoClient.getAuIdCount("count-namespace-empty"));
+
+    // The assertions above would still hold if the service reported no total
+    // and the client quietly fell back to enumerating, which is exactly what
+    // this change is meant to stop doing. So check the wire directly: the
+    // service must report the total itself.
+    URI endpointUri = RestUtil.getRestUri(
+        "http://localhost:" + port + "/aus?namespace=" + ns + "&limit=1",
+        null, null);
+
+    HttpHeaders requestHeaders = new HttpHeaders();
+    requestHeaders.setBasicAuth(USER_ADMIN.getUser(), USER_ADMIN.getPassword());
+
+    ResponseEntity<String> response =
+        new TestRestTemplate(RestUtil.getRestTemplateBuilder(0, 0))
+            .exchange(endpointUri, HttpMethod.GET,
+                new HttpEntity<>(null, requestHeaders), String.class);
+
+    assertEquals(HttpStatus.OK, response.getStatusCode());
+
+    String body = response.getBody();
+
+    assertTrue("the service must report a total count, was:\n" + body,
+        body.contains("\"totalCount\":3"));
+    assertTrue("and only one AUID should have been sent, was:\n" + body,
+        body.contains("\"itemsInPage\":1"));
+  }
+
   @Test
   public void testArtifactSizes() throws IOException {
     for (int size = 0; size < MAX_INCR_FILE; size += 100) {

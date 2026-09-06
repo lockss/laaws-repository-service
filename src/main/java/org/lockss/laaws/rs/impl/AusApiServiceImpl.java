@@ -318,6 +318,17 @@ public class AusApiServiceImpl extends BaseSpringApiServiceImpl implements AusAp
       PageInfo pageInfo = new PageInfo();
       pageInfo.setItemsInPage(auids.size());
 
+      // The total is what lets a caller that only wants the number of AUs ask
+      // for one item and read this, instead of paging every AUID. Counting is a
+      // single indexed query, not an enumeration.
+      //
+      // The field is int32 by the API contract while the count is a long, so
+      // saturate rather than let a cast wrap; a namespace with more than
+      // Integer.MAX_VALUE AUs is not reachable, but silently reporting a
+      // negative number if it were would be worse than reporting a ceiling.
+      long auIdCount = repo.getAuIdCount(namespace);
+      pageInfo.setTotalCount((int)Math.min(auIdCount, Integer.MAX_VALUE));
+
       // Get the current link.
       StringBuffer curLinkBuffer = request.getRequestURL();
 
