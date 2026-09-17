@@ -127,16 +127,17 @@ public class ChecksumalgorithmsApiServiceImpl extends BaseSpringApiServiceImpl
    */
   private List<String> getSupportedMessageDigestAlgorithms() {
     if (supportedMessageDigestAlgorithms == null) {
-      supportedMessageDigestAlgorithms = new ArrayList<String>();
+      // Build the list locally and publish it only when complete
+      List<String> algorithms = new ArrayList<String>();
 
       for (Provider provider : Security.getProviders()) {
-	log.trace("provider = {}", provider);
+        log.trace("provider = {}", provider);
 
         for (Provider.Service service : provider.getServices()) {
           log.trace("service = {}", service);
 
           if ("MessageDigest".equals(service.getType())) {
-            supportedMessageDigestAlgorithms.add(service.getAlgorithm());
+            algorithms.add(service.getAlgorithm());
             log.trace("algorithm = {}", service.getAlgorithm());
 
             String displayService = service.toString();
@@ -148,7 +149,7 @@ public class ChecksumalgorithmsApiServiceImpl extends BaseSpringApiServiceImpl
               String aliases = displayService.substring(beginIndex, endIndex);
 
               for (String alias : StringUtil.breakAt(aliases, ",")) {
-                supportedMessageDigestAlgorithms.add(alias.trim());
+                algorithms.add(alias.trim());
                 log.trace("alias = {}", alias.trim());
               }
             }
@@ -156,8 +157,8 @@ public class ChecksumalgorithmsApiServiceImpl extends BaseSpringApiServiceImpl
         }
       }
 
-      log.trace("supportedMessageDigestAlgorithms = {}",
-	  supportedMessageDigestAlgorithms);
+      log.trace("supportedMessageDigestAlgorithms = {}", algorithms);
+      supportedMessageDigestAlgorithms = algorithms;
     }
 
     return supportedMessageDigestAlgorithms;
