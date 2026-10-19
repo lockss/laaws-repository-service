@@ -66,7 +66,9 @@ public class LockssRepositoryConfig {
   public final static String PARAM_ERROR_INJECTION_SPEC =
     "org.lockss.repo.errorInjectionSpec";
 
-  private static final String ARG_START_REINDEX = "--start-reindex";
+  // Spring's SimpleCommandLineArgsParser strips the leading "--" before
+  // storing option names, so the lookup key below must not include it.
+  private static final String ARG_START_REINDEX = "start-reindex";
 
   private final RepositoryServiceProperties repoProps;
   private final ArtifactIndexVersion lastRecordedIndexVersion;
