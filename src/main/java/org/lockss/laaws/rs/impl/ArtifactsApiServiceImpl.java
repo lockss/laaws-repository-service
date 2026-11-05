@@ -487,7 +487,9 @@ public class ArtifactsApiServiceImpl extends BaseSpringApiServiceImpl
           DateTimeFormatter.ISO_INSTANT
               .format(Instant.ofEpochMilli(ad.getStoreDate()).atZone(ZoneOffset.UTC)));
 
-      if (includeContentParam == IncludeContentEnum.ALWAYS ||
+      // include payload by default or if ALWAYS or if small enough
+      if (includeContentParam == null ||
+          includeContentParam == IncludeContentEnum.ALWAYS ||
          (includeContentParam == IncludeContentEnum.IF_SMALL && ad.getContentLength() <= smallContentThreshold)) {
 
         respHeaders.set(ArtifactConstants.INCLUDES_CONTENT, "true");
